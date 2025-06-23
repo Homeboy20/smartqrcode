@@ -17,6 +17,11 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
+// Helper to check if Firebase has been initialized
+export function isFirebaseAvailable(): boolean {
+  return !!firebaseApp;
+}
+
 // Initialize Firebase only on the client side
 if (isBrowser) {
   try {
@@ -54,4 +59,4 @@ if (isBrowser) {
 }
 
 // Export the initialized services and app
-export { auth, db, storage, firebaseApp as app }; 
+export { auth, db, storage, firebaseApp as app };

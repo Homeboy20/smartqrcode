@@ -89,9 +89,10 @@ git push origin main
 
 The repository includes a `netlify.toml` file that configures:
 
-- **Build command**: `npm run build`
+- **Build command**: `npm run netlify:build`
 - **Publish directory**: `out`
-- **Node version**: 18
+- **Node version**: 20
+- **Next.js plugin**: `@netlify/plugin-nextjs`
 
 You don't need to change these settings unless you have specific requirements.
 
@@ -167,7 +168,7 @@ netlify-deploy.bat
 # Run the equivalent commands:
 # rm -rf .next out
 # npm ci
-# npm run build
+# npm run netlify:build
 ```
 
 ## Development

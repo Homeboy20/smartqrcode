@@ -47,7 +47,7 @@ If you want to test the Netlify build process locally:
 
 2. **Build the site**
    ```
-   npm run netlify-build
+   npm run netlify:build
    ```
 
 3. **Serve the built site locally**
@@ -65,4 +65,4 @@ If you want to test the Netlify build process locally:
    - If you see Firebase-related errors, check that all environment variables are properly set
 
 3. **Build Errors**
-   - If you encounter build errors, try running `npm install` again to ensure dependencies are up to date 
+   - If you encounter build errors, try running `npm install` again to ensure dependencies are up to date

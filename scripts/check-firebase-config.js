@@ -2,6 +2,13 @@
  * Script to check Firebase configuration before building
  */
 
+// Load environment variables from .env.local if present
+try {
+  require('dotenv').config({ path: '.env.local' });
+} catch (err) {
+  // If dotenv isn't installed or the file doesn't exist, continue silently
+}
+
 // Firebase environment variables that should be defined
 const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
@@ -67,4 +74,4 @@ if (missingRequired && !isBuildEnv) {
   console.warn('This may cause runtime errors if Firebase services are not properly mocked/stubbed.');
 } else {
   console.log('✅ All Firebase configuration environment variables are properly set.');
-} 
+}

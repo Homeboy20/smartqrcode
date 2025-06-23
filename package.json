@@ -14,6 +14,7 @@
     "start": "next start",
     "lint": "next lint",
     "netlify:build": "node scripts/netlify-build.js",
+    "netlify-build": "npm run netlify:build",
     "test:credentials": "ts-node --transpile-only --project tsconfig.scripts.json -r tsconfig-paths/register scripts/test-credentials.ts",
     "test:credentials:simple": "node scripts/test-credentials-simple.js",
     "test:credential-storage": "node scripts/test-credential-storage.js"
