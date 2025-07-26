@@ -1,42 +1,69 @@
 /**
- * Modified Node.js version check.
+ * Modified Firebase configuration check.
  *
- * This version logs warnings when the Node.js major version falls outside
- * the recommended range (>=18 and <22) instead of exiting the process.
- * This avoids aborting the build on platforms like Netlify that may use
- * slightly different Node versions.  It still informs you when the version
- * could be problematic so you can adjust the environment if necessary.
+ * This version loosens the build-time restrictions around environment variables.
+ * Instead of failing the build when required Firebase variables are undefined,
+ * it logs warnings and proceeds. This helps prevent Netlify deployments from
+ * aborting when you intend to inject configuration later via the Netlify UI.
  */
 
-// Get the current Node.js version
-const currentVersion = process.version;
-console.log(`Current Node.js version: ${currentVersion}`);
+// Firebase environment variables that should be defined
+const requiredEnvVars = [
+  'NEXT_PUBLIC_FIREBASE_API_KEY',
+  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'NEXT_PUBLIC_FIREBASE_APP_ID'
+];
 
-// Extract the major version number (e.g., 'v14.17.0' -> 14)
-const majorVersion = parseInt(currentVersion.slice(1).split('.')[0], 10);
+// Optional Firebase environment variables
+const optionalEnvVars = [
+  'NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID'
+];
 
-// Define acceptable version range
-const MIN_VERSION = 18;
-const MAX_VERSION = 22;
+// Check if an environment variable is defined
+function checkEnvVar(varName, isRequired = true) {
+  const value = process.env[varName];
+  const isDefined = typeof value === 'string' && value.trim() !== '';
 
-if (isNaN(majorVersion)) {
-  console.error('❌ Could not determine Node.js version!');
-  // Do not exit – assume it’s acceptable and continue.
-} else {
-  if (majorVersion < MIN_VERSION) {
-    console.warn(
-      `⚠️ Node.js version v${majorVersion}.x is below the recommended minimum of ${MIN_VERSION}.x.`
-    );
-    console.warn('The build will continue, but you may encounter unexpected issues.');
-  } else if (majorVersion >= MAX_VERSION) {
-    console.warn(
-      `⚠️ WARNING: Using Node.js v${majorVersion}.x which might not be fully tested with this project.`
-    );
-    console.warn(
-      `Consider using Node.js v${MIN_VERSION}.x - v${MAX_VERSION - 1}.x for better compatibility.`
-    );
+  if (!isDefined && isRequired) {
+    console.warn(`⚠️ Required environment variable ${varName} is not defined!`);
+    return false;
   }
-  console.log(
-    `✅ Node.js version v${majorVersion}.x is acceptable. Continuing with build...`
-  );
+
+  if (!isDefined && !isRequired) {
+    console.warn(`⚠️ Optional environment variable ${varName} is not defined.`);
+  } else {
+    console.log(`✅ ${isRequired ? 'Required' : 'Optional'} environment variable ${varName} is defined.`);
+  }
+
+  return true;
+}
+
+// Determine whether we’re in a production/build environment
+const isBuildEnv = process.env.NODE_ENV === 'production' || process.env.STATIC_EXPORT_ONLY === 'true';
+console.log(`Environment: ${isBuildEnv ? 'Production/Build' : 'Development'}`);
+
+let missingRequired = false;
+
+// Check required environment variables
+for (const envVar of requiredEnvVars) {
+  if (!checkEnvVar(envVar, true)) {
+    missingRequired = true;
+  }
+}
+
+// Check optional environment variables
+for (const envVar of optionalEnvVars) {
+  checkEnvVar(envVar, false);
+}
+
+// If required variables are missing, warn but do not exit.
+if (missingRequired) {
+  console.warn('⚠️ Missing required Firebase configuration environment variables!');
+  console.warn('The build will continue, but some services may not function properly.');
+  console.warn('Please ensure these variables are defined in your deployment environment (e.g., Netlify UI).');
+} else {
+  console.log('✅ All Firebase configuration environment variables are properly set.');
 }
