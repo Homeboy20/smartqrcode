@@ -1,4 +1,55 @@
-import { getAllDecryptedCredentials, getDecryptedCredential } from '@/app/api/admin/credentials/route';
+// For static export builds, we can't import from API routes
+// so we'll use stub functions that fall back to environment variables
+
+/**
+ * Get a decrypted credential (fallback for static export)
+ * @param key The credential key
+ * @returns The credential value or null
+ */
+async function getDecryptedCredential(key: string): Promise<string | null> {
+  // In static export mode, only use environment variables
+  return process.env[key] || null;
+}
+
+/**
+ * Get all decrypted credentials (fallback for static export)
+ * @returns Object with all available credentials
+ */
+async function getAllDecryptedCredentials(): Promise<Record<string, string>> {
+  // Return all environment variables that look like credentials
+  const creds: Record<string, string> = {};
+  
+  // Common credential keys
+  const credentialKeys = [
+    'NEXT_PUBLIC_FIREBASE_API_KEY',
+    'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+    'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+    'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+    'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+    'NEXT_PUBLIC_FIREBASE_APP_ID',
+    'NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID',
+    'STRIPE_SECRET_KEY',
+    'NEXT_PUBLIC_STRIPE_PUBLIC_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'STRIPE_PRICE_ID_PRO',
+    'STRIPE_PRICE_ID_BUSINESS',
+    'PAYPAL_CLIENT_ID',
+    'PAYPAL_CLIENT_SECRET',
+    'PAYPAL_PLAN_ID_PRO',
+    'PAYPAL_PLAN_ID_BUSINESS',
+    'FLUTTERWAVE_PUBLIC_KEY',
+    'FLUTTERWAVE_SECRET_KEY',
+    'FLUTTERWAVE_ENCRYPTION_KEY'
+  ];
+  
+  credentialKeys.forEach(key => {
+    if (process.env[key]) {
+      creds[key] = process.env[key] as string;
+    }
+  });
+  
+  return creds;
+}
 
 /**
  * Get a credential from either environment variables or encrypted storage

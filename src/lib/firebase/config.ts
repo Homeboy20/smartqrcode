@@ -54,4 +54,9 @@ if (isBrowser) {
 }
 
 // Export the initialized services and app
-export { auth, db, storage, firebaseApp as app }; 
+export { auth, db, storage, firebaseApp as app };
+
+// Export function to check if Firebase is available
+export function isFirebaseAvailable(): boolean {
+  return firebaseApp !== undefined && auth !== null && db !== null;
+} 

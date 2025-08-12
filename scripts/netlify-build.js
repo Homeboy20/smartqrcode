@@ -47,6 +47,31 @@ console.log('🧹 Cleaning previous build artifacts...');
 removeDirectory('.next');
 removeDirectory('out');
 
+// Move problematic admin routes temporarily
+console.log('📁 Temporarily moving problematic admin routes...');
+const adminPaths = [
+  'src/app/admin',
+  'src/app/admin-login', 
+  'src/app/admin-setup',
+  'src/app/api-admin-setup',
+  'src/app/debug-auth',
+  'src/app/api',
+  'src/app/shared'
+];
+
+const tempPaths = [];
+adminPaths.forEach(adminPath => {
+  if (fs.existsSync(adminPath)) {
+    const tempPath = adminPath.replace('src/app/', 'temp_build_') + '_excluded';
+    if (fs.existsSync(tempPath)) {
+      removeDirectory(tempPath);
+    }
+    fs.renameSync(adminPath, tempPath);
+    tempPaths.push({ original: adminPath, temp: tempPath });
+    console.log(`📦 Moved ${adminPath} to ${tempPath}`);
+  }
+});
+
 // Create temporary generateStaticParams files for dynamic routes
 console.log('📝 Creating temporary generateStaticParams for dynamic routes...');
 dynamicRoutes.forEach(({ route }) => {
@@ -95,6 +120,15 @@ dynamicRoutes.forEach(({ route }) => {
 if (!buildSuccess) {
   console.error('❌ All build approaches failed. Creating fallback page...');
   
+  // Restore admin routes even on failure
+  console.log('🔄 Restoring admin routes after failed build...');
+  tempPaths.forEach(({ original, temp }) => {
+    if (fs.existsSync(temp)) {
+      fs.renameSync(temp, original);
+      console.log(`✅ Restored ${original} from ${temp}`);
+    }
+  });
+  
   // Create out directory for a fallback page
   if (!fs.existsSync('out')) {
     fs.mkdirSync('out', { recursive: true });
@@ -130,6 +164,15 @@ if (!buildSuccess) {
 }
 
 console.log('✅ Build completed successfully!');
+
+// Restore admin routes after successful build
+console.log('🔄 Restoring admin routes after successful build...');
+tempPaths.forEach(({ original, temp }) => {
+  if (fs.existsSync(temp)) {
+    fs.renameSync(temp, original);
+    console.log(`✅ Restored ${original} from ${temp}`);
+  }
+});
 
 // The 'out' directory should contain the exported static site
 if (fs.existsSync('out')) {

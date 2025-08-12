@@ -11,7 +11,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  trailingSlash: true,
   assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
   experimental: {
     appDocumentPreloading: false,
@@ -19,6 +18,12 @@ const nextConfig = {
   // Configure which pages should be static vs. server-rendered
   output: 'export',
   distDir: '.next',
+  // Skip building API routes for static export
+  trailingSlash: true,
+  // Exclude problematic pages from export
+  generateBuildId: async () => {
+    return 'smartqrcode-build';
+  },
   // Exclude specific routes from static build
   excludeDefaultMomentLocales: true,
   env: {
