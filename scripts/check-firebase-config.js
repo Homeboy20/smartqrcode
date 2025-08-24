@@ -7,6 +7,13 @@
  * aborting when you intend to inject configuration later via the Netlify UI.
  */
 
+// Load environment variables from .env.local if present
+try {
+  require('dotenv').config({ path: '.env.local' });
+} catch (err) {
+  // If dotenv isn't installed or the file doesn't exist, continue silently
+}
+
 // Firebase environment variables that should be defined
 const requiredEnvVars = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
