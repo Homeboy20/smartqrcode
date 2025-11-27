@@ -18,9 +18,8 @@ const excludedPaths = [
 ];
 
 // Define dynamic routes that need special handling
-const dynamicRoutes = [
-  { route: 'shared/[id]', placeholder: 'placeholder' }
-];
+// Note: shared/[id] now has generateStaticParams in page.tsx, so no temporary files needed
+const dynamicRoutes = [];
 
 // Helper function to remove a directory recursively
 function removeDirectory(dirPath) {
@@ -55,8 +54,7 @@ const adminPaths = [
   'src/app/admin-setup',
   'src/app/api-admin-setup',
   'src/app/debug-auth',
-  'src/app/api',
-  'src/app/shared'
+  'src/app/api'
 ];
 
 const tempPaths = [];
