@@ -3,8 +3,9 @@ import type { Metadata } from 'next'
 import ClientLayout from './client-layout'
 
 export const metadata: Metadata = {
-  title: 'Smart QR Code Generator',
-  description: 'Generate QR codes and barcodes easily',
+  title: 'ScanMagic - QR Code & Barcode Generator',
+  description: 'Create stunning QR codes and barcodes instantly. Track scans, customize designs, and grow your business with the most powerful code generator.',
+  keywords: 'qr code generator, barcode generator, dynamic qr codes, qr code tracking, bulk qr codes',
 }
 
 export default function RootLayout({
@@ -15,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body 
-        className="bg-zinc-100 text-gray-800 flex flex-col min-h-screen font-sans"
+        className="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 flex flex-col min-h-screen font-sans antialiased"
         suppressHydrationWarning
       >
         <ClientLayout>
