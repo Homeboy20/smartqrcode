@@ -11,16 +11,16 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  trailingSlash: true,
-  assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
   experimental: {
     appDocumentPreloading: false,
   },
-  // Configure which pages should be static vs. server-rendered
+  // Static export for Netlify
   output: 'export',
   distDir: '.next',
-  // Exclude specific routes from static build
-  excludeDefaultMomentLocales: true,
+  trailingSlash: true,
+  generateBuildId: async () => {
+    return 'smartqrcode-build';
+  },
   env: {
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,

@@ -1,9 +1,14 @@
 /**
  * Custom build script for Netlify to handle static generation correctly
+ * Version: 2.0.0 - Handles dynamic routes by moving them temporarily
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+console.log('📦 Build Script Version: 2.0.0');
+console.log('🔍 Node.js version:', process.version);
+console.log('📂 Current directory:', process.cwd());
 
 // Define sections to exclude from static generation
 const excludedPaths = [
@@ -17,10 +22,9 @@ const excludedPaths = [
   'shared'
 ];
 
-// Define dynamic routes that need special handling
-const dynamicRoutes = [
-  { route: 'shared/[id]', placeholder: 'placeholder' }
-];
+// Dynamic routes are now handled by moving admin folder temporarily
+// No need for temporary generateStaticParams files anymore
+const dynamicRoutes = [];
 
 // Helper function to remove a directory recursively
 function removeDirectory(dirPath) {
@@ -39,33 +43,44 @@ process.env.NEXT_DISABLE_ESLINT = '1';
 process.env.NEXT_DISABLE_TYPE_CHECKS = '1';
 process.env.NEXT_TELEMETRY_DISABLED = '1';
 
-console.log("🔍 Node.js version:", process.version);
-console.log("📂 Current directory:", process.cwd());
-
 // First clean up any previous builds
 console.log('🧹 Cleaning previous build artifacts...');
 removeDirectory('.next');
 removeDirectory('out');
 
-// Create temporary generateStaticParams files for dynamic routes
-console.log('📝 Creating temporary generateStaticParams for dynamic routes...');
-dynamicRoutes.forEach(({ route }) => {
-  const parts = route.split('/');
-  const dirPath = path.join('src', 'app', ...parts);
-  const filePath = path.join(dirPath, 'generateStaticParams.js');
-  
-  // Only create if the directory exists and file doesn't
-  if (fs.existsSync(dirPath) && !fs.existsSync(filePath)) {
-    console.log(`Creating temporary generateStaticParams at ${filePath}`);
-    const content = `
-export async function generateStaticParams() {
-  // Return a placeholder value for static build
-  return [{ ${parts[parts.length-1].replace(/[\[\]]/g, '')}: "placeholder" }];
-}
-`;
-    fs.writeFileSync(filePath, content);
+// Move problematic admin routes temporarily
+console.log('📁 Temporarily moving problematic admin routes...');
+const adminPaths = [
+  'src/app/admin',
+  'src/app/admin-login', 
+  'src/app/admin-setup',
+  'src/app/api-admin-setup',
+  'src/app/debug-auth',
+  'src/app/api'
+];
+
+const tempPaths = [];
+adminPaths.forEach(adminPath => {
+  if (fs.existsSync(adminPath)) {
+    const tempPath = adminPath.replace('src/app/', 'temp_build_') + '_excluded';
+    if (fs.existsSync(tempPath)) {
+      removeDirectory(tempPath);
+    }
+    fs.renameSync(adminPath, tempPath);
+    tempPaths.push({ original: adminPath, temp: tempPath });
+    console.log(`📦 Moved ${adminPath} to ${tempPath}`);
   }
 });
+
+// Verify admin folder is moved
+if (fs.existsSync('src/app/admin')) {
+  console.log('⚠️ WARNING: src/app/admin still exists after move attempt!');
+} else {
+  console.log('✅ Confirmed: src/app/admin has been moved');
+}
+
+// No temporary files needed - dynamic routes are excluded by moving the admin folder
+console.log('📝 Dynamic routes handled by folder exclusion (no temp files needed)');
 
 // Run the Next.js build
 console.log('🏗️ Building the Next.js application...');
@@ -82,18 +97,20 @@ if (!buildSuccess) {
   buildSuccess = runCommand('npm run build:static');
 }
 
-// Clean up temporary files
-console.log('🧹 Cleaning up temporary generateStaticParams files...');
-dynamicRoutes.forEach(({ route }) => {
-  const parts = route.split('/');
-  const filePath = path.join('src', 'app', ...parts, 'generateStaticParams.js');
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-});
+// Clean up (no temporary files to clean)
+console.log('🧹 No temporary files to clean up');
 
 if (!buildSuccess) {
   console.error('❌ All build approaches failed. Creating fallback page...');
+  
+  // Restore admin routes even on failure
+  console.log('🔄 Restoring admin routes after failed build...');
+  tempPaths.forEach(({ original, temp }) => {
+    if (fs.existsSync(temp)) {
+      fs.renameSync(temp, original);
+      console.log(`✅ Restored ${original} from ${temp}`);
+    }
+  });
   
   // Create out directory for a fallback page
   if (!fs.existsSync('out')) {
@@ -130,6 +147,15 @@ if (!buildSuccess) {
 }
 
 console.log('✅ Build completed successfully!');
+
+// Restore admin routes after successful build
+console.log('🔄 Restoring admin routes after successful build...');
+tempPaths.forEach(({ original, temp }) => {
+  if (fs.existsSync(temp)) {
+    fs.renameSync(temp, original);
+    console.log(`✅ Restored ${original} from ${temp}`);
+  }
+});
 
 // The 'out' directory should contain the exported static site
 if (fs.existsSync('out')) {

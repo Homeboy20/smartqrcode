@@ -30,45 +30,39 @@ export default function Header() {
   };
 
   return (
-    <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled ? 'bg-white shadow-md py-2' : 'bg-white/90 backdrop-blur-md py-4'}`}>
+    <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${isScrolled ? 'bg-white dark:bg-gray-900 shadow-md py-2' : 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-md py-4'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           {/* Logo & Branding */}
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-600 to-blue-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
               </svg>
             </div>
             <div className="hidden sm:block">
               <Link href="/" className="flex items-center">
-                <span className="text-xl font-bold text-gray-900">Smart<span className="text-indigo-600">QR</span></span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">Scan<span className="text-indigo-600 dark:text-indigo-400">Magic</span></span>
               </Link>
             </div>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/#qrcode" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
-              QR Code
+            <Link href="/#generator" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors">
+              Generator
             </Link>
-            <Link href="/#barcode" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
-              Barcode
-            </Link>
-            <Link href="/#bulk" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
-              Bulk Generator
-            </Link>
-            <Link href="#features" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
-              Features
+            <Link href="/pricing" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors">
+              Pricing
             </Link>
             {user && (
-              <Link href="/dashboard" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
+              <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors">
                 Dashboard
               </Link>
             )}
             {user && 'role' in user && user.role === 'admin' && (
-              <Link href="/admin?public=true" className="text-gray-700 hover:text-indigo-600 font-bold transition-colors border border-gray-500 px-3 py-1 rounded-md">
-                Admin Panel (Public)
+              <Link href="/admin" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors border border-indigo-500 px-3 py-1 rounded-md">
+                Admin
               </Link>
             )}
           </nav>
@@ -76,26 +70,26 @@ export default function Header() {
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {loading ? (
-              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse"></div>
+              <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
             ) : user ? (
               <div className="flex items-center space-x-3">
-                <span className="text-gray-700 font-medium text-sm">
+                <span className="text-gray-700 dark:text-gray-300 font-medium text-sm">
                   {user.displayName || user.email}
                 </span>
                 <button 
                   onClick={handleLogout}
-                  className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 font-medium hover:bg-gray-200 transition-colors text-sm"
+                  className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
                 >
                   Sign Out
                 </button>
               </div>
             ) : (
               <>
-                <Link href="/login" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors">
+                <Link href="/login" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors">
                   Sign In
                 </Link>
-                <Link href="/register" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors shadow-sm">
-                  Sign Up
+                <Link href="/register" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm">
+                  Start Free
                 </Link>
               </>
             )}
@@ -103,15 +97,15 @@ export default function Header() {
             {/* Theme Toggle Button */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               )}
@@ -120,7 +114,7 @@ export default function Header() {
 
           {/* Mobile Menu Button */}
           <button 
-            className="md:hidden p-2 rounded-md text-gray-700"
+            className="md:hidden p-2 rounded-md text-gray-700 dark:text-gray-300"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? (
@@ -137,36 +131,30 @@ export default function Header() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-100">
+          <div className="md:hidden mt-4 pb-4 border-t border-gray-100 dark:border-gray-700">
             <nav className="flex flex-col space-y-3 mt-4">
-              <Link href="/#qrcode" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
-                QR Code
+              <Link href="/#generator" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
+                Generator
               </Link>
-              <Link href="/#barcode" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
-                Barcode
-              </Link>
-              <Link href="/#bulk" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
-                Bulk Generator
-              </Link>
-              <Link href="#features" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
-                Features
+              <Link href="/pricing" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
+                Pricing
               </Link>
               {user && (
-                <Link href="/dashboard" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
+                <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors py-2" onClick={() => setIsMobileMenuOpen(false)}>
                   Dashboard
                 </Link>
               )}
               {user && 'role' in user && user.role === 'admin' && (
-                <Link href="/admin?public=true" className="text-gray-700 hover:text-indigo-600 font-bold transition-colors py-2 border-t border-gray-100 pt-3" onClick={() => setIsMobileMenuOpen(false)}>
-                  Admin Panel (Public)
+                <Link href="/admin" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-bold transition-colors py-2 border-t border-gray-100 dark:border-gray-700 pt-3" onClick={() => setIsMobileMenuOpen(false)}>
+                  Admin Panel
                 </Link>
               )}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
                 {loading ? (
-                  <div className="h-8 w-16 rounded-lg bg-gray-200 animate-pulse"></div>
+                  <div className="h-8 w-16 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
                 ) : user ? (
                   <div className="flex flex-col">
-                    <span className="text-gray-700 font-medium text-sm">{user.displayName || user.email}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium text-sm">{user.displayName || user.email}</span>
                     <button
                       onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
                       className="text-left text-red-600 hover:text-red-800 font-medium transition-colors text-sm mt-1"
@@ -176,21 +164,21 @@ export default function Header() {
                   </div>
                 ) : (
                   <div className="flex space-x-3">
-                    <Link href="/login" className="text-gray-700 hover:text-indigo-600 font-medium transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
-                    <Link href="/register" className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors shadow-sm" onClick={() => setIsMobileMenuOpen(false)}>Sign Up</Link>
+                    <Link href="/login" className="text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
+                    <Link href="/register" className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm" onClick={() => setIsMobileMenuOpen(false)}>Start Free</Link>
                   </div>
                 )}
                 <button
                   onClick={() => { setTheme(theme === 'dark' ? 'light' : 'dark'); setIsMobileMenuOpen(false); }}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                   aria-label="Toggle theme"
                 >
                   {theme === 'dark' ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                   )}

@@ -1,21 +1,15 @@
 [build]
   command = "node scripts/netlify-build.js"
   publish = "out"
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ':(exclude)content'"
 
 [build.environment]
   NODE_VERSION = "20"
   NEXT_TELEMETRY_DISABLED = "1"
-  NEXT_PRIVATE_TARGET = "server"
-  ESLINT_NO_DEV_ERRORS = "true"
-  NEXT_SKIP_API_ROUTES = "true"
-  NEXT_SKIP_MIDDLEWARE_COMPILATION = "true"
-  NEXT_DISABLE_ESLINT = "1"
-  NEXT_DISABLE_TYPE_CHECKS = "1"
+  NPM_FLAGS = "--legacy-peer-deps"
 
-# Handle SPA routing in case SSR fails
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false 
+# Force fresh build with no cache
+[context.production]
+  command = "npm cache clean --force && node scripts/netlify-build.js"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs" 
