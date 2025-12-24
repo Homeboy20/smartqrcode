@@ -246,13 +246,3 @@ export default function SharedFilePage({ params }: SharedFilePageProps) {
     </Box>
   );
 }
-  export async function generateStaticParams() {
-  // Replace this with actual logic to fetch all shared file IDs
-  const res = await fetch('https://your-api.com/api/all-shared-file-ids');
-  const data = await res.json();
-
-  // Make sure the returned data looks like [{ id: 'abc123' }, { id: 'xyz456' }]
-  return data.map((item: { id: string }) => ({
-    id: item.id,
-  }));
-}

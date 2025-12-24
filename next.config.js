@@ -8,6 +8,8 @@ loadEnvConfig(projectDir);
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  // Enable standalone output for Docker deployment (Coolify)
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
@@ -15,9 +17,11 @@ const nextConfig = {
   assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
   experimental: {
     appDocumentPreloading: false,
+    // Allow useSearchParams without Suspense boundary (client-side only pages)
+    missingSuspenseWithCSRBailout: false,
   },
-  // Configure which pages should be static vs. server-rendered
-  output: 'export',
+  // Removed output: 'export' to allow dynamic routes to work properly
+  // Netlify's Next.js adapter will handle SSR for dynamic routes
   distDir: '.next',
   // Exclude specific routes from static build
   excludeDefaultMomentLocales: true,

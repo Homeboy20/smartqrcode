@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth, db } from '@/lib/firebase/admin';
+import { verifyAuth, db as getDb } from '@/lib/firebase/admin';
 import * as crypto from 'crypto';
+
+// Helper to get db instance
+function getFirestoreDb() {
+  const dbInstance = getDb();
+  if (!dbInstance) {
+    throw new Error('Firebase Admin SDK not initialized');
+  }
+  return dbInstance;
+}
 
 // Encryption/decryption functions
 export function encryptData(data: string): { encryptedData: string; iv: string } {
@@ -59,6 +68,7 @@ async function saveCredentials(credentials: Record<string, string>, userId: stri
   };
   
   // Save to firestore, overwriting any existing record
+  const db = getFirestoreDb();
   await db.collection('appSettings').doc('apiCredentials').set(credentialRecord);
   
   // Log access for security audit
@@ -76,6 +86,7 @@ async function saveCredentials(credentials: Record<string, string>, userId: stri
 
 // Fetch and decrypt credentials
 async function getCredentials() {
+  const db = getFirestoreDb();
   const doc = await db.collection('appSettings').doc('apiCredentials').get();
   
   if (!doc.exists) {
@@ -108,6 +119,7 @@ async function getCredentials() {
 // Fetch specific credential key for internal use
 export async function getDecryptedCredential(key: string): Promise<string | null> {
   try {
+    const db = getFirestoreDb();
     const doc = await db.collection('appSettings').doc('apiCredentials').get();
     
     if (!doc.exists) {
@@ -132,6 +144,7 @@ export async function getDecryptedCredential(key: string): Promise<string | null
 // Fetch all credentials for use by the application
 export async function getAllDecryptedCredentials(): Promise<Record<string, string>> {
   try {
+    const db = getFirestoreDb();
     const doc = await db.collection('appSettings').doc('apiCredentials').get();
     
     if (!doc.exists) {
