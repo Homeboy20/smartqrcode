@@ -12,14 +12,26 @@ if (!admin.apps.length) {
       
       console.log('Initializing Firebase Admin with environment variables...');
       
+      // Process the private key to handle different formats
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      
+      // Handle escaped newlines from environment variables
+      if (privateKey.includes('\\n')) {
+        privateKey = privateKey.replace(/\\n/g, '\n');
+      }
+      
+      // Remove any surrounding quotes that might be added by Coolify/Docker
+      privateKey = privateKey.replace(/^["']|["']$/g, '');
+      
+      console.log('Private key starts with:', privateKey.substring(0, 30));
+      console.log('Private key ends with:', privateKey.substring(privateKey.length - 30));
+      
       // Initialize with environment variables
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          // The private key comes as a string with "\n" characters
-          // We need to replace them with actual newlines
-          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+          privateKey: privateKey,
         }),
         databaseURL: process.env.FIREBASE_DATABASE_URL || `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
       });
