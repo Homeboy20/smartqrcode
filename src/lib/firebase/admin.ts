@@ -21,12 +21,26 @@ function getAdminApp(): App | null {
   // Check if required env vars are present
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
   
   if (!projectId || !clientEmail || !privateKey) {
-    console.warn('Firebase Admin SDK: Missing required environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)');
+    console.warn('Firebase Admin SDK: Missing required environment variables');
+    console.warn('FIREBASE_PROJECT_ID:', projectId ? 'SET' : 'MISSING');
+    console.warn('FIREBASE_CLIENT_EMAIL:', clientEmail ? 'SET' : 'MISSING');
+    console.warn('FIREBASE_PRIVATE_KEY:', privateKey ? 'SET' : 'MISSING');
     return null;
   }
+  
+  // Handle different private key formats from environment variables
+  // 1. Replace escaped newlines with actual newlines
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+  // 2. Remove surrounding quotes if present
+  privateKey = privateKey.replace(/^["']|["']$/g, '');
+  
+  console.log('Private key length:', privateKey.length);
+  console.log('Private key starts with:', privateKey.substring(0, 30));
   
   try {
     adminApp = initializeApp({
