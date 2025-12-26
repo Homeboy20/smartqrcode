@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Subscription {
   id: string;
@@ -20,7 +20,7 @@ interface Subscription {
 }
 
 export default function AdminSubscriptionsPage() {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

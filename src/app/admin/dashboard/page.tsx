@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 // Example StatCard component for dashboard metrics
 function StatCard({ title, value, description, icon, color = 'indigo' }: { 
@@ -62,7 +62,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboardPage() {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,

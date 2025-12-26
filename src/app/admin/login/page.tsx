@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 import Image from 'next/image';
-import { signInWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { supabase } from '@/lib/supabase/client';
 
 export default function AdminLogin() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo') || '/admin';
   

@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import { getSubscriptionDetails, SubscriptionTier } from '@/lib/subscriptions';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 import { User as FirebaseUser } from 'firebase/auth';
 
@@ -35,7 +35,7 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);

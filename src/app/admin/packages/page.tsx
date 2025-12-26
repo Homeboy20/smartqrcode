@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { subscriptionFeatures, subscriptionPricing, SubscriptionTier } from '@/lib/subscriptions';
 
 interface PackageFeature {
@@ -11,7 +11,7 @@ interface PackageFeature {
 }
 
 export default function AdminPackagesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

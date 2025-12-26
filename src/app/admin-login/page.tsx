@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
-import { signInWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { supabase } from '@/lib/supabase/client';
 
 // Add dynamic export to prevent static generation
 export const dynamic = 'force-dynamic';
 
 export default function AdminLogin() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo') || '/admin';
   
@@ -26,16 +26,28 @@ export default function AdminLogin() {
     if (loading) return;
     
     if (user) {
-      // If user is already logged in, check if they're an admin
-      if ('role' in user && user.role === 'admin') {
-        // User is admin, redirect to admin panel
-        router.push(returnTo);
-      } else {
-        // User is logged in but not an admin
-        setError('Your account does not have administrator privileges.');
-      }
+      // Check if user is admin
+      checkAdminStatus(user.id);
     }
   }, [loading, user, router, returnTo]);
+
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (!error && data?.role === 'admin') {
+        router.push(returnTo);
+      } else {
+        setError('Your account does not have administrator privileges.');
+      }
+    } catch (err) {
+      console.error('Error checking admin status:', err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,34 +55,35 @@ export default function AdminLogin() {
     setIsSubmitting(true);
 
     try {
-      // Use Firebase auth directly to sign in
-      const auth = getAuth();
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Get the ID token to check admin status
-      const idToken = await user.getIdToken(true);
-      
-      // Verify admin status with API endpoint
-      const response = await fetch('/api/admin/check-admin', {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
+      // Sign in with Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       
-      if (response.ok) {
-        // User is admin, redirect to admin panel
-        router.push(returnTo);
-      } else {
-        // User is not an admin
-        setError('Your account does not have administrator privileges.');
-        // Sign out since they're not an admin
-        await auth.signOut();
+      if (signInError) {
+        throw signInError;
+      }
+
+      if (data.user) {
+        // Check admin status
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userError || userData?.role !== 'admin') {
+          setError('Your account does not have administrator privileges.');
+          await supabase.auth.signOut();
+        } else {
+          router.push(returnTo);
+        }
       }
     } catch (error) {
       console.error('Admin login error:', error);
       if (error instanceof Error) {
-        if (error.message.includes('user-not-found') || error.message.includes('wrong-password')) {
+        if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password.');
         } else {
           setError(error.message);

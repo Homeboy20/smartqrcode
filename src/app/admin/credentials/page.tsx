@@ -2,12 +2,12 @@
 
 import React from 'react';
 import PaymentCredentialsForm from '@/components/admin/PaymentCredentialsForm';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function CredentialsPage() {
-  const { user, loading } = useAuth();
+  const { user, loading } = useSupabaseAuth();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);

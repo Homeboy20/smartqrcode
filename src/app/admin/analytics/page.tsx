@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface ChartData {
   labels: string[];
@@ -119,7 +119,7 @@ const getMockData = (): AnalyticsData => {
 };
 
 export default function AnalyticsPage() {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState<'week' | 'month' | 'year'>('week');
