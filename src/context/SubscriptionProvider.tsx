@@ -1,10 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useSubscription as useSubscriptionHook } from '@/hooks/useSubscription';
+import { useSupabaseSubscription } from '@/hooks/useSupabaseSubscription';
 import { SubscriptionTier } from '@/lib/subscription';
 
-type SubscriptionContextType = ReturnType<typeof useSubscriptionHook>;
+type SubscriptionContextType = ReturnType<typeof useSupabaseSubscription>;
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
@@ -21,7 +21,7 @@ interface SubscriptionProviderProps {
 }
 
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
-  const subscriptionData = useSubscriptionHook();
+  const subscriptionData = useSupabaseSubscription();
   
   return (
     <SubscriptionContext.Provider value={subscriptionData}>

@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/context/FirebaseAuthContext";
+import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const { user, signIn, loginWithGoogle, loading, error: authError } = useAuth();
+  const { user, signIn, signInWithGoogle, loading, error: authError } = useSupabaseAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') || '/';

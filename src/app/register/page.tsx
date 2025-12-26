@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useAuth } from "@/context/FirebaseAuthContext";
+import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { user, signUp } = useAuth();
+  const { user, signUp } = useSupabaseAuth();
   const router = useRouter();
 
   // Redirect if user is already logged in

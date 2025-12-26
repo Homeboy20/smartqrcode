@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import AdminHeader from './AdminHeader';
 import AdminSidebar from './AdminSidebar';
-import { AuthProvider, useAuth } from '@/context/FirebaseAuthContext';
+import { SupabaseAuthProvider, useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 
 interface AdminLayoutProps {
@@ -12,7 +12,7 @@ interface AdminLayoutProps {
 }
 
 function AdminLayoutContent({ children }: AdminLayoutProps) {
-  const { user, loading } = useAuth();
+  const { user, loading } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const isPublic = searchParams?.get('public') === 'true';
   const [isAdmin, setIsAdmin] = useState(false);
@@ -130,8 +130,8 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <AuthProvider>
+    <SupabaseAuthProvider>
       <AdminLayoutContent>{children}</AdminLayoutContent>
-    </AuthProvider>
+    </SupabaseAuthProvider>
   );
 } 

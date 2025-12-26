@@ -3,11 +3,11 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 export default function AdminHeader() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout } = useSupabaseAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Get the current path for returnTo parameter

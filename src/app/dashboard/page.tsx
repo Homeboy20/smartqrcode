@@ -2,12 +2,12 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import SubscriptionInfo from '@/components/SubscriptionInfo';
 import { useSubscription } from '@/hooks/useSubscription';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const { subscriptionTier, loading } = useSubscription();
 
   if (!user) {

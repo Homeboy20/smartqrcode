@@ -2,14 +2,14 @@
 
 import React, { useState } from 'react';
 import { subscriptionFeatures, subscriptionPricing, SubscriptionTier } from '@/lib/subscriptions';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/context/SubscriptionProvider';
 import { useRouter } from 'next/navigation';
 import { updateUserData } from '@/lib/firestore';
 import PaymentProviderSelector, { PaymentProvider } from '@/components/PaymentProviderSelector';
 
 export default function PricingPage() {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
   const { subscriptionTier, loading } = useSubscription();
   const router = useRouter();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
