@@ -8,8 +8,8 @@ loadEnvConfig(projectDir);
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  // Removed standalone output - using standard Next.js deployment
-  // output: 'standalone',
+  // Enable standalone output for Docker deployment (Coolify)
+  output: 'standalone',
   images: {
     unoptimized: true,
   },
