@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartQRCode - Coolify Deployment Guide</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-code: #0d1117;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+        
+        .toc {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+        
+        .toc h2 {
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        
+        .toc ul {
+            list-style: none;
+        }
+        
+        .toc li {
+            margin: 0.5rem 0;
+        }
+        
+        .toc a {
+            color: var(--text);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: color 0.2s;
+        }
+        
+        .toc a:hover {
+            color: var(--primary);
+        }
+        
+        .toc .step-num {
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        
+        section h2 {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        section h2 .step-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        h3 {
+            color: var(--primary);
+            margin: 1.5rem 0 1rem;
+            font-size: 1.1rem;
+        }
+        
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+        
+        ul, ol {
+            margin: 1rem 0 1rem 1.5rem;
+            color: var(--text-muted);
+        }
+        
+        li {
+            margin: 0.5rem 0;
+        }
+        
+        code {
+            background: var(--bg-code);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            color: #e879f9;
+        }
+        
+        pre {
+            background: var(--bg-code);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text);
+        }
+        
+        .comment {
+            color: #6b7280;
+        }
+        
+        .env-var {
+            color: #22d3ee;
+        }
+        
+        .env-value {
+            color: #a3e635;
+        }
+        
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+        
+        .alert-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        
+        .alert-info {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid var(--primary);
+        }
+        
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid var(--warning);
+        }
+        
+        .alert-success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--success);
+        }
+        
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--danger);
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background 0.2s;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+        
+        .btn:hover {
+            background: var(--primary-dark);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .screenshot {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .checklist {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .checklist li {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+        
+        .checklist li::before {
+            content: "☐";
+            font-size: 1.2rem;
+        }
+        
+        .env-block {
+            background: var(--bg-code);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        
+        .env-block .env-line {
+            display: flex;
+            margin: 0.3rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85rem;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--border);
+            border: none;
+            color: var(--text);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        
+        .copy-btn:hover {
+            background: var(--primary);
+        }
+        
+        .code-wrapper {
+            position: relative;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            section {
+                padding: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 SmartQRCode Deployment Guide</h1>
+            <p class="subtitle">Complete step-by-step guide to deploy SmartQRCode using Coolify</p>
+        </header>
+
+        <!-- Table of Contents -->
+        <nav class="toc">
+            <h2>📋 Table of Contents</h2>
+            <ul>
+                <li><a href="#prerequisites"><span class="step-num">0</span> Prerequisites</a></li>
+                <li><a href="#step1"><span class="step-num">1</span> Set Up Coolify Server</a></li>
+                <li><a href="#step2"><span class="step-num">2</span> Create New Project in Coolify</a></li>
+                <li><a href="#step3"><span class="step-num">3</span> Connect GitHub Repository</a></li>
+                <li><a href="#step4"><span class="step-num">4</span> Configure Environment Variables</a></li>
+                <li><a href="#step5"><span class="step-num">5</span> Configure Build Settings</a></li>
+                <li><a href="#step6"><span class="step-num">6</span> Deploy the Application</a></li>
+                <li><a href="#step7"><span class="step-num">7</span> Set Up Domain & SSL</a></li>
+                <li><a href="#step8"><span class="step-num">8</span> Create Admin User</a></li>
+                <li><a href="#step9"><span class="step-num">9</span> Post-Deployment Security</a></li>
+                <li><a href="#troubleshooting"><span class="step-num">?</span> Troubleshooting</a></li>
+            </ul>
+        </nav>
+
+        <!-- Prerequisites -->
+        <section id="prerequisites">
+            <h2><span class="step-badge">Step 0</span> Prerequisites</h2>
+            
+            <p>Before you begin, make sure you have the following ready:</p>
+            
+            <ul class="checklist">
+                <li>A VPS or server with Coolify installed (or access to Coolify Cloud)</li>
+                <li>A domain name pointed to your server's IP address</li>
+                <li>Firebase project with Firestore and Authentication enabled</li>
+                <li>Firebase Admin SDK credentials (service account JSON)</li>
+                <li>GitHub account with access to the SmartQRCode repository</li>
+            </ul>
+
+            <div class="alert alert-info">
+                <span class="alert-icon">ℹ️</span>
+                <div>
+                    <strong>Don't have Coolify yet?</strong><br>
+                    Install Coolify on your server with one command:<br>
+                    <code>curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash</code>
+                </div>
+            </div>
+
+            <h3>🔥 Firebase Setup Checklist</h3>
+            <ul class="checklist">
+                <li>Firebase project created at <a href="https://console.firebase.google.com" target="_blank" style="color: var(--primary)">console.firebase.google.com</a></li>
+                <li>Firestore Database enabled (start in production mode)</li>
+                <li>Authentication enabled with Email/Password provider</li>
+                <li>Service Account key downloaded (Project Settings → Service Accounts)</li>
+                <li>Web app registered and config copied</li>
+            </ul>
+        </section>
+
+        <!-- Step 1 -->
+        <section id="step1">
+            <h2><span class="step-badge">Step 1</span> Set Up Coolify Server</h2>
+            
+            <h3>Access Coolify Dashboard</h3>
+            <ol>
+                <li>Open your browser and go to your Coolify URL (e.g., <code>https://coolify.yourdomain.com</code>)</li>
+                <li>Log in with your admin credentials</li>
+                <li>You should see the Coolify dashboard</li>
+            </ol>
+
+            <div class="screenshot">
+                📸 Coolify Dashboard - Main view showing servers and projects
+            </div>
+
+            <h3>Verify Server Connection</h3>
+            <ol>
+                <li>Click on <strong>"Servers"</strong> in the left sidebar</li>
+                <li>Ensure your server shows a <span style="color: var(--success)">green status</span></li>
+                <li>If not connected, click on the server and check the connection settings</li>
+            </ol>
+        </section>
+
+        <!-- Step 2 -->
+        <section id="step2">
+            <h2><span class="step-badge">Step 2</span> Create New Project in Coolify</h2>
+            
+            <ol>
+                <li>Click <strong>"Projects"</strong> in the left sidebar</li>
+                <li>Click the <strong>"+ Add"</strong> button (top right)</li>
+                <li>Enter project details:
+                    <ul>
+                        <li><strong>Name:</strong> <code>SmartQRCode</code></li>
+                        <li><strong>Description:</strong> <code>QR Code Generator Application</code></li>
+                    </ul>
+                </li>
+                <li>Click <strong>"Save"</strong></li>
+            </ol>
+
+            <h3>Create Production Environment</h3>
+            <ol>
+                <li>Inside your new project, click <strong>"+ New"</strong></li>
+                <li>Select <strong>"Production"</strong> as the environment name</li>
+                <li>Click <strong>"Create"</strong></li>
+            </ol>
+
+            <div class="alert alert-info">
+                <span class="alert-icon">💡</span>
+                <div>
+                    <strong>Tip:</strong> You can create multiple environments (staging, development) for testing before production.
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 3 -->
+        <section id="step3">
+            <h2><span class="step-badge">Step 3</span> Connect GitHub Repository</h2>
+            
+            <h3>Add New Resource</h3>
+            <ol>
+                <li>Inside your Production environment, click <strong>"+ New"</strong></li>
+                <li>Select <strong>"Public Repository"</strong> (or Private if you've connected GitHub)</li>
+            </ol>
+
+            <h3>Configure Repository</h3>
+            <div class="code-wrapper">
+                <pre><code>Repository URL: https://github.com/Homeboy20/smartqrcode.git
+Branch: master
+Build Pack: Nixpacks (recommended) or Dockerfile</code></pre>
+            </div>
+
+            <ol>
+                <li>Enter the repository URL: <code>https://github.com/Homeboy20/smartqrcode.git</code></li>
+                <li>Set branch to: <code>master</code></li>
+                <li>Select <strong>"Nixpacks"</strong> as the build pack</li>
+                <li>Click <strong>"Continue"</strong></li>
+            </ol>
+
+            <div class="alert alert-warning">
+                <span class="alert-icon">⚠️</span>
+                <div>
+                    <strong>Using Dockerfile instead?</strong><br>
+                    If you prefer Docker, select "Dockerfile" as build pack. The repository includes a pre-configured <code>Dockerfile</code> and <code>docker-compose.yml</code>.
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 4 -->
+        <section id="step4">
+            <h2><span class="step-badge">Step 4</span> Configure Environment Variables</h2>
+            
+            <p>This is the most important step. You need to add all required environment variables for the application to work.</p>
+
+            <h3>Navigate to Environment Variables</h3>
+            <ol>
+                <li>In your application settings, click <strong>"Environment Variables"</strong> tab</li>
+                <li>Click <strong>"+ Add"</strong> or use bulk edit mode</li>
+            </ol>
+
+            <h3>Required Environment Variables</h3>
+            <p>Copy and paste these variables, replacing the placeholder values with your actual credentials:</p>
+
+            <div class="env-block">
+                <h4 style="color: var(--primary); margin-bottom: 1rem;">🔧 Application Settings</h4>
+                <pre><code><span class="env-var">NODE_ENV</span>=<span class="env-value">production</span>
+<span class="env-var">NEXT_PUBLIC_APP_URL</span>=<span class="env-value">https://your-domain.com</span></code></pre>
+            </div>
+
+            <div class="env-block">
+                <h4 style="color: var(--warning); margin-bottom: 1rem;">🔥 Firebase Client (Public - Safe to expose)</h4>
+                <pre><code><span class="comment"># Get these from Firebase Console → Project Settings → General → Your apps</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_API_KEY</span>=<span class="env-value">AIzaSy...</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN</span>=<span class="env-value">your-project.firebaseapp.com</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_PROJECT_ID</span>=<span class="env-value">your-project-id</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET</span>=<span class="env-value">your-project.appspot.com</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID</span>=<span class="env-value">123456789</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_APP_ID</span>=<span class="env-value">1:123456789:web:abc123</span>
+<span class="env-var">NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID</span>=<span class="env-value">G-XXXXXXXXXX</span></code></pre>
+            </div>
+
+            <div class="env-block">
+                <h4 style="color: var(--danger); margin-bottom: 1rem;">🔐 Firebase Admin (Server-side - Keep Secret!)</h4>
+                <pre><code><span class="comment"># Get these from Firebase Console → Project Settings → Service Accounts</span>
+<span class="comment"># Click "Generate new private key" and copy values from the JSON file</span>
+<span class="env-var">FIREBASE_PROJECT_ID</span>=<span class="env-value">your-project-id</span>
+<span class="env-var">FIREBASE_CLIENT_EMAIL</span>=<span class="env-value">firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com</span>
+<span class="env-var">FIREBASE_PRIVATE_KEY</span>=<span class="env-value">"-----BEGIN PRIVATE KEY-----\nMIIEvQ...your-key-here...\n-----END PRIVATE KEY-----\n"</span></code></pre>
+            </div>
+
+            <div class="alert alert-danger">
+                <span class="alert-icon">🚨</span>
+                <div>
+                    <strong>IMPORTANT: FIREBASE_PRIVATE_KEY Format</strong><br>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>Keep the <code>\n</code> characters - don't convert to actual newlines</li>
+                        <li>Wrap the entire value in double quotes</li>
+                        <li>Copy directly from the downloaded JSON file's <code>private_key</code> field</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="env-block">
+                <h4 style="color: var(--success); margin-bottom: 1rem;">👤 Admin Setup (Temporary)</h4>
+                <pre><code><span class="comment"># Generate a random secret - remove after creating first admin!</span>
+<span class="env-var">ADMIN_SETUP_SECRET</span>=<span class="env-value">generate-a-random-32-char-string-here</span></code></pre>
+            </div>
+
+            <h3>Generate Admin Setup Secret</h3>
+            <p>Generate a secure random string using one of these methods:</p>
+            <div class="code-wrapper">
+                <pre><code><span class="comment"># PowerShell (Windows)</span>
+[guid]::NewGuid().ToString().Replace("-","")
+
+<span class="comment"># Bash/Linux/Mac</span>
+openssl rand -hex 32
+
+<span class="comment"># Python</span>
+python -c "import secrets; print(secrets.token_hex(32))"</code></pre>
+            </div>
+
+            <div class="env-block">
+                <h4 style="color: var(--primary); margin-bottom: 1rem;">💳 Stripe (Optional - for payments)</h4>
+                <pre><code><span class="env-var">STRIPE_SECRET_KEY</span>=<span class="env-value">sk_live_...</span>
+<span class="env-var">NEXT_PUBLIC_STRIPE_PUBLIC_KEY</span>=<span class="env-value">pk_live_...</span></code></pre>
+            </div>
+        </section>
+
+        <!-- Step 5 -->
+        <section id="step5">
+            <h2><span class="step-badge">Step 5</span> Configure Build Settings</h2>
+            
+            <h3>General Settings</h3>
+            <ol>
+                <li>Go to the <strong>"General"</strong> tab in your application</li>
+                <li>Configure these settings:
+                    <ul>
+                        <li><strong>Port:</strong> <code>3000</code></li>
+                        <li><strong>Build Command:</strong> <code>npm run build</code></li>
+                        <li><strong>Start Command:</strong> <code>npm start</code></li>
+                        <li><strong>Install Command:</strong> <code>npm ci</code></li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>If Using Dockerfile</h3>
+            <p>If you selected Dockerfile as build pack:</p>
+            <ul>
+                <li><strong>Dockerfile Location:</strong> <code>Dockerfile</code> (root)</li>
+                <li><strong>Docker Compose:</strong> Leave empty (or use <code>docker-compose.yml</code> for compose mode)</li>
+            </ul>
+
+            <h3>Health Check (Recommended)</h3>
+            <ol>
+                <li>Go to <strong>"Health Check"</strong> tab</li>
+                <li>Enable health check</li>
+                <li>Set path to: <code>/api/health</code> or <code>/</code></li>
+                <li>Interval: <code>30</code> seconds</li>
+            </ol>
+        </section>
+
+        <!-- Step 6 -->
+        <section id="step6">
+            <h2><span class="step-badge">Step 6</span> Deploy the Application</h2>
+            
+            <h3>Initial Deployment</h3>
+            <ol>
+                <li>Click the <strong>"Deploy"</strong> button (top right)</li>
+                <li>Watch the build logs in real-time</li>
+                <li>Wait for the build to complete (first build takes ~5-10 minutes)</li>
+            </ol>
+
+            <div class="screenshot">
+                📸 Build Logs - Shows npm install, build process, and deployment status
+            </div>
+
+            <h3>What to Expect</h3>
+            <p>During deployment, you'll see:</p>
+            <ol>
+                <li><strong>Pulling</strong> - Cloning repository</li>
+                <li><strong>Building</strong> - Installing dependencies, compiling Next.js</li>
+                <li><strong>Deploying</strong> - Starting the container</li>
+                <li><strong>Running</strong> - Application is live! 🎉</li>
+            </ol>
+
+            <div class="alert alert-success">
+                <span class="alert-icon">✅</span>
+                <div>
+                    <strong>Deployment Successful!</strong><br>
+                    When you see "Running" status with a green indicator, your app is live.
+                </div>
+            </div>
+
+            <h3>Enable Auto-Deploy (Optional)</h3>
+            <ol>
+                <li>Go to <strong>"Webhooks"</strong> tab</li>
+                <li>Copy the webhook URL</li>
+                <li>Add it to your GitHub repository:
+                    <ul>
+                        <li>Go to GitHub repo → Settings → Webhooks</li>
+                        <li>Add webhook with Coolify URL</li>
+                        <li>Select "Just the push event"</li>
+                    </ul>
+                </li>
+            </ol>
+        </section>
+
+        <!-- Step 7 -->
+        <section id="step7">
+            <h2><span class="step-badge">Step 7</span> Set Up Domain & SSL</h2>
+            
+            <h3>Configure Domain</h3>
+            <ol>
+                <li>Go to <strong>"Settings"</strong> or <strong>"Domains"</strong> tab</li>
+                <li>Add your domain: <code>your-domain.com</code></li>
+                <li>Optionally add: <code>www.your-domain.com</code></li>
+            </ol>
+
+            <h3>DNS Configuration</h3>
+            <p>In your domain registrar (Namecheap, Cloudflare, GoDaddy, etc.):</p>
+            
+            <div class="code-wrapper">
+                <pre><code><span class="comment"># Add these DNS records:</span>
+
+Type: A
+Name: @
+Value: YOUR_SERVER_IP
+TTL: 3600
+
+Type: A  
+Name: www
+Value: YOUR_SERVER_IP
+TTL: 3600
+
+<span class="comment"># Or use CNAME if using Cloudflare proxy:</span>
+Type: CNAME
+Name: www
+Value: your-domain.com</code></pre>
+            </div>
+
+            <h3>Enable SSL (HTTPS)</h3>
+            <ol>
+                <li>In Coolify, SSL is usually auto-configured via Let's Encrypt</li>
+                <li>Make sure <strong>"Generate SSL"</strong> or <strong>"Let's Encrypt"</strong> is enabled</li>
+                <li>Wait a few minutes for certificate generation</li>
+                <li>Your site should now be accessible via <code>https://</code></li>
+            </ol>
+
+            <div class="alert alert-warning">
+                <span class="alert-icon">⏳</span>
+                <div>
+                    <strong>DNS Propagation</strong><br>
+                    DNS changes can take up to 48 hours to propagate globally, but usually work within 15-30 minutes.
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 8 -->
+        <section id="step8">
+            <h2><span class="step-badge">Step 8</span> Create Admin User</h2>
+            
+            <p>Now that your app is deployed, you need to create the first admin account.</p>
+
+            <h3>Step-by-Step Admin Creation</h3>
+            <ol>
+                <li>
+                    <strong>Register a new account</strong><br>
+                    Go to <code>https://your-domain.com/register</code><br>
+                    Create an account with your email and password
+                </li>
+                <li>
+                    <strong>Verify your email</strong> (if email verification is enabled)<br>
+                    Check your inbox and click the verification link
+                </li>
+                <li>
+                    <strong>Go to Admin Setup page</strong><br>
+                    Visit: <code>https://your-domain.com/secure-admin-setup</code>
+                </li>
+                <li>
+                    <strong>Enter your Admin Setup Secret</strong><br>
+                    This is the <code>ADMIN_SETUP_SECRET</code> you configured in environment variables
+                </li>
+                <li>
+                    <strong>Click Submit</strong><br>
+                    You should see a success message: "Admin privileges granted!"
+                </li>
+            </ol>
+
+            <div class="screenshot">
+                📸 Admin Setup Page - Enter your secret key to become admin
+            </div>
+
+            <div class="alert alert-success">
+                <span class="alert-icon">👑</span>
+                <div>
+                    <strong>You're now an Admin!</strong><br>
+                    Access the admin panel at <code>https://your-domain.com/admin</code>
+                </div>
+            </div>
+        </section>
+
+        <!-- Step 9 -->
+        <section id="step9">
+            <h2><span class="step-badge">Step 9</span> Post-Deployment Security</h2>
+            
+            <div class="alert alert-danger">
+                <span class="alert-icon">🔒</span>
+                <div>
+                    <strong>CRITICAL SECURITY STEP</strong><br>
+                    Remove the <code>ADMIN_SETUP_SECRET</code> immediately after creating your admin account!
+                </div>
+            </div>
+
+            <h3>Remove Admin Setup Secret</h3>
+            <ol>
+                <li>Go back to Coolify → Your Application → Environment Variables</li>
+                <li>Find <code>ADMIN_SETUP_SECRET</code></li>
+                <li>Delete it or set it to empty</li>
+                <li>Redeploy the application</li>
+            </ol>
+
+            <h3>Security Checklist</h3>
+            <ul class="checklist">
+                <li>ADMIN_SETUP_SECRET removed from environment</li>
+                <li>SSL certificate is active (HTTPS working)</li>
+                <li>Firebase security rules are properly configured</li>
+                <li>All sensitive variables are marked as "Secret" in Coolify</li>
+                <li>Admin account has a strong password</li>
+            </ul>
+
+            <h3>Firebase Security Rules</h3>
+            <p>Make sure your Firestore rules are secure. The application includes default rules in <code>firestore.rules</code>.</p>
+            <div class="code-wrapper">
+                <pre><code><span class="comment">// Deploy rules from Firebase Console or CLI:</span>
+firebase deploy --only firestore:rules</code></pre>
+            </div>
+        </section>
+
+        <!-- Troubleshooting -->
+        <section id="troubleshooting">
+            <h2><span class="step-badge">?</span> Troubleshooting</h2>
+
+            <h3>❌ Build Fails</h3>
+            <div class="alert alert-warning">
+                <div>
+                    <strong>Common causes:</strong>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>Missing environment variables</li>
+                        <li>Invalid <code>FIREBASE_PRIVATE_KEY</code> format</li>
+                        <li>Node.js version mismatch</li>
+                    </ul>
+                    <strong>Solution:</strong> Check build logs for specific errors. Ensure all required env vars are set.
+                </div>
+            </div>
+
+            <h3>❌ 500 Internal Server Error</h3>
+            <div class="alert alert-warning">
+                <div>
+                    <strong>Common causes:</strong>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>Firebase credentials not set correctly</li>
+                        <li>Private key has wrong format (missing \n or quotes)</li>
+                        <li>Firestore not enabled in Firebase</li>
+                    </ul>
+                    <strong>Solution:</strong> Check application logs in Coolify. Verify Firebase setup.
+                </div>
+            </div>
+
+            <h3>❌ Admin Setup Page Shows Error</h3>
+            <div class="alert alert-warning">
+                <div>
+                    <strong>Common causes:</strong>
+                    <ul style="margin-top: 0.5rem;">
+                        <li><code>ADMIN_SETUP_SECRET</code> not set</li>
+                        <li>Secret doesn't match what you entered</li>
+                        <li>Not logged in when trying to set up</li>
+                    </ul>
+                    <strong>Solution:</strong> Make sure you're logged in first, then enter the exact secret.
+                </div>
+            </div>
+
+            <h3>❌ SSL Certificate Not Working</h3>
+            <div class="alert alert-warning">
+                <div>
+                    <strong>Common causes:</strong>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>DNS not pointing to server</li>
+                        <li>Port 80/443 blocked by firewall</li>
+                        <li>Domain verification failed</li>
+                    </ul>
+                    <strong>Solution:</strong> Check DNS propagation at <a href="https://dnschecker.org" target="_blank" style="color: var(--primary)">dnschecker.org</a>. Ensure ports are open.
+                </div>
+            </div>
+
+            <h3>📝 View Logs</h3>
+            <p>To debug issues, check the application logs:</p>
+            <ol>
+                <li>In Coolify, go to your application</li>
+                <li>Click <strong>"Logs"</strong> tab</li>
+                <li>Look for error messages</li>
+            </ol>
+
+            <h3>🔄 Force Rebuild</h3>
+            <p>Sometimes a fresh build fixes issues:</p>
+            <ol>
+                <li>Go to <strong>"Deployments"</strong> tab</li>
+                <li>Click <strong>"Rebuild"</strong> or <strong>"Deploy"</strong></li>
+                <li>Check <strong>"Force rebuild without cache"</strong> if available</li>
+            </ol>
+        </section>
+
+        <!-- Quick Reference -->
+        <section>
+            <h2>📚 Quick Reference</h2>
+            
+            <h3>Important URLs</h3>
+            <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Homepage</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Login</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com/login</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Register</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com/register</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Admin Setup</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com/secure-admin-setup</code></td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Admin Panel</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com/admin</code></td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem; color: var(--text-muted);">Dashboard</td>
+                    <td style="padding: 0.75rem;"><code>https://your-domain.com/dashboard</code></td>
+                </tr>
+            </table>
+
+            <h3>Useful Commands</h3>
+            <div class="code-wrapper">
+                <pre><code><span class="comment"># Generate admin secret (PowerShell)</span>
+[guid]::NewGuid().ToString().Replace("-","")
+
+<span class="comment"># Generate admin secret (Bash)</span>
+openssl rand -hex 32
+
+<span class="comment"># Test DNS propagation</span>
+nslookup your-domain.com
+
+<span class="comment"># Check if port is open</span>
+curl -I https://your-domain.com</code></pre>
+            </div>
+        </section>
+
+        <footer>
+            <p>SmartQRCode Deployment Guide • Last updated: December 2024</p>
+            <p style="margin-top: 0.5rem;">
+                <a href="https://github.com/Homeboy20/smartqrcode" target="_blank" class="btn btn-outline">View on GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
