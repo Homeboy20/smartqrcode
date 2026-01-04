@@ -1,95 +1,78 @@
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK only if it hasn't been initialized yet
-if (!admin.apps.length) {
+function normalizePrivateKey(raw: string) {
+  let privateKey = raw;
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+  // Remove any surrounding quotes that might be added by Docker/CI.
+  privateKey = privateKey.replace(/^["']|["']$/g, '');
+  return privateKey;
+}
+
+/**
+ * IMPORTANT:
+ * Next.js may import route handler modules during build to analyze exports.
+ * This file must be safe to import even when Firebase Admin credentials are missing.
+ *
+ * We only initialize the Admin SDK when credentials exist, and we avoid calling
+ * admin.auth()/admin.firestore() unless an app is initialized.
+ */
+function tryInitializeAdmin() {
+  if (admin.apps.length) return;
+
+  const hasServiceAccountEnv =
+    !!process.env.FIREBASE_PROJECT_ID &&
+    !!process.env.FIREBASE_CLIENT_EMAIL &&
+    !!process.env.FIREBASE_PRIVATE_KEY;
+
   try {
-    console.log('Attempting to initialize Firebase Admin SDK...');
-    
-    // Check if we have environment variables for service account
-    if (process.env.FIREBASE_PROJECT_ID && 
-        process.env.FIREBASE_CLIENT_EMAIL && 
-        process.env.FIREBASE_PRIVATE_KEY) {
-      
-      console.log('Initializing Firebase Admin with environment variables...');
-      
-      // Process the private key to handle different formats
-      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-      
-      // Handle escaped newlines from environment variables
-      if (privateKey.includes('\\n')) {
-        privateKey = privateKey.replace(/\\n/g, '\n');
-      }
-      
-      // Remove any surrounding quotes that might be added by Coolify/Docker
-      privateKey = privateKey.replace(/^["']|["']$/g, '');
-      
-      console.log('Private key starts with:', privateKey.substring(0, 30));
-      console.log('Private key ends with:', privateKey.substring(privateKey.length - 30));
-      
-      // Initialize with environment variables
+    if (hasServiceAccountEnv) {
       admin.initializeApp({
         credential: admin.credential.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: privateKey,
+          privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY as string),
         }),
-        databaseURL: process.env.FIREBASE_DATABASE_URL || `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
+        databaseURL:
+          process.env.FIREBASE_DATABASE_URL ||
+          `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`,
       });
-      
-      console.log('Firebase Admin SDK initialized with environment variables.');
-    } 
-    // Fallback to application default credentials if available
-    else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('Initializing Firebase Admin with application default credentials...');
-      
+      return;
+    }
+
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       admin.initializeApp({
-        credential: admin.credential.applicationDefault()
+        credential: admin.credential.applicationDefault(),
       });
-      
-      console.log('Firebase Admin SDK initialized with application default credentials.');
+      return;
     }
-    else {
-      throw new Error(
-        'Firebase Admin SDK initialization failed: Missing credentials. ' +
-        'Please provide FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY ' +
-        'environment variables or set GOOGLE_APPLICATION_CREDENTIALS.'
-      );
-    }
+
+    // No credentials: do not throw. Features that depend on Firebase Admin
+    // should fail gracefully at request-time instead.
   } catch (error: any) {
-    console.error('Firebase Admin SDK Initialization Error:', error);
-    
-    // Log additional details for debugging
-    if (error.message) console.error('Error Message:', error.message);
-    if (error.code) console.error('Error Code:', error.code);
-    if (error.stack) console.error('Error Stack:', error.stack);
-    
-    // Check if there's an issue with the private key format
-    if (process.env.FIREBASE_PRIVATE_KEY && 
-        error.message && 
-        error.message.includes('private_key')) {
-      console.error(
-        'There might be an issue with your private key format. ' +
-        'Make sure it includes the BEGIN and END markers and proper newlines (\\n).'
-      );
-    }
-    
-    // Check for time sync issues
-    if (error.message && error.message.includes('invalid_grant')) {
-      console.error(
-        'There might be an issue with your server time synchronization or the service account key has been revoked. ' +
-        'Please check your system time or generate a new service account key from the Firebase console.'
-      );
-    }
+    console.error('Firebase Admin SDK Initialization Error:', error?.message || error);
   }
-} else {
-  // If already initialized (e.g., due to hot-reloading in dev), get the default app
-  console.log('Firebase Admin SDK already initialized');
-  admin.app(); 
 }
 
-// Export admin services
-const adminDb = admin.firestore();
-const adminAuth = admin.auth();
+function createMissingProxy(name: string) {
+  return new Proxy(
+    {},
+    {
+      get() {
+        throw new Error(
+          `Firebase Admin SDK is not configured (missing credentials). Attempted to access ${name}.`
+        );
+      },
+    }
+  );
+}
+
+tryInitializeAdmin();
+
+// Export admin services (safe at build-time)
+const adminDb = admin.apps.length ? admin.firestore() : (createMissingProxy('firestore') as any);
+const adminAuth = admin.apps.length ? admin.auth() : (createMissingProxy('auth') as any);
 
 // Aliases for backward compatibility
 const db = adminDb;
