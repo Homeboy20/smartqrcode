@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from '@/context/FirebaseAuthContext';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { db } from '@/lib/firebase/config';
 import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { 
@@ -42,6 +43,7 @@ export const SubscriptionProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
   const { user } = useAuth();
+  const { settings: appSettings, loading: appSettingsLoading } = useAppSettings();
   const [tier, setTier] = useState<SubscriptionTier>('free');
   const [usageStats, setUsageStats] = useState<UsageStats | null>(defaultUsageStats);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,35 +89,41 @@ export const SubscriptionProvider: React.FC<{
     };
   }, [user]);
 
+  const freeModeForAuthenticatedUser = !!user && !!appSettings?.freeMode;
+  const effectiveTier: SubscriptionTier = freeModeForAuthenticatedUser ? 'business' : tier;
+
   const checkFeatureAccess = (feature: FeatureType): boolean => {
-    return hasFeatureAccess(tier, feature);
+    if (freeModeForAuthenticatedUser) return true;
+    return hasFeatureAccess(effectiveTier, feature);
   };
 
   const checkHasReachedLimit = (feature: FeatureType): boolean => {
+    if (freeModeForAuthenticatedUser) return false;
     if (!usageStats) return true;
-    
-    return hasReachedLimit(tier, feature, {
+
+    return hasReachedLimit(effectiveTier, feature, {
       daily: usageStats.features[feature]?.daily.count || 0,
       monthly: usageStats.features[feature]?.monthly.count || 0
     });
   };
 
   const getRemaining = (feature: FeatureType) => {
+    if (freeModeForAuthenticatedUser) return { daily: Number.MAX_SAFE_INTEGER, monthly: Number.MAX_SAFE_INTEGER };
     if (!usageStats) return { daily: 0, monthly: 0 };
-    
-    return getRemainingUsage(tier, feature, {
+
+    return getRemainingUsage(effectiveTier, feature, {
       daily: usageStats.features[feature]?.daily.count || 0,
       monthly: usageStats.features[feature]?.monthly.count || 0
     });
   };
 
   const value = {
-    tier,
+    tier: effectiveTier,
     usageStats,
     hasFeatureAccess: checkFeatureAccess,
     hasReachedLimit: checkHasReachedLimit,
     getRemainingUsage: getRemaining,
-    isLoading,
+    isLoading: isLoading || appSettingsLoading,
   };
 
   return (

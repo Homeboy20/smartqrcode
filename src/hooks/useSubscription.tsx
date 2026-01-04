@@ -1,98 +1,79 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../context/FirebaseAuthContext';
-import { SubscriptionTier, UserData, UseSubscriptionReturn } from '../lib/types';
-import { 
-  hasFeatureAccess, 
-  getRemainingUsage, 
+import { useEffect, useMemo, useState } from 'react';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { SubscriptionTier, UserData, UseSubscriptionReturn } from '@/lib/types';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import {
+  FeatureType,
+  hasFeatureAccess,
+  getRemainingUsage,
   hasReachedLimit,
   subscriptionLimits,
-  featureAccess
-} from '../lib/subscription';
-import { db } from '@/lib/firebase/config';
-import { doc, getDoc, FirestoreError } from 'firebase/firestore';
-import { FirebaseError } from 'firebase/app';
+  featureAccess,
+} from '@/lib/subscription';
+import { supabase } from '@/lib/supabase/client';
 
 export function useSubscription(): UseSubscriptionReturn {
-  const { user } = useAuth();
+  const { user } = useSupabaseAuth();
+  const { settings: appSettings, loading: appSettingsLoading } = useAppSettings();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchUserData() {
-      if (!user || !db) {
-        // If no user is logged in or db is not available, set default data
+      if (!user) {
         setUserData(null);
         setLoading(false);
         return;
       }
 
       try {
-        console.log("Attempting to fetch user data for:", user.uid);
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          console.log("User data retrieved successfully");
-          const data = userSnap.data() as UserData;
-          console.log("User subscription tier:", data.subscriptionTier);
-          console.log("Full user data:", data);
-          setUserData(data);
-        } else {
-          // If user document doesn't exist, create default user data
-          console.log("No user document found, creating default data");
-          const defaultUserData = {
-            id: user.uid,
-            email: user.email || '',
-            displayName: user.displayName || '',
-            photoURL: user.photoURL || '',
-            subscriptionTier: 'free',
-            role: 'user',
-            featuresUsage: {
-              qrCodesGenerated: 0,
-              barcodesGenerated: 0,
-              bulkGenerations: 0,
-              aiCustomizations: 0
-            }
-          };
-          setUserData(defaultUserData as UserData);
+        const { data, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (fetchError) {
+          throw fetchError;
         }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        
-        // Extract more specific error information
-        let errorMessage = 'Could not fetch user data, using default settings';
-        if (error instanceof FirebaseError || error instanceof FirestoreError) {
-          // Provide more specific error messages based on Firebase error codes
-          const fbError = error as FirebaseError;
-          if (fbError.code === 'permission-denied') {
-            errorMessage = 'Firestore permissions error: You do not have access to this data';
-          } else if (fbError.code === 'unavailable') {
-            errorMessage = 'Firebase service unavailable. Check your connection';
-          } else if (fbError.code === 'not-found') {
-            errorMessage = 'User document not found';
-          } else {
-            errorMessage = `Firebase error (${fbError.code}): ${fbError.message}`;
-          }
-        }
-        
-        // On error, set default user data instead of failing
-        const defaultUserData = {
-          id: user.uid,
+
+        const featuresUsage = (data?.features_usage as any) || {};
+
+        const mapped: UserData = {
+          id: user.id,
+          email: data?.email || user.email || '',
+          displayName: data?.display_name || (user.user_metadata as any)?.display_name || (user.user_metadata as any)?.full_name || null,
+          photoURL: data?.photo_url || (user.user_metadata as any)?.avatar_url || (user.user_metadata as any)?.picture || '',
+          subscriptionTier: ((data?.subscription_tier as SubscriptionTier) || 'free') as SubscriptionTier,
+          role: (data?.role as any) || 'user',
+          featuresUsage: {
+            qrCodesGenerated: Number(featuresUsage.qrCodesGenerated || 0),
+            barcodesGenerated: Number(featuresUsage.barcodesGenerated || 0),
+            bulkGenerations: Number(featuresUsage.bulkGenerations || 0),
+            aiCustomizations: Number(featuresUsage.aiCustomizations || 0),
+          },
+        };
+
+        setUserData(mapped);
+      } catch (err: any) {
+        console.error('Error fetching user data:', err);
+        setError(err?.message || 'Could not fetch user data, using default settings');
+
+        setUserData({
+          id: user.id,
           email: user.email || '',
-          displayName: user.displayName || '',
-          photoURL: user.photoURL || '',
+          displayName: ((user.user_metadata as any)?.display_name || (user.user_metadata as any)?.full_name || null) as any,
+          photoURL: ((user.user_metadata as any)?.avatar_url || '') as any,
           subscriptionTier: 'free',
           role: 'user',
           featuresUsage: {
             qrCodesGenerated: 0,
             barcodesGenerated: 0,
             bulkGenerations: 0,
-            aiCustomizations: 0
-          }
-        };
-        setUserData(defaultUserData as UserData);
-        setError(errorMessage);
+            aiCustomizations: 0,
+          },
+        });
       } finally {
         setLoading(false);
       }
@@ -102,22 +83,40 @@ export function useSubscription(): UseSubscriptionReturn {
   }, [user]);
 
   const subscriptionTier = userData?.subscriptionTier || 'free';
-  const featuresUsage = userData?.featuresUsage || {
-    qrCodesGenerated: 0,
-    barcodesGenerated: 0,
-    bulkGenerations: 0,
-    aiCustomizations: 0
-  };
+  const freeModeForAuthenticatedUser = !!user && !!appSettings?.freeMode;
+  const effectiveTier: SubscriptionTier = freeModeForAuthenticatedUser ? 'business' : subscriptionTier;
+
+  const featuresUsage = useMemo(
+    () =>
+      userData?.featuresUsage || {
+        qrCodesGenerated: 0,
+        barcodesGenerated: 0,
+        bulkGenerations: 0,
+        aiCustomizations: 0,
+      },
+    [userData]
+  );
+
+  const unlimited = Number.MAX_SAFE_INTEGER;
+  const effectiveLimits = freeModeForAuthenticatedUser
+    ? {
+        qrGenerationLimit: { daily: unlimited, monthly: unlimited },
+        barcodeGenerationLimit: { daily: unlimited, monthly: unlimited },
+        bulkGenerationLimit: { daily: unlimited, monthly: unlimited },
+        aiCustomizationLimit: { daily: unlimited, monthly: unlimited },
+      }
+    : subscriptionLimits[effectiveTier as SubscriptionTier];
 
   return {
-    loading,
+    loading: loading || appSettingsLoading,
     error,
-    subscriptionTier,
+    subscriptionTier: effectiveTier,
     featuresUsage,
-    limits: subscriptionLimits[subscriptionTier as SubscriptionTier],
+    limits: effectiveLimits,
     getLimit: (featureKey: string) => {
+      if (freeModeForAuthenticatedUser) return unlimited;
       try {
-        const tier = subscriptionTier as SubscriptionTier;
+        const tier = effectiveTier as SubscriptionTier;
         const tierLimits = subscriptionLimits[tier];
         
         if (!tierLimits) return 0;
@@ -134,74 +133,44 @@ export function useSubscription(): UseSubscriptionReturn {
       }
     },
     canUseFeature: (feature: string) => {
-      console.log(`useSubscription.canUseFeature called for: ${feature}`);
-      console.log(`Current tier: ${subscriptionTier}`);
-      const result = hasFeatureAccess(subscriptionTier as SubscriptionTier, feature as keyof typeof featureAccess.free);
-      console.log(`Result of hasFeatureAccess: ${result}`);
-      return result;
+      if (freeModeForAuthenticatedUser) return true;
+
+      // Anonymous Free Mode: allow only basic generation.
+      if (!user && appSettings?.freeMode) {
+        const ft = feature as FeatureType;
+        if (ft === 'qrCodesGenerated') return !!appSettings.freeModeFeatures.qrCodeGeneration;
+        if (ft === 'barcodesGenerated') return !!appSettings.freeModeFeatures.barcodeGeneration;
+        return false;
+      }
+
+      const ft = feature as FeatureType;
+      return hasFeatureAccess(effectiveTier as SubscriptionTier, ft);
     },
     remainingUsage: (feature: string) => {
-      const usageKey = {
-        qrGenerationLimit: 'qrCodesGenerated',
-        barcodeGenerationLimit: 'barcodesGenerated',
-        bulkGenerationLimit: 'bulkGenerations',
-        aiCustomizationLimit: 'aiCustomizations'
-      }[feature] as keyof typeof featuresUsage;
-      
-      const currentUsage = { 
-        daily: featuresUsage[usageKey], 
-        monthly: featuresUsage[usageKey] 
-      };
-      
-      const result = getRemainingUsage(
-        subscriptionTier as SubscriptionTier,
-        feature as any,
-        currentUsage
-      );
-      
-      // Return the daily limit
+      if (freeModeForAuthenticatedUser) return unlimited;
+      if (!user && appSettings?.freeMode) return unlimited;
+
+      const ft = feature as FeatureType;
+      const count = (featuresUsage as any)[ft] || 0;
+      const result = getRemainingUsage(effectiveTier as SubscriptionTier, ft, { daily: count, monthly: count });
       return result.daily;
     },
     hasReachedLimit: (feature: string) => {
-      const usageKey = {
-        qrGenerationLimit: 'qrCodesGenerated',
-        barcodeGenerationLimit: 'barcodesGenerated',
-        bulkGenerationLimit: 'bulkGenerations',
-        aiCustomizationLimit: 'aiCustomizations'
-      }[feature] as keyof typeof featuresUsage;
-      
-      const currentUsage = { 
-        daily: featuresUsage[usageKey], 
-        monthly: featuresUsage[usageKey] 
-      };
-      
-      return hasReachedLimit(
-        subscriptionTier as SubscriptionTier,
-        feature as any,
-        currentUsage
-      );
+      if (freeModeForAuthenticatedUser) return false;
+      if (!user && appSettings?.freeMode) return false;
+
+      const ft = feature as FeatureType;
+      const count = (featuresUsage as any)[ft] || 0;
+      return hasReachedLimit(effectiveTier as SubscriptionTier, ft, { daily: count, monthly: count });
     },
     // Check if a usage amount is within the remaining limit
     isWithinUsageLimit: (feature: string, amount: number = 1): boolean => {
+      if (freeModeForAuthenticatedUser) return true;
+      if (!user && appSettings?.freeMode) return true;
       try {
-        const usageKey = {
-          qrGenerationLimit: 'qrCodesGenerated',
-          barcodeGenerationLimit: 'barcodesGenerated',
-          bulkGenerationLimit: 'bulkGenerations',
-          aiCustomizationLimit: 'aiCustomizations'
-        }[feature] as keyof typeof featuresUsage;
-        
-        const currentUsage = { 
-          daily: featuresUsage[usageKey] || 0, 
-          monthly: featuresUsage[usageKey] || 0
-        };
-        
-        const remaining = getRemainingUsage(
-          subscriptionTier as SubscriptionTier,
-          feature as any,
-          currentUsage
-        );
-        
+        const ft = feature as FeatureType;
+        const count = (featuresUsage as any)[ft] || 0;
+        const remaining = getRemainingUsage(effectiveTier as SubscriptionTier, ft, { daily: count, monthly: count });
         return remaining.daily >= amount;
       } catch (error) {
         console.error("Error in isWithinUsageLimit:", error);

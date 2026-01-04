@@ -10,7 +10,11 @@ import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  sendEmailVerification,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  ConfirmationResult
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
@@ -26,6 +30,11 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<boolean>;
   updateUserProfile: (data: { displayName?: string, photoURL?: string }) => Promise<boolean>;
   signInWithGoogle: () => Promise<boolean>;
+  getIdToken: () => Promise<string | null>;
+  sendVerificationEmail: () => Promise<boolean>;
+  setupRecaptcha: (containerId: string) => Promise<RecaptchaVerifier>;
+  sendPhoneVerificationCode: (phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) => Promise<ConfirmationResult>;
+  verifyPhoneCode: (confirmationResult: ConfirmationResult, verificationCode: string, displayName?: string) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -40,6 +49,15 @@ const AuthContext = createContext<AuthContextType>({
   resetPassword: async () => false,
   updateUserProfile: async () => false,
   signInWithGoogle: async () => false,
+  getIdToken: async () => null,
+  sendVerificationEmail: async () => false,
+  setupRecaptcha: async () => {
+    throw new Error('setupRecaptcha not implemented');
+  },
+  sendPhoneVerificationCode: async () => {
+    throw new Error('sendPhoneVerificationCode not implemented');
+  },
+  verifyPhoneCode: async () => false,
   clearError: () => {}
 });
 
@@ -220,6 +238,110 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Get ID token for authenticated requests
+  const getIdToken = async (): Promise<string | null> => {
+    if (!auth?.currentUser) return null;
+    
+    try {
+      const token = await auth.currentUser.getIdToken();
+      return token;
+    } catch (err: any) {
+      console.error('Error getting ID token:', err);
+      return null;
+    }
+  };
+
+  const sendVerificationEmail = async (): Promise<boolean> => {
+    if (!auth?.currentUser) return false;
+    try {
+      clearError();
+      await sendEmailVerification(auth.currentUser);
+      return true;
+    } catch (err: any) {
+      setError(err?.message || 'Failed to send verification email');
+      return false;
+    }
+  };
+
+  const setupRecaptcha = async (containerId: string): Promise<RecaptchaVerifier> => {
+    if (!auth) throw new Error('Firebase Auth not initialized');
+    const win = window as any;
+
+    // If we already created + rendered a verifier for this same container, reuse it.
+    if (win.recaptchaVerifier && win.recaptchaContainerId === containerId && win.recaptchaRendered) {
+      return win.recaptchaVerifier as RecaptchaVerifier;
+    }
+
+    const container = document.getElementById(containerId);
+    if (!container) throw new Error(`reCAPTCHA container not found: ${containerId}`);
+
+    // Clear any previous widget DOM to prevent "already rendered" errors.
+    try {
+      container.innerHTML = '';
+    } catch {
+      // ignore
+    }
+
+    // Clean up existing verifier if present.
+    if (win.recaptchaVerifier) {
+      try {
+        win.recaptchaVerifier.clear();
+      } catch {
+        // ignore
+      }
+    }
+
+    const verifier = new RecaptchaVerifier(auth, containerId, {
+      size: 'invisible',
+    });
+
+    win.recaptchaVerifier = verifier;
+    win.recaptchaContainerId = containerId;
+
+    try {
+      await verifier.render();
+      win.recaptchaRendered = true;
+    } catch (err: any) {
+      const message = String(err?.message || err);
+      if (message.toLowerCase().includes('already been rendered')) {
+        // Treat as success; the widget is already attached to this element.
+        win.recaptchaRendered = true;
+      } else {
+        throw err;
+      }
+    }
+
+    return verifier;
+  };
+
+  const sendPhoneVerificationCode = async (
+    phoneNumber: string,
+    recaptchaVerifier: RecaptchaVerifier
+  ): Promise<ConfirmationResult> => {
+    if (!auth) throw new Error('Firebase Auth not initialized');
+    clearError();
+    return await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+  };
+
+  const verifyPhoneCode = async (
+    confirmationResult: ConfirmationResult,
+    verificationCode: string,
+    displayName?: string
+  ): Promise<boolean> => {
+    if (!auth) return false;
+    try {
+      clearError();
+      const credential = await confirmationResult.confirm(verificationCode);
+      if (displayName && credential.user) {
+        await updateProfile(credential.user, { displayName });
+      }
+      return true;
+    } catch (err: any) {
+      setError(err?.message || 'Failed to verify phone code');
+      return false;
+    }
+  };
+
   // Return provider with auth values
   return (
     <AuthContext.Provider
@@ -233,6 +355,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         resetPassword,
         updateUserProfile,
         signInWithGoogle,
+        getIdToken,
+        sendVerificationEmail,
+        setupRecaptcha,
+        sendPhoneVerificationCode,
+        verifyPhoneCode,
         clearError
       }}
     >

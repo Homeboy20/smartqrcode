@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 
 export default function AdminLogin() {
   const router = useRouter();
-  const { user, loading } = useSupabaseAuth();
+  const { user, loading, isAdmin } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo') || '/admin';
   
@@ -24,16 +24,10 @@ export default function AdminLogin() {
     if (loading) return;
     
     if (user) {
-      // If user is already logged in, check if they're an admin
-      if ('role' in user && user.role === 'admin') {
-        // User is admin, redirect to admin panel
-        router.push(returnTo);
-      } else {
-        // User is logged in but not an admin
-        setError('Your account does not have administrator privileges.');
-      }
+      if (isAdmin) router.push(returnTo);
+      else setError('Your account does not have administrator privileges.');
     }
-  }, [loading, user, router, returnTo]);
+  }, [loading, user, isAdmin, router, returnTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,34 +35,30 @@ export default function AdminLogin() {
     setIsSubmitting(true);
 
     try {
-      // Use Firebase auth directly to sign in
-      const auth = getAuth();
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Get the ID token to check admin status
-      const idToken = await user.getIdToken(true);
-      
-      // Verify admin status with API endpoint
-      const response = await fetch('/api/admin/check-admin', {
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        }
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('Login succeeded but session token is missing');
+
+      // One quick check against an admin-only endpoint.
+      const response = await fetch('/api/admin/credentials', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
-      
-      if (response.ok) {
-        // User is admin, redirect to admin panel
-        router.push(returnTo);
-      } else {
-        // User is not an admin
+
+      if (!response.ok) {
         setError('Your account does not have administrator privileges.');
-        // Sign out since they're not an admin
-        await auth.signOut();
+        await supabase.auth.signOut();
+        return;
       }
+
+      router.push(returnTo);
     } catch (error) {
       console.error('Admin login error:', error);
       if (error instanceof Error) {
-        if (error.message.includes('user-not-found') || error.message.includes('wrong-password')) {
+        if (error.message.includes('Invalid login credentials')) {
           setError('Invalid email or password.');
         } else {
           setError(error.message);

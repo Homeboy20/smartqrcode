@@ -85,7 +85,7 @@ export default function AdminDashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         {user && (
           <p className="mt-1 text-sm text-gray-600">
-            Welcome back, {user.displayName || user.email}
+            Welcome back, {(user.user_metadata as any)?.display_name || (user.user_metadata as any)?.full_name || user.email}
           </p>
         )}
       </div>

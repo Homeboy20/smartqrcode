@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useAuth } from '@/context/FirebaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Button, Card, Heading, Text, Box, Flex, Input, Select, Switch, Badge, IconButton, VStack, HStack, useToast, Spinner, Tooltip } from '@chakra-ui/react';
 import { FiLink, FiTrash2, FiCopy, FiEye, FiDownload, FiLock, FiUnlock, FiCalendar } from 'react-icons/fi';
 import { getUserSharedFiles, revokeSharing, makeFilePublic, shareFileWithUsers } from '@/lib/fileSharingService';

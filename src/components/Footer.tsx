@@ -14,13 +14,13 @@ export default function Footer() {
   const resourceLinks = [
     { href: "/about/", label: "About Us" },
     { href: "/#faq", label: "FAQ" },
-    { href: "/contact/", label: "Contact" },
+    { href: "/contact", label: "Contact" },
     { href: "/blog/", label: "Blog" },
   ];
 
   const legalLinks = [
-    { href: "/privacy/", label: "Privacy Policy" },
-    { href: "/terms/", label: "Terms of Service" },
+    { href: "/privacypolicy", label: "Privacy Policy" },
+    { href: "/terms&condition", label: "Terms of Service" },
     { href: "/cookies/", label: "Cookie Policy" },
   ];
 

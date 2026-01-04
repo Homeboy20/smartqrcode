@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/FirebaseAuthContext';
 
 // Define types for integration settings
 interface FlutterwaveSettings {
@@ -20,6 +21,13 @@ interface StripeSettings {
   webhookSecret: string;
 }
 
+interface PaystackSettings {
+  publicKey: string;
+  secretKey: string;
+  planCodePro: string;
+  planCodeBusiness: string;
+}
+
 interface GooglePaySettings {
   merchantId: string;
   merchantName: string;
@@ -29,28 +37,97 @@ interface IntegrationSettings {
   flutterwave: FlutterwaveSettings;
   paypal: PayPalSettings;
   stripe: StripeSettings;
+  paystack: PaystackSettings;
   googlePay: GooglePaySettings;
 }
 
-type ActiveTab = 'flutterwave' | 'paypal' | 'stripe' | 'googlePay';
+type ActiveTab = 'flutterwave' | 'paypal' | 'stripe' | 'paystack' | 'googlePay';
+
+type ProviderStatus = Record<Exclude<ActiveTab, 'googlePay'>, boolean>;
+
+const emptySettings: IntegrationSettings = {
+  flutterwave: { publicKey: '', secretKey: '', encryptionKey: '' },
+  paypal: { clientId: '', clientSecret: '' },
+  stripe: { publicKey: '', secretKey: '', webhookSecret: '' },
+  paystack: { publicKey: '', secretKey: '', planCodePro: '', planCodeBusiness: '' },
+  googlePay: { merchantId: '', merchantName: '' },
+};
+
+const emptyStatus: ProviderStatus = {
+  flutterwave: false,
+  paypal: false,
+  stripe: false,
+  paystack: false,
+};
+
+const isSaveableProvider = (tab: ActiveTab): tab is Exclude<ActiveTab, 'googlePay'> => tab !== 'googlePay';
 
 export default function IntegrationsForm() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('flutterwave');
-  const [settings, setSettings] = useState<IntegrationSettings>({
-    flutterwave: { publicKey: '', secretKey: '', encryptionKey: '' },
-    paypal: { clientId: '', clientSecret: '' },
-    stripe: { publicKey: '', secretKey: '', webhookSecret: '' },
-    googlePay: { merchantId: '', merchantName: '' },
-  });
+  const [settings, setSettings] = useState<IntegrationSettings>(emptySettings);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus>(emptyStatus);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // TODO: Fetch current integration settings on mount
+  // Fetch current integration settings on mount (from payment_settings)
   useEffect(() => {
-    console.log("Placeholder: Fetch current integration settings.");
-    // Example: fetch('/api/admin/integrations').then(...)
-  }, []);
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+
+      try {
+        const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
+        if (!idToken) {
+          throw new Error('Authentication required');
+        }
+
+        const response = await fetch('/api/admin/payment-settings', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load payment settings');
+        }
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setProviderStatus({
+          stripe: Boolean(data?.stripe?.isActive),
+          paypal: Boolean(data?.paypal?.isActive),
+          flutterwave: Boolean(data?.flutterwave?.isActive),
+          paystack: Boolean(data?.paystack?.isActive),
+        });
+
+        setSettings(prev => ({
+          ...prev,
+          stripe: { ...emptySettings.stripe, ...(data?.stripe?.credentials ?? {}) },
+          paypal: { ...emptySettings.paypal, ...(data?.paypal?.credentials ?? {}) },
+          flutterwave: { ...emptySettings.flutterwave, ...(data?.flutterwave?.credentials ?? {}) },
+          paystack: { ...emptySettings.paystack, ...(data?.paystack?.credentials ?? {}) },
+        }));
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load settings');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    if (user) load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const handleInputChange = (gateway: keyof IntegrationSettings, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -68,20 +145,35 @@ export default function IntegrationsForm() {
     setLoading(true);
     setError(null);
     setSuccess(null);
-    console.log("Saving Integration Settings (Placeholder):", settings);
 
-    // IMPORTANT: In a real app, send this data to a secure backend endpoint.
-    // The backend should encrypt sensitive keys before storing or use a proper secrets manager.
-    // DO NOT store raw secrets unencrypted in your database.
+    if (!isSaveableProvider(activeTab)) {
+      setLoading(false);
+      setError('Google Pay settings are not supported here yet.');
+      return;
+    }
+
     try {
-      // const response = await fetch('/api/admin/integrations', { // Your secure backend endpoint
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(settings),
-      // });
-      // if (!response.ok) throw new Error('Failed to save integration settings');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      setSuccess('Integration settings saved successfully! (Placeholder)');
+      const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
+      if (!idToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch('/api/admin/payment-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          provider: activeTab,
+          isActive: providerStatus[activeTab],
+          credentials: settings[activeTab],
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to save integration settings');
+      }
+
+      setSuccess('Integration settings saved successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
@@ -99,6 +191,15 @@ export default function IntegrationsForm() {
         return (
           <div className="space-y-4">
             <h3 className="text-md font-medium text-gray-800">Flutterwave Settings</h3>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={providerStatus.flutterwave}
+                onChange={(e) => setProviderStatus(prev => ({ ...prev, flutterwave: e.target.checked }))}
+                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              Enabled
+            </label>
             <div>
               <label htmlFor="fwPublicKey" className={labelStyle}>Public Key</label>
               <input type="text" id="fwPublicKey" name="publicKey" value={settings.flutterwave.publicKey} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="FLWPUBK..." />
@@ -117,6 +218,15 @@ export default function IntegrationsForm() {
         return (
           <div className="space-y-4">
             <h3 className="text-md font-medium text-gray-800">PayPal Settings</h3>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={providerStatus.paypal}
+                onChange={(e) => setProviderStatus(prev => ({ ...prev, paypal: e.target.checked }))}
+                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              Enabled
+            </label>
             <div>
               <label htmlFor="ppClientId" className={labelStyle}>Client ID</label>
               <input type="text" id="ppClientId" name="clientId" value={settings.paypal.clientId} onChange={(e) => handleInputChange('paypal', e)} className={inputStyle} placeholder="PayPal Client ID" />
@@ -131,6 +241,15 @@ export default function IntegrationsForm() {
         return (
           <div className="space-y-4">
             <h3 className="text-md font-medium text-gray-800">Stripe Settings</h3>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={providerStatus.stripe}
+                onChange={(e) => setProviderStatus(prev => ({ ...prev, stripe: e.target.checked }))}
+                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              Enabled
+            </label>
             <div>
               <label htmlFor="stripePublicKey" className={labelStyle}>Publishable Key</label>
               <input type="text" id="stripePublicKey" name="publicKey" value={settings.stripe.publicKey} onChange={(e) => handleInputChange('stripe', e)} className={inputStyle} placeholder="pk_live_..." />
@@ -142,6 +261,37 @@ export default function IntegrationsForm() {
              <div>
               <label htmlFor="stripeWebhookSecret" className={labelStyle}>Webhook Signing Secret</label>
               <input type="password" id="stripeWebhookSecret" name="webhookSecret" value={settings.stripe.webhookSecret} onChange={(e) => handleInputChange('stripe', e)} className={inputStyle} placeholder="whsec_..." />
+            </div>
+          </div>
+        );
+      case 'paystack':
+        return (
+          <div className="space-y-4">
+            <h3 className="text-md font-medium text-gray-800">Paystack Settings</h3>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={providerStatus.paystack}
+                onChange={(e) => setProviderStatus(prev => ({ ...prev, paystack: e.target.checked }))}
+                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              />
+              Enabled
+            </label>
+            <div>
+              <label htmlFor="paystackPublicKey" className={labelStyle}>Public Key</label>
+              <input type="text" id="paystackPublicKey" name="publicKey" value={settings.paystack.publicKey} onChange={(e) => handleInputChange('paystack', e)} className={inputStyle} placeholder="pk_live_..." />
+            </div>
+            <div>
+              <label htmlFor="paystackSecretKey" className={labelStyle}>Secret Key</label>
+              <input type="password" id="paystackSecretKey" name="secretKey" value={settings.paystack.secretKey} onChange={(e) => handleInputChange('paystack', e)} className={inputStyle} placeholder="sk_live_..." />
+            </div>
+            <div>
+              <label htmlFor="paystackPlanCodePro" className={labelStyle}>Plan Code (Pro)</label>
+              <input type="text" id="paystackPlanCodePro" name="planCodePro" value={settings.paystack.planCodePro} onChange={(e) => handleInputChange('paystack', e)} className={inputStyle} placeholder="PLN_..." />
+            </div>
+            <div>
+              <label htmlFor="paystackPlanCodeBusiness" className={labelStyle}>Plan Code (Business)</label>
+              <input type="text" id="paystackPlanCodeBusiness" name="planCodeBusiness" value={settings.paystack.planCodeBusiness} onChange={(e) => handleInputChange('paystack', e)} className={inputStyle} placeholder="PLN_..." />
             </div>
           </div>
         );
@@ -181,6 +331,7 @@ export default function IntegrationsForm() {
             <button type="button" onClick={() => setActiveTab('flutterwave')} className={getTabClass('flutterwave')}>Flutterwave</button>
             <button type="button" onClick={() => setActiveTab('paypal')} className={getTabClass('paypal')}>PayPal</button>
             <button type="button" onClick={() => setActiveTab('stripe')} className={getTabClass('stripe')}>Stripe</button>
+            <button type="button" onClick={() => setActiveTab('paystack')} className={getTabClass('paystack')}>Paystack</button>
             <button type="button" onClick={() => setActiveTab('googlePay')} className={getTabClass('googlePay')}>Google Pay</button>
           </nav>
         </div>

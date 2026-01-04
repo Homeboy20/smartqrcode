@@ -7,45 +7,25 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 export default function CredentialsPage() {
-  const { user, loading } = useSupabaseAuth();
+  const { user, loading, isAdmin } = useSupabaseAuth();
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    // Check if user is admin
-    const checkAdminStatus = async () => {
-      if (!user) {
-        if (!loading) {
-          router.push('/login?redirect=/admin/credentials');
-        }
-        return;
-      }
+    if (loading) return;
 
-      try {
-        const idToken = await user.getIdToken();
-        const response = await fetch('/api/admin/check-admin', {
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
+    if (!user) {
+      router.push('/login?redirect=/admin/credentials');
+      return;
+    }
 
-        if (response.ok) {
-          setIsAdmin(true);
-        } else {
-          // Not an admin, redirect to home
-          router.push('/');
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-        router.push('/');
-      } finally {
-        setCheckingAdmin(false);
-      }
-    };
+    if (!isAdmin) {
+      router.push('/');
+      return;
+    }
 
-    checkAdminStatus();
-  }, [user, loading, router]);
+    setCheckingAdmin(false);
+  }, [user, loading, isAdmin, router]);
 
   if (loading || checkingAdmin) {
     return (

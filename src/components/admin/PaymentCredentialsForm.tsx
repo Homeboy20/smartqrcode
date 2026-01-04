@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { PaymentGatewayConfig, defaultGatewayConfig, getGatewayConfig, saveGatewayConfig } from '@/lib/firestore';
-import { db } from '@/lib/firebase/config';
 
 interface PaymentCredentials {
   // Stripe
@@ -24,12 +23,18 @@ interface PaymentCredentials {
   FLUTTERWAVE_SECRET_KEY: string;
   FLUTTERWAVE_ENCRYPTION_KEY: string;
   
+  // Paystack
+  PAYSTACK_PUBLIC_KEY: string;
+  PAYSTACK_SECRET_KEY: string;
+  PAYSTACK_PLAN_CODE_PRO: string;
+  PAYSTACK_PLAN_CODE_BUSINESS: string;
+  
   // Allow for dynamic indexing
   [key: string]: string;
 }
 
 export default function PaymentCredentialsForm() {
-  const { user } = useAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const [credentials, setCredentials] = useState<PaymentCredentials>({
     // Stripe
     STRIPE_SECRET_KEY: '',
@@ -47,13 +52,19 @@ export default function PaymentCredentialsForm() {
     // Flutterwave
     FLUTTERWAVE_PUBLIC_KEY: '',
     FLUTTERWAVE_SECRET_KEY: '',
-    FLUTTERWAVE_ENCRYPTION_KEY: ''
+    FLUTTERWAVE_ENCRYPTION_KEY: '',
+    
+    // Paystack
+    PAYSTACK_PUBLIC_KEY: '',
+    PAYSTACK_SECRET_KEY: '',
+    PAYSTACK_PLAN_CODE_PRO: '',
+    PAYSTACK_PLAN_CODE_BUSINESS: ''
   });
   
   // Payment gateway configuration state
   const [gatewayConfig, setGatewayConfig] = useState<PaymentGatewayConfig>(defaultGatewayConfig);
   
-  const [activeTab, setActiveTab] = useState<'stripe' | 'paypal' | 'flutterwave'>('stripe');
+  const [activeTab, setActiveTab] = useState<'stripe' | 'paypal' | 'flutterwave' | 'paystack'>('paystack');
   const [loading, setLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,70 +78,32 @@ export default function PaymentCredentialsForm() {
         console.log('PaymentCredentialsForm: Fetching credentials...');
         setLoadingCredentials(true);
         setError(null);
-        
-        // Get ID token safely
-        const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
-        
-        if (!idToken) {
+
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
           console.error('PaymentCredentialsForm: Failed to get authentication token');
-          setError('Authentication error. Please try refreshing the page.');
+          setError('Authentication error. Please try signing in again.');
           return;
         }
-        
-        try {
-          const response = await fetch('/api/admin/credentials', {
-            headers: {
-              'Authorization': `Bearer ${idToken}`
-            }
+
+        const response = await fetch('/api/admin/credentials', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('PaymentCredentialsForm: Failed to fetch credentials', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText,
           });
-          
-          // If unauthorized, try to refresh the token and try again
-          if (response.status === 401) {
-            console.log('PaymentCredentialsForm: Unauthorized, refreshing token and retrying...');
-            // Refresh token and try again
-            const newToken = user && 'getIdToken' in user ? await user.getIdToken(true) : null;
-            
-            if (!newToken) {
-              throw new Error('Failed to refresh authentication token');
-            }
-            
-            const retryResponse = await fetch('/api/admin/credentials', {
-              headers: {
-                'Authorization': `Bearer ${newToken}`
-              }
-            });
-            
-            if (!retryResponse.ok) {
-              const errorText = await retryResponse.text();
-              console.error('PaymentCredentialsForm: Retry failed', { 
-                status: retryResponse.status, 
-                statusText: retryResponse.statusText,
-                errorText
-              });
-              throw new Error(`Failed to fetch credentials: ${retryResponse.status} ${retryResponse.statusText}`);
-            }
-            
-            const data = await retryResponse.json();
-            handleCredentialsData(data);
-            return;
-          }
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('PaymentCredentialsForm: Failed to fetch credentials', { 
-              status: response.status, 
-              statusText: response.statusText,
-              errorText
-            });
-            throw new Error(`Failed to fetch credentials: ${response.status} ${response.statusText}`);
-          }
-          
-          const data = await response.json();
-          handleCredentialsData(data);
-        } catch (fetchError: unknown) {
-          console.error('PaymentCredentialsForm: Fetch error:', fetchError);
-          throw new Error(`API request failed: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+          throw new Error(`Failed to fetch credentials: ${response.status} ${response.statusText}`);
         }
+
+        const data = await response.json();
+        handleCredentialsData(data);
       } catch (error: unknown) {
         console.error('PaymentCredentialsForm: Error fetching credentials:', error);
         setError('Failed to load saved credentials. ' + (error instanceof Error ? error.message : String(error)));
@@ -150,18 +123,20 @@ export default function PaymentCredentialsForm() {
         updatedAt: data.updatedAt
       });
       
-      if (data.credentials && Object.keys(data.credentials).length > 0) {
+      const receivedCredentials = data.credentials ?? {};
+
+      if (Object.keys(receivedCredentials).length > 0) {
         // Log the keys of credentials received (not values for security)
-        console.log('PaymentCredentialsForm: Credential keys received:', Object.keys(data.credentials));
+        console.log('PaymentCredentialsForm: Credential keys received:', Object.keys(receivedCredentials));
         
         setCredentials(prevCredentials => {
           const newCredentials = {
             ...prevCredentials,
-            ...data.credentials
+            ...receivedCredentials
           };
           // Log which fields were updated
-          Object.keys(data.credentials).forEach(key => {
-            if (data.credentials?.[key] && data.credentials[key] !== prevCredentials[key]) {
+          Object.keys(receivedCredentials).forEach(key => {
+            if (receivedCredentials[key] && receivedCredentials[key] !== prevCredentials[key]) {
               console.log(`PaymentCredentialsForm: Updated credential ${key}`);
             }
           });
@@ -191,7 +166,7 @@ export default function PaymentCredentialsForm() {
     } else {
       console.log('PaymentCredentialsForm: No user logged in, skipping credential fetch');
     }
-  }, [user]);
+  }, [user, getAccessToken]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -201,7 +176,7 @@ export default function PaymentCredentialsForm() {
     }));
   };
 
-  const handleGatewayToggle = (gateway: 'stripe' | 'paypal' | 'flutterwave', field: 'enabled' | 'testMode') => {
+  const handleGatewayToggle = (gateway: 'stripe' | 'paypal' | 'flutterwave' | 'paystack', field: 'enabled' | 'testMode') => {
     setGatewayConfig(prev => ({
       ...prev,
       [gateway]: {
@@ -219,12 +194,8 @@ export default function PaymentCredentialsForm() {
     setSuccess(null);
     
     try {
-      // Get ID token safely
-      const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
-      
-      if (!idToken) {
-        throw new Error('Failed to get authentication token');
-      }
+      const accessToken = await getAccessToken();
+      if (!accessToken) throw new Error('Failed to get authentication token');
       
       // Log keys being submitted (not values)
       console.log('PaymentCredentialsForm: Submitting credential keys:', 
@@ -235,7 +206,7 @@ export default function PaymentCredentialsForm() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          Authorization: `Bearer ${accessToken}`
         },
         body: JSON.stringify(credentials)
       });
@@ -391,26 +362,37 @@ export default function PaymentCredentialsForm() {
           >
             Flutterwave
           </button>
+          <button
+            type="button"
+            className={getTabClass('paystack')}
+            onClick={() => setActiveTab('paystack')}
+          >
+            Paystack
+          </button>
           
           {/* Debug button - only visible in development */}
           {process.env.NODE_ENV === 'development' && (
             <button
               type="button"
               className="ml-auto px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
-              onClick={() => {
+              onClick={async () => {
                 console.log('Current credentials state:', credentials);
                 console.log('Keys with values:', Object.keys(credentials).filter(k => credentials[k]));
                 console.log('Gateway config:', gatewayConfig);
                 // Also attempt to check Firestore directly
+                const accessToken = await getAccessToken();
                 fetch('/api/admin/credentials', {
-                  headers: { 'Cache-Control': 'no-cache' }
+                  headers: {
+                    'Cache-Control': 'no-cache',
+                    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                  }
                 })
-                .then(response => {
-                  console.log('Debug fetch response status:', response.status);
-                  return response.json();
-                })
-                .then(data => console.log('Debug fetch response:', data))
-                .catch(err => console.error('Debug fetch error:', err));
+                  .then(response => {
+                    console.log('Debug fetch response status:', response.status);
+                    return response.json();
+                  })
+                  .then(data => console.log('Debug fetch response:', data))
+                  .catch(err => console.error('Debug fetch error:', err));
               }}
             >
               Debug
@@ -643,6 +625,73 @@ export default function PaymentCredentialsForm() {
                 onChange={handleInputChange}
                 className={inputStyle}
                 placeholder="Flutterwave Encryption Key"
+              />
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'paystack' && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="PAYSTACK_PUBLIC_KEY" className={labelStyle}>
+                Public Key
+              </label>
+              <input
+                type="text"
+                id="PAYSTACK_PUBLIC_KEY"
+                name="PAYSTACK_PUBLIC_KEY"
+                value={credentials.PAYSTACK_PUBLIC_KEY}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="pk_live_... or pk_test_..."
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="PAYSTACK_SECRET_KEY" className={labelStyle}>
+                Secret Key
+              </label>
+              <input
+                type="password"
+                id="PAYSTACK_SECRET_KEY"
+                name="PAYSTACK_SECRET_KEY"
+                value={credentials.PAYSTACK_SECRET_KEY}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="sk_live_... or sk_test_..."
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="PAYSTACK_PLAN_CODE_PRO" className={labelStyle}>
+                Pro Plan Code
+              </label>
+              <input
+                type="text"
+                id="PAYSTACK_PLAN_CODE_PRO"
+                name="PAYSTACK_PLAN_CODE_PRO"
+                value={credentials.PAYSTACK_PLAN_CODE_PRO}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="PLN_..."
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Create subscription plans in Paystack Dashboard → Products → Plans
+              </p>
+            </div>
+            
+            <div>
+              <label htmlFor="PAYSTACK_PLAN_CODE_BUSINESS" className={labelStyle}>
+                Business Plan Code
+              </label>
+              <input
+                type="text"
+                id="PAYSTACK_PLAN_CODE_BUSINESS"
+                name="PAYSTACK_PLAN_CODE_BUSINESS"
+                value={credentials.PAYSTACK_PLAN_CODE_BUSINESS}
+                onChange={handleInputChange}
+                className={inputStyle}
+                placeholder="PLN_..."
               />
             </div>
           </div>

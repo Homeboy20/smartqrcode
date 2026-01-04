@@ -122,8 +122,8 @@ Set the following environment variables in Netlify dashboard (Site settings > Bu
 - `PAYPAL_PLAN_ID_BUSINESS` - PayPal plan ID for Business tier
 
 **Flutterwave Configuration (For Payments):**
-- `FLUTTERWAVE_PUBLIC_KEY` - Flutterwave public key
-- `FLUTTERWAVE_SECRET_KEY` - Flutterwave secret key
+- `FLUTTERWAVE_CLIENT_ID` - Flutterwave V4 client ID
+- `FLUTTERWAVE_CLIENT_SECRET` - Flutterwave V4 client secret
 - `FLUTTERWAVE_ENCRYPTION_KEY` - Flutterwave encryption key
 
 **Application Configuration:**

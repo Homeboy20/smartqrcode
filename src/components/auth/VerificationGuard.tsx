@@ -14,7 +14,7 @@ const VerificationGuard: React.FC<VerificationGuardProps> = ({
   children, 
   redirectTo = '/verify-account'
 }) => {
-  const { user, loading, isEmailVerified } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
 
@@ -27,23 +27,9 @@ const VerificationGuard: React.FC<VerificationGuardProps> = ({
       }
 
       // Check verification status
-      if ('uid' in user) {
-        // Firebase Auth user
-        const verified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
-        setIsVerified(verified);
-        
-        if (!verified) {
-          router.push(redirectTo);
-        }
-      } else {
-        // UserData object
-        const verified = Boolean(user.emailVerified) || Boolean(user.phoneVerified);
-        setIsVerified(verified);
-        
-        if (!verified) {
-          router.push(redirectTo);
-        }
-      }
+      const verified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
+      setIsVerified(verified);
+      if (!verified) router.push(redirectTo);
     }
   }, [user, loading, router, redirectTo]);
 

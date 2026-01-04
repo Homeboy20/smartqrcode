@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import jsPDF from 'jspdf';
 import { useSubscription } from "../hooks/useSubscription";
 import { useTrackUsage } from "../hooks/useTrackUsage";
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { hasFeatureAccess, getFeatureLimit } from '../lib/subscriptions';
 import SubscriptionCheck from './SubscriptionCheck';
 import { useRouter } from "next/navigation";
@@ -34,6 +35,9 @@ export default function SequenceGenerator() {
     isWithinUsageLimit
   } = useTrackUsage();
   
+  const { user } = useSupabaseAuth();
+  const isVisitor = !user;
+  
   const [prefix, setPrefix] = useState<string>("");
   const [startNumber, setStartNumber] = useState<number>(1);
   const [increment, setIncrement] = useState<number>(1);
@@ -45,6 +49,8 @@ export default function SequenceGenerator() {
   const [previewCode, setPreviewCode] = useState<string>("");
   const [generatedCodes, setGeneratedCodes] = useState<string[]>([]);
   const [imageFormat, setImageFormat] = useState<ImageFormat>('png');
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [lockedFeatureName, setLockedFeatureName] = useState('');
   
   // Tiling State (for PDF Tile download)
   const [tileColumns, setTileColumns] = useState<number>(5);
@@ -106,19 +112,17 @@ export default function SequenceGenerator() {
     const feature = format === "qrcode" ? "qrCodesGenerated" : "barcodesGenerated";
     
     // Check if user can generate this many codes
-    if (subscriptionTier === "free" && !isWithinUsageLimit(feature, count)) {
-      alert(`You've reached your daily limit for ${format === "qrcode" ? "QR code" : "barcode"} generation.`);
-      router.push('/pricing');
+    if (!isWithinUsageLimit(feature, count)) {
+      setLockedFeatureName(`${format === "qrcode" ? "QR Code" : "Barcode"} Generation Limit`);
+      setShowLoginModal(true);
       return [];
     }
 
     // If user can proceed, track the usage
-    if (subscriptionTier === "free") {
-      if (format === "qrcode") {
-        trackUsage('qrCodesGenerated', count);
-      } else {
-        trackUsage('barcodesGenerated', count);
-      }
+    if (format === "qrcode") {
+      trackUsage('qrCodesGenerated', count);
+    } else {
+      trackUsage('barcodesGenerated', count);
     }
 
     const newCodes = [];
@@ -313,8 +317,8 @@ export default function SequenceGenerator() {
         
         // Check if user has enough remaining usage
         if (!isWithinUsageLimit(feature, generatedCodes.length)) {
-          alert(`You've reached your daily limit for ${format === "qrcode" ? "QR code" : "barcode"} generation.`);
-          router.push('/pricing');
+          setLockedFeatureName(`${format === "qrcode" ? "QR Code" : "Barcode"} Generation Limit`);
+          setShowLoginModal(true);
           return;
         }
         
@@ -354,8 +358,8 @@ export default function SequenceGenerator() {
             (imageFormat === "eps" && !canUseFeature("svgDownload")) ||
             (imageFormat === "png" && !canUseFeature("noWatermark"))) {
           // User doesn't have permission for this format
-          alert(`You need a Pro or Business subscription to download in ${imageFormat.toUpperCase()} format.`);
-          router.push('/pricing');
+          setLockedFeatureName(`${imageFormat.toUpperCase()} Export`);
+          setShowLoginModal(true);
           return;
         }
         
@@ -795,6 +799,135 @@ export default function SequenceGenerator() {
           )}
         </div>
       </div>
+
+      {/* Login Required Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                <svg className="w-6 h-6 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Premium Feature
+              </h3>
+              <button
+                onClick={() => setShowLoginModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <div className="bg-gradient-to-r from-green-50 to-teal-50 border-l-4 border-green-500 p-4 rounded-lg mb-4">
+                <p className="text-sm text-gray-700">
+                  <strong className="text-green-700">{lockedFeatureName}</strong> {isVisitor ? 'requires a free account' : 'is a premium feature'}.
+                </p>
+              </div>
+              
+              {isVisitor ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    Create a <strong>free account</strong> to unlock:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-2 ml-4">
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>Generate sequences up to 1000 codes</span>
+                    </li>
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>Save and download sequences</span>
+                    </li>
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>Track analytics</span>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-3">
+                    🚀 Upgrade to Pro later for advanced features
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    Upgrade to <strong className="text-green-600">Pro</strong> or <strong className="text-teal-600">Business</strong> to unlock:
+                  </p>
+                  <ul className="text-sm text-gray-600 space-y-2 ml-4">
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>Unlimited sequence generation</span>
+                    </li>
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>SVG, PDF & EPS export formats</span>
+                    </li>
+                    <li className="flex items-start">
+                      <svg className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span>High-quality exports & bulk downloads</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              {isVisitor ? (
+                <>
+                  <button
+                    onClick={() => router.push('/register?returnTo=/sequence')}
+                    className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-3 px-4 rounded-lg transition transform hover:scale-105 flex items-center justify-center shadow-lg"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Create Free Account
+                  </button>
+                  <button
+                    onClick={() => router.push('/login?returnTo=/sequence')}
+                    className="w-full bg-white border-2 border-green-600 text-green-600 hover:bg-green-50 font-semibold py-3 px-4 rounded-lg transition"
+                  >
+                    Already have an account? Login
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => router.push('/pricing')}
+                    className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-3 px-4 rounded-lg transition transform hover:scale-105 flex items-center justify-center shadow-lg"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    View Pricing Plans
+                  </button>
+                  <button
+                    onClick={() => setShowLoginModal(false)}
+                    className="w-full bg-white border-2 border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 px-4 rounded-lg transition"
+                  >
+                    Continue with Free Features
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

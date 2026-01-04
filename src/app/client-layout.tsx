@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { SubscriptionProvider } from "@/context/SubscriptionProvider";
+import { AuthProvider } from '@/context/FirebaseAuthContext';
 import { SupabaseAuthProvider } from '@/context/SupabaseAuthContext';
 import { usePathname } from 'next/navigation';
 
@@ -15,6 +15,9 @@ export default function ClientLayout({
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   const isAdminPage = pathname?.startsWith('/admin');
+  const needsFirebaseAuth =
+    pathname?.startsWith('/phone-auth') ||
+    pathname?.startsWith('/verify-account');
 
   useEffect(() => {
     setIsMounted(true);
@@ -24,31 +27,31 @@ export default function ClientLayout({
   if (isAdminPage) {
     return (
       <SupabaseAuthProvider>
-        <SubscriptionProvider>
+        <AuthProvider>
           {children}
-        </SubscriptionProvider>
+        </AuthProvider>
       </SupabaseAuthProvider>
     );
   }
 
+  const page = needsFirebaseAuth ? <AuthProvider>{children}</AuthProvider> : children;
+
   // For regular pages, include header and footer
   return (
     <SupabaseAuthProvider>
-      <SubscriptionProvider>
-        {isMounted ? (
-          <>
-            <Header />
-            <main className="flex-grow container mx-auto px-4 py-8">
-              {children}
-            </main>
-            <Footer />
-          </>
-        ) : (
-          <div className="flex-grow container mx-auto px-4 py-8">
-            <div className="h-64 w-full bg-gray-200 rounded animate-pulse"></div>
-          </div>
-        )}
-      </SubscriptionProvider>
+      {isMounted ? (
+        <>
+          <Header />
+          <main className="flex-grow container mx-auto px-4 py-8">
+            {page}
+          </main>
+          <Footer />
+        </>
+      ) : (
+        <div className="flex-grow container mx-auto px-4 py-8">
+          <div className="h-64 w-full bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      )}
     </SupabaseAuthProvider>
   )
 } 

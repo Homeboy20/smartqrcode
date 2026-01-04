@@ -33,7 +33,6 @@
     "file-saver": "^2.0.5",
     "firebase": "^11.6.0",
     "firebase-admin": "^13.2.0",
-    "flutterwave-node-v3": "^1.2.0",
     "html2canvas": "^1.4.1",
     "jsbarcode": "^3.11.6",
     "jspdf": "^3.0.1",

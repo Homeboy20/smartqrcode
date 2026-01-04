@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
 
 interface UserProfile {
   displayName: string;
@@ -22,7 +23,7 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { user, loading, logout } = useSupabaseAuth();
+  const { user, loading, logout, updateProfile } = useSupabaseAuth();
   const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
@@ -36,56 +37,124 @@ export default function ProfilePage() {
   // Redirect if not logged in
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login?redirect=profile');
+      router.push('/login?redirect=/profile');
     }
   }, [user, loading, router]);
 
-  // Fetch user profile data
+  // Populate profile state from Supabase user (no /api/user/profile route exists)
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user?.uid) return;
-      
+    if (!user) return;
+
+    let cancelled = false;
+
+    setProfileLoading(false);
+    setError(null);
+
+    const createdAtRaw = (user as any).created_at as string | undefined;
+    const lastLoginRaw = (user as any).last_sign_in_at as string | undefined;
+    const createdAt = createdAtRaw ? new Date(createdAtRaw) : undefined;
+    const lastLogin = lastLoginRaw ? new Date(lastLoginRaw) : undefined;
+
+    const displayNameFromMeta =
+      (user.user_metadata as any)?.display_name ||
+      (user.user_metadata as any)?.full_name ||
+      '';
+    const avatarFromMeta =
+      (user.user_metadata as any)?.avatar_url ||
+      (user.user_metadata as any)?.picture ||
+      undefined;
+
+    if (createdAt) {
+      const now = new Date();
+      if (now.getTime() - createdAt.getTime() < 5 * 60 * 1000) {
+        setIsNewUser(true);
+      }
+    }
+
+    setUserProfile({
+      displayName: displayNameFromMeta || '',
+      email: user.email || '',
+      photoURL: avatarFromMeta,
+      subscriptionTier: 'free',
+      role: 'user',
+      createdAt,
+      lastLogin,
+    });
+
+    setFormData({
+      displayName: displayNameFromMeta || '',
+    });
+
+    (async () => {
       try {
-        setProfileLoading(true);
-        setError(null);
-        
-        const response = await fetch(`/api/user/profile`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
+        const { data, error: fetchError } = await supabase
+          .from('users')
+          .select('display_name, photo_url, subscription_tier, role, features_usage, created_at')
+          .eq('id', user.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+        if (cancelled) return;
+
+        const dbDisplayName = (data as any)?.display_name as string | null | undefined;
+        const dbPhotoUrl = (data as any)?.photo_url as string | null | undefined;
+        const subscriptionTier = ((data as any)?.subscription_tier as string | undefined) || 'free';
+        const role = ((data as any)?.role as string | undefined) || 'user';
+        const featuresUsage = ((data as any)?.features_usage as any) || undefined;
+        const dbCreatedAtRaw = (data as any)?.created_at as string | undefined;
+        const dbCreatedAt = dbCreatedAtRaw ? new Date(dbCreatedAtRaw) : undefined;
+
+        // Prefer DB profile values, then auth metadata fallbacks.
+        setUserProfile(prev => {
+          const base = prev || {
+            displayName: displayNameFromMeta || '',
+            email: user.email || '',
+            photoURL: avatarFromMeta,
+            subscriptionTier: 'free',
+            role: 'user',
+            createdAt,
+            lastLogin,
+            featuresUsage: undefined,
+          };
+
+          return {
+            ...base,
+            displayName: dbDisplayName || base.displayName,
+            photoURL: dbPhotoUrl || base.photoURL,
+            subscriptionTier,
+            role,
+            createdAt: dbCreatedAt || base.createdAt,
+            featuresUsage: featuresUsage
+              ? {
+                  qrCodesGenerated: Number(featuresUsage.qrCodesGenerated || 0),
+                  barcodesGenerated: Number(featuresUsage.barcodesGenerated || 0),
+                  bulkGenerations: Number(featuresUsage.bulkGenerations || 0),
+                  aiCustomizations: Number(featuresUsage.aiCustomizations || 0),
+                }
+              : base.featuresUsage,
+          };
         });
-        
-        if (!response.ok) {
-          throw new Error(`Error ${response.status}: ${await response.text()}`);
+
+        if (dbDisplayName) {
+          setFormData({ displayName: dbDisplayName });
         }
-        
-        const data = await response.json();
-        
-        // Check if this might be a new user
-        if (data.user && data.user.createdAt) {
-          const createdTime = new Date(data.user.createdAt.seconds * 1000);
+
+        if (dbCreatedAt) {
           const now = new Date();
-          // If account was created in the last 5 minutes, consider it new
-          if ((now.getTime() - createdTime.getTime()) < 5 * 60 * 1000) {
+          if (now.getTime() - dbCreatedAt.getTime() < 5 * 60 * 1000) {
             setIsNewUser(true);
           }
         }
-        
-        setUserProfile(data.user);
-        setFormData({
-          displayName: data.user?.displayName || '',
-        });
       } catch (err) {
-        console.error('Failed to fetch profile:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load profile data');
-      } finally {
-        setProfileLoading(false);
+        if (!cancelled) {
+          console.error('Failed to load profile from users table:', err);
+        }
       }
-    };
+    })();
 
-    fetchUserProfile();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,33 +165,29 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user?.uid) return;
+    if (!user) return;
     
     try {
       setProfileLoading(true);
       setError(null);
       setUpdateSuccess(false);
-      
-      const response = await fetch(`/api/user/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-        body: JSON.stringify({
-          displayName: formData.displayName,
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${await response.text()}`);
+
+      const success = await updateProfile({ displayName: formData.displayName });
+      if (!success) {
+        throw new Error('Failed to update profile');
       }
-      
-      const data = await response.json();
-      setUserProfile(prev => ({
-        ...prev!,
-        displayName: formData.displayName,
-      }));
+
+      setUserProfile(prev =>
+        prev
+          ? { ...prev, displayName: formData.displayName }
+          : {
+              displayName: formData.displayName,
+              email: user.email || '',
+              photoURL: (user.user_metadata as any)?.avatar_url || undefined,
+              subscriptionTier: 'free',
+              role: 'user',
+            }
+      );
       setUpdateSuccess(true);
       
       // Hide success message after 3 seconds
@@ -287,10 +352,12 @@ export default function ProfilePage() {
                       <dt className="text-sm font-medium text-gray-500">Subscription</dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${userProfile?.subscriptionTier === 'premium' ? 'bg-purple-100 text-purple-800' : 
+                          ${userProfile?.subscriptionTier === 'business' ? 'bg-purple-100 text-purple-800' : 
                             userProfile?.subscriptionTier === 'pro' ? 'bg-blue-100 text-blue-800' : 
                             'bg-gray-100 text-gray-800'}`}>
-                          {userProfile?.subscriptionTier?.charAt(0).toUpperCase() + userProfile?.subscriptionTier?.slice(1) || 'Free'}
+                          {(userProfile?.subscriptionTier
+                            ? userProfile.subscriptionTier.charAt(0).toUpperCase() + userProfile.subscriptionTier.slice(1)
+                            : 'Free')}
                         </span>
                         {(userProfile?.subscriptionTier === 'free' || !userProfile?.subscriptionTier) && (
                           <Link href="/pricing" className="ml-3 text-xs text-indigo-600 hover:text-indigo-900">

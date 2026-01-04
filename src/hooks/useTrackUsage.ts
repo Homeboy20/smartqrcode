@@ -1,54 +1,31 @@
 import { useState, useCallback, useMemo } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
-import { useSubscription } from '@/context/SubscriptionContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { FeatureType } from '@/lib/subscription';
 
 /**
  * Hook for tracking feature usage
  */
 export function useTrackUsage() {
-  const { user } = useAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const subscription = useSubscription();
+  const { settings: appSettings } = useAppSettings();
   const [isTracking, setIsTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize the access to subscription properties to prevent render loops
-  const subscriptionTier = useMemo(() => subscription?.tier || 'free', [subscription?.tier]);
-  const usageStats = useMemo(() => subscription?.usageStats || null, [subscription?.usageStats]);
-
-  // Helper to safely get remaining usage - memoized to prevent render loops
-  const getRemaining = useCallback((feature: FeatureType): number => {
-    try {
-      if (!feature) return 0;
-      
-      if (typeof subscription?.getRemainingUsage === 'function') {
-        const result = subscription.getRemainingUsage(feature);
-        return result.daily || 0;
+  const canUseFeature = useCallback(
+    (feature: string): boolean => {
+      try {
+        if (!feature) return false;
+        return subscription.canUseFeature(feature);
+      } catch (e) {
+        console.error('Error in canUseFeature:', e);
+        return false;
       }
-      
-      return 0;
-    } catch (error) {
-      console.error("Error getting remaining usage:", error);
-      return 0;
-    }
-  }, [subscription]);
-
-  // Memoize the canUseFeature function
-  const canUseFeature = useCallback((feature: string): boolean => {
-    try {
-      if (!feature) return false;
-      
-      // For all features, use hasFeatureAccess from the context
-      if (typeof subscription?.hasFeatureAccess === 'function') {
-        return subscription.hasFeatureAccess(feature as FeatureType);
-      }
-      
-      return false;
-    } catch (error) {
-      console.error("Error in canUseFeature:", error);
-      return false;
-    }
-  }, [subscription]);
+    },
+    [subscription]
+  );
 
   // Memoize the isWithinUsageLimit function
   const isWithinUsageLimit = useCallback((feature: string, amount: number = 1): boolean => {
@@ -56,28 +33,39 @@ export function useTrackUsage() {
       if (!feature) return false;
       
       // For permission-based features
-      if (feature === "pdfDownload" || feature === "svgDownload" || feature === "noWatermark") {
+      if (feature === "pdfDownload" || feature === "svgDownload" || feature === "noWatermark" || feature === "fileUploads") {
         return canUseFeature(feature);
       }
       
-      // For other features, check if reached limit
-      if (typeof subscription?.hasReachedLimit === 'function') {
-        return !subscription.hasReachedLimit(feature as FeatureType);
-      }
-      
-      // Fall back to checking remaining
-      const remaining = getRemaining(feature as FeatureType);
-      return remaining >= amount;
+      // For other features, check if reached limit via subscription hook
+      return subscription.isWithinUsageLimit(feature, amount);
     } catch (error) {
       console.error("Error in isWithinUsageLimit:", error);
       return false;
     }
-  }, [subscription, canUseFeature, getRemaining]);
+  }, [subscription, canUseFeature]);
 
   // Memoize the trackUsage function
   const trackUsage = useCallback(async (feature: FeatureType, amount: number = 1): Promise<boolean> => {
+    // Anonymous Free Mode: allow basic features without tracking.
     if (!user) {
+      const isFreeMode = !!appSettings?.freeMode;
+      const allowsQr = !!appSettings?.freeModeFeatures?.qrCodeGeneration;
+      const allowsBarcode = !!appSettings?.freeModeFeatures?.barcodeGeneration;
+
+      const basicAllowed =
+        isFreeMode &&
+        ((feature === 'qrCodesGenerated' && allowsQr) || (feature === 'barcodesGenerated' && allowsBarcode));
+
+      if (basicAllowed) return true;
+
       setError('User not authenticated');
+      return false;
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      setError('Unable to authenticate request');
       return false;
     }
 
@@ -101,6 +89,7 @@ export function useTrackUsage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           feature,
@@ -120,13 +109,13 @@ export function useTrackUsage() {
     } finally {
       setIsTracking(false);
     }
-  }, [user, canUseFeature, isWithinUsageLimit]);
+  }, [user, getAccessToken, canUseFeature, isWithinUsageLimit, appSettings]);
 
   // Get remaining usage for a feature (using local state data)
   const getRemainingUsage = useCallback((feature?: FeatureType): number => {
     if (!feature) return 0;
-    return getRemaining(feature);
-  }, [getRemaining]);
+    return subscription.remainingUsage(feature);
+  }, [subscription]);
 
   // Return stable object with memoized functions to prevent render loops
   return useMemo(() => ({

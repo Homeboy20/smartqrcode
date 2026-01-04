@@ -1,4 +1,4 @@
-'use server';
+import 'server-only';
 
 import { db as getDb } from '@/lib/firebase/admin';
 import * as crypto from 'crypto';

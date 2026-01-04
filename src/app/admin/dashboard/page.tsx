@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useAuth } from '@/context/FirebaseAuthContext';
 
 // Example StatCard component for dashboard metrics
 function StatCard({ title, value, description, icon, color = 'indigo' }: { 
@@ -55,53 +56,58 @@ function StatCard({ title, value, description, icon, color = 'indigo' }: {
 interface DashboardStats {
   totalUsers: number;
   totalQrCodes: number;
+  totalScans: number;
   totalRevenue: string;
   activeSubscriptions: number;
-  recentUsers: Array<{id: string; email: string; createdAt: string}>;
-  recentTransactions: Array<{id: string; amount: string; date: string; status: string}>;
+  recentUsers: Array<{id: string; email: string; displayName?: string; createdAt: string}>;
+  recentTransactions: Array<{id: string; amount: number; currency: string; status: string; createdAt: string}>;
 }
 
 export default function AdminDashboardPage() {
-  const { user } = useSupabaseAuth();
+  const { user: supabaseUser } = useSupabaseAuth();
+  const { user: firebaseUser, getIdToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalQrCodes: 0,
+    totalScans: 0,
     totalRevenue: '$0',
     activeSubscriptions: 0,
     recentUsers: [],
     recentTransactions: []
   });
 
-  // Simulate fetching dashboard data
+  // Fetch dashboard data from analytics API
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        // Placeholder for actual API call
-        // const response = await fetch('/api/admin/dashboard');
-        // const data = await response.json();
         
-        // Simulate API delay and data
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        const token = await getIdToken();
         
-        // In a real app, this would come from your API
-        setStats({
-          totalUsers: 156,
-          totalQrCodes: 2543,
-          totalRevenue: '$12,435',
-          activeSubscriptions: 78,
-          recentUsers: [
-            { id: '1', email: 'user1@example.com', createdAt: new Date().toISOString() },
-            { id: '2', email: 'user2@example.com', createdAt: new Date(Date.now() - 3600000).toISOString() },
-            { id: '3', email: 'user3@example.com', createdAt: new Date(Date.now() - 7200000).toISOString() }
-          ],
-          recentTransactions: [
-            { id: '101', amount: '$29.99', date: new Date().toISOString(), status: 'completed' },
-            { id: '102', amount: '$59.99', date: new Date(Date.now() - 3600000).toISOString(), status: 'pending' },
-            { id: '103', amount: '$14.99', date: new Date(Date.now() - 7200000).toISOString(), status: 'completed' }
-          ]
+        const response = await fetch('/api/admin/analytics', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Authorization': `Bearer ${token}`
+          }
         });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setStats({
+            totalUsers: data.summary?.totalUsers || 0,
+            totalQrCodes: data.summary?.totalQrCodes || 0,
+            totalScans: data.summary?.totalScans || 0,
+            totalRevenue: data.summary?.totalRevenue || '$0',
+            activeSubscriptions: data.summary?.activeSubscriptions || 0,
+            recentUsers: data.recentUsers || [],
+            recentTransactions: data.recentTransactions || []
+          });
+        } else {
+          console.error('Failed to fetch analytics data');
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -110,7 +116,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [getIdToken]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -130,9 +136,9 @@ export default function AdminDashboardPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        {user && (
+        {(supabaseUser || firebaseUser) && (
           <p className="mt-1 text-sm text-gray-600">
-            Welcome back, {user.displayName || user.email}
+            Welcome back, {supabaseUser?.email || firebaseUser?.email}
           </p>
         )}
       </div>
@@ -140,7 +146,7 @@ export default function AdminDashboardPage() {
       {/* Stats Grid */}
       {loading ? (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(5)].map((_, i) => (
             <div key={i} className="bg-white overflow-hidden shadow rounded-lg p-5 animate-pulse">
               <div className="h-10 bg-gray-200 rounded w-1/3 mb-3"></div>
               <div className="h-6 bg-gray-300 rounded w-1/2"></div>
@@ -148,7 +154,7 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           <StatCard 
             title="Total Users" 
             value={stats.totalUsers}
@@ -169,6 +175,17 @@ export default function AdminDashboardPage() {
             }
           />
           <StatCard 
+            title="Total Scans" 
+            value={stats.totalScans.toLocaleString()}
+            color="purple"
+            icon={
+              <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            }
+          />
+          <StatCard 
             title="Total Revenue" 
             value={stats.totalRevenue}
             color="green"
@@ -181,7 +198,7 @@ export default function AdminDashboardPage() {
           <StatCard 
             title="Active Subscriptions" 
             value={stats.activeSubscriptions}
-            color="purple"
+            color="indigo"
             icon={
               <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -358,7 +375,7 @@ export default function AdminDashboardPage() {
                           <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                         </svg>
                         <p>
-                          {formatDate(transaction.date)}
+                          {formatDate(transaction.createdAt)}
                         </p>
                       </div>
                     </div>

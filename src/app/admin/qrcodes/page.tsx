@@ -25,13 +25,23 @@ interface QrCode {
 }
 
 export default function AdminQrCodesPage() {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const [qrCodes, setQrCodes] = useState<QrCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingQrCode, setEditingQrCode] = useState<QrCode | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    content: '',
+    type: 'qrcode' as 'qrcode' | 'barcode',
+    format: 'png',
+    userId: ''
+  });
 
   // Function to refresh QR code data
   const refreshQrCodes = async () => {
@@ -39,11 +49,14 @@ export default function AdminQrCodesPage() {
       setLoading(true);
       setError(null);
       
+      const token = await getIdToken();
+      
       const response = await fetch('/api/admin/qrcodes', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -102,10 +115,13 @@ export default function AdminQrCodesPage() {
     }
     
     try {
+      const token = await getIdToken();
+      
       const response = await fetch(`/api/admin/qrcodes/${id}`, {
         method: 'DELETE',
         headers: {
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -113,17 +129,87 @@ export default function AdminQrCodesPage() {
         throw new Error(`Error ${response.status}: ${await response.text()}`);
       }
       
-      // Refresh QR codes to show current data
       await refreshQrCodes();
-      
-      // Show success message
-      setError(null);
-      // Create temporary success message
-      const successMessage = "QR code deleted successfully";
-      alert(successMessage);
+      alert("QR code deleted successfully");
     } catch (err) {
       console.error('Failed to delete QR code:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete QR code');
+    }
+  };
+
+  const handleEditQrCode = (qrCode: QrCode) => {
+    setEditingQrCode(qrCode);
+    setFormData({
+      name: qrCode.name,
+      content: qrCode.content,
+      type: qrCode.type,
+      format: qrCode.format || 'png',
+      userId: qrCode.userId
+    });
+    setShowEditModal(true);
+  };
+
+  const handleCreateQrCode = () => {
+    setFormData({
+      name: '',
+      content: '',
+      type: 'qrcode',
+      format: 'png',
+      userId: user?.uid || ''
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleSaveQrCode = async () => {
+    try {
+      const token = await getIdToken();
+      
+      if (editingQrCode) {
+        // Update existing QR code
+        const response = await fetch(`/api/admin/qrcodes/${editingQrCode.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            content: formData.content,
+            type: formData.type,
+            format: formData.format
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${await response.text()}`);
+        }
+
+        alert('QR code updated successfully');
+        setShowEditModal(false);
+      } else {
+        // Create new QR code
+        const response = await fetch('/api/admin/qrcodes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${await response.text()}`);
+        }
+
+        alert('QR code created successfully');
+        setShowCreateModal(false);
+      }
+
+      await refreshQrCodes();
+      setEditingQrCode(null);
+    } catch (err) {
+      console.error('Failed to save QR code:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save QR code');
     }
   };
 
@@ -211,6 +297,12 @@ export default function AdminQrCodesPage() {
               {filteredQrCodes.length} {filteredQrCodes.length === 1 ? 'QR code' : 'QR codes'} found
             </span>
           </div>
+          <button
+            onClick={handleCreateQrCode}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Create New QR Code
+          </button>
         </div>
       </div>
 
@@ -305,8 +397,14 @@ export default function AdminQrCodesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button 
+                        onClick={() => handleEditQrCode(qrCode)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        Edit
+                      </button>
+                      <button 
                         onClick={() => handleDeleteQrCode(qrCode.id)}
-                        className="text-red-600 hover:text-red-900 ml-2"
+                        className="text-red-600 hover:text-red-900 ml-4"
                       >
                         Delete
                       </button>
@@ -318,6 +416,144 @@ export default function AdminQrCodesPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto" onClick={() => setShowEditModal(false)}>
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  Edit QR Code
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Name</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Content</label>
+                    <textarea
+                      value={formData.content}
+                      onChange={(e) => setFormData({...formData, content: e.target.value})}
+                      rows={3}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Type</label>
+                    <select
+                      value={formData.type}
+                      onChange={(e) => setFormData({...formData, type: e.target.value as 'qrcode' | 'barcode'})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    >
+                      <option value="qrcode">QR Code</option>
+                      <option value="barcode">Barcode</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleSaveQrCode}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto" onClick={() => setShowCreateModal(false)}>
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  Create New QR Code
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Content *</label>
+                    <textarea
+                      value={formData.content}
+                      onChange={(e) => setFormData({...formData, content: e.target.value})}
+                      rows={3}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">User ID *</label>
+                    <input
+                      type="text"
+                      value={formData.userId}
+                      onChange={(e) => setFormData({...formData, userId: e.target.value})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Type</label>
+                    <select
+                      value={formData.type}
+                      onChange={(e) => setFormData({...formData, type: e.target.value as 'qrcode' | 'barcode'})}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                    >
+                      <option value="qrcode">QR Code</option>
+                      <option value="barcode">Barcode</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={handleSaveQrCode}
+                >
+                  Create
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowCreateModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

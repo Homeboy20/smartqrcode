@@ -36,6 +36,43 @@
 5. **Access the local site**
    - Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
 
+## Supabase Edge Functions (Contact System)
+
+The `/contact` form and `/admin/contact-messages` viewer call Supabase Edge Functions.
+
+### Prerequisites
+- Supabase CLI installed: `npm i -g supabase`
+- Logged in: `supabase login`
+- Linked to the correct project: `supabase link --project-ref <PROJECT_REF>`
+
+### Deploy functions
+Deploy after changing anything under `supabase/functions/**`:
+
+```
+supabase functions deploy submit-contact
+supabase functions deploy admin-contact-messages
+supabase functions deploy process-contact-outbox
+supabase functions deploy purge-contact-data
+```
+
+### Required secrets
+
+```
+supabase secrets set CONTACT_IP_PEPPER="change-me-long-random-string"
+supabase secrets set CONTACT_RETENTION_DAYS="180"
+supabase secrets set CONTACT_AUDIT_RETENTION_DAYS="365"
+```
+
+If you enable email notifications (outbox worker):
+
+```
+supabase secrets set RESEND_API_KEY="..."
+supabase secrets set CONTACT_NOTIFY_TO="support@scanmagic.online"
+supabase secrets set CONTACT_NOTIFY_FROM="ScanMagic <noreply@scanmagic.online>"
+```
+
+If you see CORS errors in the browser, it usually means the deployed function code is out of date and needs redeploying.
+
 ## Testing the Netlify Build Process Locally
 
 If you want to test the Netlify build process locally:

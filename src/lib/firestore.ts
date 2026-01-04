@@ -307,6 +307,10 @@ export interface PaymentGatewayConfig {
     enabled: boolean;
     testMode: boolean;
   };
+  paystack: {
+    enabled: boolean;
+    testMode: boolean;
+  };
 }
 
 // Default gateway configuration
@@ -320,6 +324,10 @@ export const defaultGatewayConfig: PaymentGatewayConfig = {
     testMode: true
   },
   flutterwave: {
+    enabled: false,
+    testMode: true
+  },
+  paystack: {
     enabled: false,
     testMode: true
   }

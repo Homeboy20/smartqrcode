@@ -127,6 +127,40 @@ export default function AdminSidebar() {
           </Link>
 
           <Link 
+            href="/admin/contact-messages" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/contact-messages')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 8h18a2 2 0 002-2V8a2 2 0 00-2-2H3a2 2 0 00-2 2v6a2 2 0 002 2z" />
+            </svg>
+            Contact Messages
+          </Link>
+
+          <Link 
+            href="/admin/support-chat" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/support-chat')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8m-8 4h5m7 6l-4-4H6a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2z" />
+            </svg>
+            Support Chat
+          </Link>
+
+          <Link 
             href="/admin/settings" 
             className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/settings')}`}
           >
@@ -142,6 +176,115 @@ export default function AdminSidebar() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             Settings
+          </Link>
+
+          <Link 
+            href="/admin/app-settings" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/app-settings')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            App Settings
+          </Link>
+
+          {/* Integrations Section */}
+          <div className="pt-5 mt-5 border-t border-gray-700">
+            <h3 className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Integrations
+            </h3>
+          </div>
+
+          <Link 
+            href="/admin/integrations" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/integrations')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+            </svg>
+            All Integrations
+          </Link>
+
+          <Link 
+            href="/admin/payment-settings" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/payment-settings')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+            Payment Gateways
+          </Link>
+
+          <Link 
+            href="/admin/flutterwave-customers" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/flutterwave-customers')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Flutterwave Customers
+          </Link>
+
+          <Link 
+            href="/admin/integrations/webhooks" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/integrations/webhooks')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Webhooks
+          </Link>
+
+          <Link 
+            href="/admin/integrations/logs" 
+            className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${isActive('/admin/integrations/logs')}`}
+          >
+            <svg 
+              className="mr-3 h-6 w-6 text-gray-400 group-hover:text-gray-300" 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            API Logs
           </Link>
 
           <Link 

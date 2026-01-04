@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const { user, signIn, signInWithGoogle, loading, error: authError } = useSupabaseAuth();
+  const { user, signIn, signInWithGoogle, loading, error: authError, clearError } = useSupabaseAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') || '/';
@@ -17,7 +17,6 @@ export default function LoginPage() {
   });
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -25,20 +24,6 @@ export default function LoginPage() {
       router.push(redirect);
     }
   }, [user, loading, router, redirect]);
-
-  // Debug code to check Firebase config
-  useEffect(() => {
-    try {
-      const config = {
-        isProduction: process.env.NODE_ENV === 'production',
-        firebaseProject: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'Not found in env',
-        authProviders: true
-      };
-      setDebugInfo(JSON.stringify(config, null, 2));
-    } catch (e) {
-      setDebugInfo('Error getting debug info');
-    }
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -56,31 +41,14 @@ export default function LoginPage() {
     try {
       setAuthLoading(true);
       setError(null);
+      clearError();
       const success = await signIn(formData.email, formData.password);
       if (!success) {
-        // Check for errors from auth context
         setError(authError || 'Sign in failed. Please check your credentials.');
       }
     } catch (err: any) {
       console.error('Login error:', err);
-      let errorMessage = 'Failed to login';
-      
-      // Handle Firebase auth error codes
-      if (err.code === 'auth/invalid-credential') {
-        errorMessage = 'Invalid email or password';
-      } else if (err.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email';
-      } else if (err.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password';
-      } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email format';
-      } else if (err.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed login attempts. Please try again later';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
+      setError(err?.message || 'Failed to sign in');
     } finally {
       setAuthLoading(false);
     }
@@ -90,7 +58,10 @@ export default function LoginPage() {
     try {
       setAuthLoading(true);
       setError(null);
-      const success = await loginWithGoogle();
+      clearError();
+      const origin = window.location.origin;
+      const redirectTo = `${origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
+      const success = await signInWithGoogle({ redirectTo });
       if (!success) {
         setError(authError || 'Failed to login with Google. Please try again.');
       }
@@ -123,7 +94,7 @@ export default function LoginPage() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link href={`/register?redirect=${encodeURIComponent(redirect)}`} className="font-medium text-indigo-600 hover:text-indigo-500">
               create a new account
             </Link>
           </p>
@@ -190,7 +161,7 @@ export default function LoginPage() {
             </div>
 
             <div className="text-sm">
-              <Link href="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
+              <Link href={`/forgot-password?redirect=${encodeURIComponent(redirect)}`} className="font-medium text-indigo-600 hover:text-indigo-500">
                 Forgot your password?
               </Link>
             </div>
@@ -238,6 +209,13 @@ export default function LoginPage() {
               </svg>
               Sign in with Google
             </button>
+
+            <Link
+              href={`/phone-auth?redirect=${encodeURIComponent(redirect)}`}
+              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              Sign in with Phone (SMS)
+            </Link>
           </div>
           
           {/* Admin login link */}
@@ -251,14 +229,6 @@ export default function LoginPage() {
               </span>
             </Link>
           </div>
-          
-          {/* Debug info in development mode */}
-          {process.env.NODE_ENV !== 'production' && debugInfo && (
-            <div className="mt-6 p-3 bg-gray-100 rounded text-xs">
-              <p className="font-bold mb-1">Debug Info:</p>
-              <pre>{debugInfo}</pre>
-            </div>
-          )}
         </div>
       </div>
     </div>

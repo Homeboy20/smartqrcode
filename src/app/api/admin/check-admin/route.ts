@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth, db } from '@/lib/firebase/admin';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // GET - Check if current user is admin
 export async function GET(request: NextRequest) {
   try {

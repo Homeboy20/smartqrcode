@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
 
 interface UserData {
   id: string;
@@ -48,7 +49,20 @@ export default function UserDetailPage() {
         setError(null);
         
         console.log('Fetching user with ID:', userId);
-        const response = await fetch(`/api/admin/users/${userId}?v=${Date.now()}`);
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          throw new Error('Not authenticated. Please log in again.');
+        }
+
+        const response = await fetch(`/api/admin/users/${userId}?v=${Date.now()}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+        });
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -59,19 +73,37 @@ export default function UserDetailPage() {
         
         const data = await response.json();
         console.log('Received user data:', data);
-        
-        if (data.user) {
-          setUser(data.user);
-          
-          // For users that exist in Auth but not Firestore, we'll still show their basic info
-          setFormData({
-            displayName: data.user.displayName || '',
-            role: data.user.role || 'user',
-            subscriptionTier: data.user.subscriptionTier || 'free',
-          });
-        } else {
+
+        // API may return `{ user: {...} }` (older shape) or the user object directly.
+        const rawUser = (data && (data.user ?? data)) as any;
+        if (!rawUser || typeof rawUser !== 'object' || !rawUser.id) {
           throw new Error('Invalid user data received');
         }
+
+        const normalizedUser: UserData = {
+          id: String(rawUser.id),
+          email: typeof rawUser.email === 'string' ? rawUser.email : '',
+          displayName: typeof rawUser.displayName === 'string' ? rawUser.displayName : (rawUser.displayName ?? null),
+          role: typeof rawUser.role === 'string' ? rawUser.role : 'user',
+          subscriptionTier: typeof rawUser.subscriptionTier === 'string' ? rawUser.subscriptionTier : 'free',
+          createdAt: rawUser.createdAt ?? rawUser.creationTime ?? null,
+          updatedAt: rawUser.updatedAt ?? rawUser.lastSignInTime ?? null,
+          featuresUsage: {
+            qrCodesGenerated: Number(rawUser.featuresUsage?.qrCodesGenerated ?? 0),
+            barcodesGenerated: Number(rawUser.featuresUsage?.barcodesGenerated ?? 0),
+            bulkGenerations: Number(rawUser.featuresUsage?.bulkGenerations ?? 0),
+            aiCustomizations: Number(rawUser.featuresUsage?.aiCustomizations ?? 0),
+          },
+        };
+
+        setUser(normalizedUser);
+
+        // For users that exist in Auth but not Firestore, we'll still show their basic info
+        setFormData({
+          displayName: normalizedUser.displayName || '',
+          role: normalizedUser.role || 'user',
+          subscriptionTier: normalizedUser.subscriptionTier || 'free',
+        });
       } catch (err) {
         console.error('Failed to fetch user:', err);
         setError(err instanceof Error ? err.message : 'Failed to load user data');
@@ -103,12 +135,19 @@ export default function UserDetailPage() {
       setSaving(true);
       setError(null);
       setSuccess(null);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
       
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(formData),
       });
@@ -145,9 +184,18 @@ export default function UserDetailPage() {
     try {
       setSaving(true);
       setError(null);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
       
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
       
       if (!response.ok) {

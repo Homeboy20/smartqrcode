@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "next-themes";
 import { usePathname } from 'next/navigation';
-import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useAuth } from '@/context/FirebaseAuthContext';
 // Removed unused Lucide icons
 // import { Menu, X } from "lucide-react";
 
@@ -23,7 +23,7 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const { user, loading, logout } = useSupabaseAuth();
+  const { user, loading, logout } = useAuth();
   const pathname = usePathname();
 
   useEffect(() => {

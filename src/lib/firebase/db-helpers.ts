@@ -20,7 +20,7 @@ import {
   startAfter,
   QueryDocumentSnapshot
 } from 'firebase/firestore';
-import { db } from './firebase-config';
+import { db } from './config';
 
 // Generic type for Firestore document data
 export type FirestoreDoc<T> = T & {

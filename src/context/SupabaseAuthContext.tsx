@@ -12,9 +12,11 @@ interface SupabaseAuthContextType {
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, displayName?: string) => Promise<boolean>;
+  updateProfile: (profile: { displayName?: string }) => Promise<boolean>;
   logout: () => Promise<boolean>;
   resetPassword: (email: string) => Promise<boolean>;
-  signInWithGoogle: () => Promise<boolean>;
+  signInWithGoogle: (options?: { redirectTo?: string }) => Promise<boolean>;
+  getAccessToken: () => Promise<string | null>;
   clearError: () => void;
   isAdmin: boolean;
 }
@@ -27,9 +29,11 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
   error: null,
   signIn: async () => false,
   signUp: async () => false,
+  updateProfile: async () => false,
   logout: async () => false,
   resetPassword: async () => false,
   signInWithGoogle: async () => false,
+  getAccessToken: async () => null,
   clearError: () => {},
   isAdmin: false,
 });
@@ -128,22 +132,67 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return false;
       }
 
-      // Create user record in users table
+      // Best-effort upsert to users table (DB trigger should provision reliably).
       if (data.user) {
-        await supabase.from('users').upsert({
-          id: data.user.id,
-          email: data.user.email,
-          display_name: displayName || '',
-          role: 'user',
-          subscription_tier: 'free',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+        try {
+          await supabase.from('users').upsert({
+            id: data.user.id,
+            email: data.user.email,
+            display_name: displayName || '',
+            role: 'user',
+            subscription_tier: 'free',
+          });
+        } catch (e) {
+          // Ignore: user row will be created by trigger or on first authenticated session.
+          console.warn('Users table upsert skipped:', e);
+        }
       }
 
       return true;
     } catch (err: any) {
       setError(err.message);
+      return false;
+    }
+  };
+
+  // Update profile (auth metadata + users table)
+  const updateProfile = async (profile: { displayName?: string }) => {
+    try {
+      clearError();
+
+      const displayName = profile.displayName?.trim();
+      if (!displayName) {
+        setError('Display name is required');
+        return false;
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const currentUser = sessionData.session?.user;
+      if (!currentUser) {
+        setError('Not signed in');
+        return false;
+      }
+
+      const { error: updateAuthError } = await supabase.auth.updateUser({
+        data: {
+          display_name: displayName,
+        },
+      });
+      if (updateAuthError) throw updateAuthError;
+
+      // Best-effort update for app profile.
+      await supabase
+        .from('users')
+        .upsert({
+          id: currentUser.id,
+          email: currentUser.email,
+          display_name: displayName,
+        });
+
+      return true;
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update profile');
       return false;
     }
   };
@@ -182,13 +231,15 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   // Sign in with Google
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (options?: { redirectTo?: string }) => {
     try {
       clearError();
+
+      const redirectTo = options?.redirectTo || `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo,
         }
       });
       if (error) {
@@ -202,6 +253,16 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const getAccessToken = async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return null;
+      return data.session?.access_token || null;
+    } catch {
+      return null;
+    }
+  };
+
   return (
     <SupabaseAuthContext.Provider
       value={{
@@ -211,9 +272,11 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         error,
         signIn,
         signUp,
+        updateProfile,
         logout,
         resetPassword,
         signInWithGoogle,
+        getAccessToken,
         clearError,
         isAdmin,
       }}

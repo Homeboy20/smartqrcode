@@ -7,6 +7,8 @@ import QRCodeGenerator from "@/components/QRCodeGenerator";
 import BarcodeGenerator from "@/components/BarcodeGenerator";
 import SequenceGenerator from "@/components/SequenceGenerator";
 import BulkSequenceGenerator from "@/components/BulkSequenceGenerator";
+import { useAppSettings } from "@/hooks/useAppSettings";
+import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 
 // Unified component for code generation
 function UnifiedGenerator() {
@@ -47,7 +49,7 @@ function UnifiedGenerator() {
           <button
             onClick={() => handleTabChange('qrcode')}
             id="tab-qrcode"
-            aria-selected={activeTab === 'qrcode'}
+            aria-pressed={activeTab === 'qrcode'}
             className={`${
               activeTab === 'qrcode'
                 ? "bg-indigo-600 text-white font-bold shadow-md"
@@ -59,7 +61,7 @@ function UnifiedGenerator() {
           <button
             onClick={() => handleTabChange('barcode')}
             id="tab-barcode"
-            aria-selected={activeTab === 'barcode'}
+            aria-pressed={activeTab === 'barcode'}
             className={`${
               activeTab === 'barcode'
                 ? "bg-indigo-600 text-white font-bold shadow-md"
@@ -71,7 +73,7 @@ function UnifiedGenerator() {
           <button
             onClick={() => handleTabChange('sequence')}
             id="tab-sequence"
-            aria-selected={activeTab === 'sequence'}
+            aria-pressed={activeTab === 'sequence'}
             className={`${
               activeTab === 'sequence'
                 ? "bg-indigo-600 text-white font-bold shadow-md"
@@ -83,7 +85,7 @@ function UnifiedGenerator() {
           <button
             onClick={() => handleTabChange('bulk')}
             id="tab-bulk"
-            aria-selected={activeTab === 'bulk'}
+            aria-pressed={activeTab === 'bulk'}
             className={`${
               activeTab === 'bulk'
                 ? "bg-indigo-600 text-white font-bold shadow-md"
@@ -173,6 +175,10 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 }
 
 export default function Home() {
+  const { settings: appSettings, loading: settingsLoading } = useAppSettings();
+  const { user } = useSupabaseAuth();
+  const isFreeModeEnabled = appSettings.freeMode;
+  
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
@@ -185,14 +191,34 @@ export default function Home() {
         
         <div className="relative max-w-7xl mx-auto px-4 py-16 sm:py-24 lg:py-32 sm:px-6 lg:px-8">
           <div className="text-center">
+            {/* Free Mode Badge */}
+            {isFreeModeEnabled && !user && (
+              <div className="inline-flex items-center bg-yellow-400 text-gray-900 px-4 py-2 rounded-full font-bold text-sm mb-6 animate-bounce shadow-lg">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                100% FREE - No Signup Required!
+              </div>
+            )}
+            
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight">
               Free QR Code & Barcode
               <span className="block text-yellow-400 mt-2">Generator Online</span>
             </h1>
             <p className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-indigo-100 leading-relaxed">
-              Create custom QR codes and barcodes instantly. No signup required. 
-              Download in PNG, SVG, or JPEG format. Perfect for business cards, 
-              product labels, marketing materials, and more.
+              {isFreeModeEnabled ? (
+                <>
+                  Create custom QR codes and barcodes <strong className="text-yellow-300">instantly - no signup required!</strong>
+                  {" "}Try basic features for free, or create an account to unlock premium templates, 
+                  bulk generation, and advanced customization.
+                </>
+              ) : (
+                <>
+                  Create custom QR codes and barcodes instantly. No signup required. 
+                  Download in PNG, SVG, or JPEG format. Perfect for business cards, 
+                  product labels, marketing materials, and more.
+                </>
+              )}
             </p>
             
             {/* CTA Buttons */}
@@ -216,24 +242,49 @@ export default function Home() {
             
             {/* Trust indicators */}
             <div className="mt-12 flex flex-wrap justify-center gap-8 text-indigo-200 text-sm">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                No signup required
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                100% Free to use
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-                High-resolution downloads
-              </div>
+              {isFreeModeEnabled ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <strong className="text-yellow-300">Try Free Now</strong> - No Account Required
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Instant Generation
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Premium Features Available
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    No signup required
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    100% Free to use
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    High-resolution downloads
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -242,6 +293,56 @@ export default function Home() {
       {/* Generator Section */}
       <section id="generator" className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Free Mode Banner */}
+          {isFreeModeEnabled && !user && (
+            <div className="mb-8 bg-gradient-to-r from-green-50 via-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+              {/* Animated background sparkles */}
+              <div className="absolute inset-0 opacity-20">
+                <div className="absolute top-2 left-10 w-2 h-2 bg-yellow-400 rounded-full animate-ping"></div>
+                <div className="absolute top-5 right-20 w-3 h-3 bg-orange-400 rounded-full animate-pulse"></div>
+                <div className="absolute bottom-3 left-1/3 w-2 h-2 bg-green-400 rounded-full animate-bounce"></div>
+              </div>
+              
+              <div className="relative flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-start flex-1">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                      🎉 Start Creating Instantly!
+                    </h3>
+                    <p className="mt-2 text-sm text-gray-700 leading-relaxed">
+                      <strong className="text-green-700">No signup needed!</strong> Generate QR codes and barcodes right now. Want to save your work and unlock premium features?
+                      {" "}<span className="font-semibold text-yellow-700">Create a free account</span> in 30 seconds.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 flex flex-col sm:flex-row gap-3">
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105 transition"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                    Sign Up Free
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center px-6 py-3 border-2 border-indigo-600 text-base font-semibold rounded-xl text-indigo-700 bg-white hover:bg-indigo-50 transition"
+                  >
+                    Login
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
               Create Your Code in Seconds

@@ -170,6 +170,10 @@ export function getRemainingUsage(
     case 'noWatermark':
     case 'svgDownload':
     case 'pdfDownload':
+    case 'qrCodeTracking':
+    case 'enhancedBarcodes':
+    case 'fileUploads':
+    case 'analytics':
       // These are access-based features, not limited by usage
       return { daily: 999999, monthly: 999999 };
     default:

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function VerifyAccountPage() {
-  const { user, loading, error, sendVerificationEmail, setupRecaptcha, verifyPhoneCode } = useAuth();
+  const { user, loading, error, sendVerificationEmail, setupRecaptcha, sendPhoneVerificationCode, verifyPhoneCode } = useAuth();
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('email');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -21,15 +21,7 @@ export default function VerifyAccountPage() {
   // Check if user is already verified
   useEffect(() => {
     if (!loading && user) {
-      let isVerified = false;
-      
-      if ('uid' in user) {
-        // Firebase Auth user
-        isVerified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
-      } else {
-        // UserData object
-        isVerified = Boolean(user.emailVerified) || Boolean(user.phoneVerified);
-      }
+      const isVerified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
       
       if (isVerified) {
         router.push('/dashboard');
@@ -70,9 +62,10 @@ export default function VerifyAccountPage() {
           const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
           
           // Store the phone number in the window object for later use
-          window.phoneNumber = formattedPhoneNumber;
-          
-          const confirmation = await setupRecaptcha(formattedPhoneNumber);
+          (window as any).phoneNumber = formattedPhoneNumber;
+
+          const recaptchaVerifier = await setupRecaptcha('recaptcha-container');
+          const confirmation = await sendPhoneVerificationCode(formattedPhoneNumber, recaptchaVerifier);
           setConfirmationResult(confirmation);
           setCodeSent(true);
           setStatusMessage('Verification code sent to your phone. Please enter it below.');
@@ -99,7 +92,7 @@ export default function VerifyAccountPage() {
     setStatusMessage('');
     
     try {
-      const success = await verifyPhoneCode(verificationCode, confirmationResult);
+      const success = await verifyPhoneCode(confirmationResult, verificationCode);
       if (success) {
         setStatusMessage('Phone verified successfully!');
         // Redirect to dashboard after successful verification
@@ -198,6 +191,7 @@ export default function VerifyAccountPage() {
           </div>
         ) : (
           <div className="space-y-4">
+            <div id="recaptcha-container" />
             {!codeSent ? (
               <>
                 <div className="space-y-2">

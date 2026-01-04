@@ -165,7 +165,14 @@ export interface PayPalCredentials {
 }
 
 export interface FlutterwaveCredentials {
+  clientId: string;
+  clientSecret: string;
+  encryptionKey: string;
+}
+
+export interface PaystackCredentials {
   publicKey: string;
   secretKey: string;
-  encryptionKey: string;
+  planCodePro: string;
+  planCodeBusiness: string;
 } 

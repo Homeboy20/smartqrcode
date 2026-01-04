@@ -1,31 +1,109 @@
-import Flutterwave from 'flutterwave-node-v3';
+// Flutterwave V4 API Integration
+// Documentation: https://developer.flutterwave.com/reference
+
 import { getCredential } from '@/lib/credentials';
+import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 
-// Initialize Flutterwave with lazy loading
-let flutterwaveClient: any = null;
+const FLUTTERWAVE_V4_BASE_URL = 'https://api.flutterwave.com/v4';
 
-// Get Flutterwave client
-async function getFlutterwaveClient() {
-  if (!flutterwaveClient) {
-    const publicKey = await getCredential('FLUTTERWAVE_PUBLIC_KEY');
-    const secretKey = await getCredential('FLUTTERWAVE_SECRET_KEY');
-    
-    // Make sure credentials are available
-    if (!publicKey || !secretKey) {
-      console.warn('Missing Flutterwave credentials (FLUTTERWAVE_PUBLIC_KEY and/or FLUTTERWAVE_SECRET_KEY)');
-      throw new Error('Flutterwave credentials not configured');
-    }
-    
-    flutterwaveClient = new Flutterwave(publicKey, secretKey);
-  }
-  
-  return flutterwaveClient;
+// Types for Flutterwave V4 API
+export interface FlutterwaveCustomer {
+  id?: string;
+  email: string;
+  name?: {
+    first: string;
+    middle?: string;
+    last?: string;
+  };
+  phone?: {
+    country_code: string;
+    number: string;
+  };
+  address?: {
+    city?: string;
+    country?: string;
+    line1?: string;
+    line2?: string;
+    postal_code?: string;
+    state?: string;
+  };
+  meta?: Record<string, any>;
 }
 
-// Create a payment link with Flutterwave
+export interface FlutterwavePayment {
+  tx_ref: string;
+  amount: string;
+  currency: string;
+  redirect_url: string;
+  payment_options?: string;
+  customer: {
+    email: string;
+    name: string;
+  };
+  customizations?: {
+    title?: string;
+    description?: string;
+    logo?: string;
+  };
+  meta?: Record<string, any>;
+}
+
+// Get Flutterwave credentials
+async function getFlutterwaveCredentials() {
+  const runtime = await getProviderRuntimeConfig('flutterwave');
+  const clientId = runtime.credentials.clientId || (await getCredential('FLUTTERWAVE_CLIENT_ID'));
+  const clientSecret = runtime.credentials.clientSecret || (await getCredential('FLUTTERWAVE_CLIENT_SECRET'));
+  const encryptionKey = runtime.credentials.encryptionKey || (await getCredential('FLUTTERWAVE_ENCRYPTION_KEY'));
+  
+  if (!clientId || !clientSecret) {
+    throw new Error('Flutterwave credentials not configured');
+  }
+  
+  return { clientId, clientSecret, encryptionKey };
+}
+
+// Make authenticated request to Flutterwave V4 API
+async function flutterwaveRequest(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  body?: any
+) {
+  const { clientSecret } = await getFlutterwaveCredentials();
+  
+  const url = `${FLUTTERWAVE_V4_BASE_URL}${endpoint}`;
+  
+  const options: RequestInit = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${clientSecret}`,
+    },
+  };
+  
+  if (body && (method === 'POST' || method === 'PUT')) {
+    options.body = JSON.stringify(body);
+  }
+  
+  const response = await fetch(url, options);
+  const data = await response.json();
+  
+  if (!response.ok || data.status !== 'success') {
+    const errorMessage = data.message || `Flutterwave API error: ${response.statusText}`;
+    console.error('Flutterwave API Error:', {
+      status: response.status,
+      message: errorMessage,
+      data
+    });
+    throw new Error(errorMessage);
+  }
+  
+  return data;
+}
+
+// Create a payment link with Flutterwave V4
 export async function createFlutterwavePaymentLink({
   amount,
-  currency = 'USD',
+  currency = 'NGN',
   customerEmail,
   customerName,
   description,
@@ -45,15 +123,11 @@ export async function createFlutterwavePaymentLink({
   metadata?: Record<string, any>;
 }) {
   try {
-    // Get Flutterwave client
-    const flw = await getFlutterwaveClient();
-    
-    // Prepare payment payload
-    const payload: any = {
+    const payload = {
       tx_ref: reference,
-      amount,
+      amount: amount.toString(),
       currency,
-      payment_options: 'card, mobilemoneyghana, ussd',
+      payment_options: 'card,mobilemoney,ussd,account,banktransfer',
       redirect_url: redirectUrl,
       customer: {
         email: customerEmail,
@@ -62,51 +136,32 @@ export async function createFlutterwavePaymentLink({
       customizations: {
         title: 'SmartQRCode Payment',
         description,
-        logo: 'https://yourdomain.com/logo.png', // Replace with your logo URL
+        logo: process.env.NEXT_PUBLIC_APP_LOGO_URL || '',
       },
       meta: {
         ...metadata,
         source: 'smartqrcode_app',
+        callback_url: callbackUrl,
       },
     };
 
-    if (callbackUrl) {
-      payload.meta = {
-        ...payload.meta,
-        callback_url: callbackUrl
-      };
-    }
-
-    // Create payment link
-    const response = await flw.Charge.card(payload);
-
-    // Verify that the request was successful
-    if (response.status !== 'success') {
-      throw new Error(response.message || 'Failed to create payment link');
-    }
+    const response = await flutterwaveRequest('/payments', 'POST', payload);
 
     return {
       paymentLink: response.data.link,
       reference: payload.tx_ref,
-      flwRef: response.data?.flw_ref,
+      flwRef: response.data.id,
     };
   } catch (error) {
     console.error('Error creating Flutterwave payment link:', error);
-    throw new Error('Failed to create payment link');
+    throw error;
   }
 }
 
-// Verify a Flutterwave transaction
+// Verify a Flutterwave transaction using V4 API
 export async function verifyFlutterwaveTransaction(transactionId: string) {
   try {
-    // Get Flutterwave client
-    const flw = await getFlutterwaveClient();
-    
-    const response = await flw.Transaction.verify({ id: transactionId });
-
-    if (response.status !== 'success') {
-      throw new Error(response.message || 'Transaction verification failed');
-    }
+    const response = await flutterwaveRequest(`/transactions/${transactionId}/verify`);
 
     const transactionData = response.data;
 
@@ -116,7 +171,7 @@ export async function verifyFlutterwaveTransaction(transactionId: string) {
       currency: transactionData.currency,
       customerEmail: transactionData.customer.email,
       reference: transactionData.tx_ref,
-      flwRef: transactionData.flw_ref,
+      flwRef: transactionData.id,
       transactionId: transactionData.id,
       paymentType: transactionData.payment_type,
       metadata: transactionData.meta,
@@ -124,7 +179,7 @@ export async function verifyFlutterwaveTransaction(transactionId: string) {
     };
   } catch (error) {
     console.error('Error verifying Flutterwave transaction:', error);
-    throw new Error('Failed to verify transaction');
+    throw error;
   }
 }
 
@@ -141,7 +196,7 @@ export interface FlutterwavePaymentParams {
   testMode?: boolean; // Add test mode parameter
 }
 
-// Update the function implementation to handle test mode
+// Create subscription payment using V4 API
 export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePaymentParams) {
   const { 
     amount, 
@@ -155,22 +210,58 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
     testMode = false 
   } = params;
   
-  // Use test or production credentials based on test mode
-  const publicKey = testMode 
-    ? process.env.FLUTTERWAVE_TEST_PUBLIC_KEY || process.env.FLUTTERWAVE_PUBLIC_KEY
-    : process.env.FLUTTERWAVE_PUBLIC_KEY;
+  try {
+    const { clientSecret } = await getFlutterwaveCredentials();
     
-  const secretKey = testMode
-    ? process.env.FLUTTERWAVE_TEST_SECRET_KEY || process.env.FLUTTERWAVE_SECRET_KEY
-    : process.env.FLUTTERWAVE_SECRET_KEY;
-  
-  // Implement rest of the function...
-  
-  // Mock return for now
-  return {
-    reference,
-    paymentLink: 'https://flutterwave.com/checkout'
-  };
+    const payload = {
+      tx_ref: reference,
+      amount: amount.toString(),
+      currency,
+      redirect_url: redirectUrl,
+      payment_options: 'card,mobilemoney,ussd,account,banktransfer',
+      customer: {
+        email: customerEmail,
+        name: customerName || customerEmail.split('@')[0],
+      },
+      customizations: {
+        title: planName,
+        description: `Subscription payment for ${planName}`,
+        logo: process.env.NEXT_PUBLIC_APP_LOGO_URL || 'https://smartqrcode.app/logo.png',
+      },
+      meta: {
+        ...metadata,
+        planName,
+        source: 'smartqrcode_subscription',
+        testMode,
+      },
+    };
+
+    const response = await fetch(`${FLUTTERWAVE_V4_BASE_URL}/payments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${clientSecret}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await response.json();
+
+    if (!response.ok || json?.status !== 'success') {
+      const message = json?.message || 'Failed to initialize Flutterwave payment';
+      console.error('Flutterwave V4 init error:', message, json);
+      throw new Error(message);
+    }
+
+    return {
+      reference,
+      paymentLink: json.data?.link,
+      flwRef: json.data?.id,
+    };
+  } catch (error) {
+    console.error('Error creating Flutterwave subscription payment:', error);
+    throw error;
+  }
 }
 
 // Cancel a subscription (implemented as disabling recurring billing)
@@ -190,12 +281,195 @@ export async function cancelFlutterwaveSubscription(customerId: string, subscrip
   };
 }
 
-// Get Flutterwave public key for client-side rendering
-export async function getFlutterwavePublicKey() {
-  return await getCredential('FLUTTERWAVE_PUBLIC_KEY');
+// Get Flutterwave client ID for client-side rendering
+export async function getFlutterwaveClientId() {
+  const { clientId } = await getFlutterwaveCredentials();
+  return clientId;
 }
 
 // Get Flutterwave encryption key for client-side encryption
 export async function getFlutterwaveEncryptionKey() {
-  return await getCredential('FLUTTERWAVE_ENCRYPTION_KEY');
+  const { encryptionKey } = await getFlutterwaveCredentials();
+  return encryptionKey;
+}
+
+// List all transactions (V4 API)
+export async function listFlutterwaveTransactions(params?: {
+  from?: string;
+  to?: string;
+  page?: number;
+  customer_email?: string;
+}) {
+  try {
+    let endpoint = '/transactions';
+    if (params) {
+      const queryParams = new URLSearchParams();
+      if (params.from) queryParams.append('from', params.from);
+      if (params.to) queryParams.append('to', params.to);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.customer_email) queryParams.append('customer_email', params.customer_email);
+      
+      if (queryParams.toString()) {
+        endpoint += `?${queryParams.toString()}`;
+      }
+    }
+    
+    const response = await flutterwaveRequest(endpoint);
+    return response.data;
+  } catch (error) {
+    console.error('Error listing Flutterwave transactions:', error);
+    throw error;
+  }
+}
+
+// Get transaction fee (V4 API)
+export async function getFlutterwaveTransactionFee(params: {
+  amount: number;
+  currency: string;
+  payment_type?: string;
+}) {
+  try {
+    const queryParams = new URLSearchParams({
+      amount: params.amount.toString(),
+      currency: params.currency,
+    });
+    
+    if (params.payment_type) {
+      queryParams.append('payment_type', params.payment_type);
+    }
+    
+    const response = await flutterwaveRequest(`/transactions/fee?${queryParams.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting Flutterwave transaction fee:', error);
+    throw error;
+  }
+}
+
+// ============================================
+// CUSTOMER MANAGEMENT (V4 API)
+// ============================================
+
+// List customers with pagination
+export async function listFlutterwaveCustomers(params?: {
+  page?: number;
+  size?: number; // 10-50
+}) {
+  try {
+    const queryParams = new URLSearchParams();
+    queryParams.append('page', (params?.page || 1).toString());
+    queryParams.append('size', Math.min(params?.size || 10, 50).toString());
+    
+    const response = await flutterwaveRequest(`/customers?${queryParams.toString()}`);
+    return {
+      customers: response.data,
+      meta: response.meta,
+    };
+  } catch (error) {
+    console.error('Error listing Flutterwave customers:', error);
+    throw error;
+  }
+}
+
+// Create a new customer
+export async function createFlutterwaveCustomer(customer: FlutterwaveCustomer) {
+  try {
+    const payload: any = {
+      email: customer.email,
+    };
+
+    if (customer.name) {
+      payload.name = customer.name;
+    }
+
+    if (customer.phone) {
+      payload.phone = customer.phone;
+    }
+
+    if (customer.address) {
+      payload.address = customer.address;
+    }
+
+    if (customer.meta) {
+      payload.meta = customer.meta;
+    }
+
+    const response = await flutterwaveRequest('/customers', 'POST', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating Flutterwave customer:', error);
+    throw error;
+  }
+}
+
+// Get a single customer by ID
+export async function getFlutterwaveCustomer(customerId: string) {
+  try {
+    const response = await flutterwaveRequest(`/customers/${customerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting Flutterwave customer:', error);
+    throw error;
+  }
+}
+
+// Update an existing customer
+export async function updateFlutterwaveCustomer(
+  customerId: string,
+  updates: Partial<FlutterwaveCustomer>
+) {
+  try {
+    const payload: any = {};
+
+    if (updates.email) payload.email = updates.email;
+    if (updates.name) payload.name = updates.name;
+    if (updates.phone) payload.phone = updates.phone;
+    if (updates.address) payload.address = updates.address;
+    if (updates.meta) payload.meta = updates.meta;
+
+    const response = await flutterwaveRequest(`/customers/${customerId}`, 'PUT', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating Flutterwave customer:', error);
+    throw error;
+  }
+}
+
+// Search customers by email, name, or phone
+export async function searchFlutterwaveCustomers(searchParams: {
+  email?: string;
+  name?: string;
+  phone?: string;
+}) {
+  try {
+    const response = await flutterwaveRequest('/customers/search', 'POST', searchParams);
+    return response.data;
+  } catch (error) {
+    console.error('Error searching Flutterwave customers:', error);
+    throw error;
+  }
+}
+
+// Get or create customer (helper function)
+export async function getOrCreateFlutterwaveCustomer(customer: FlutterwaveCustomer) {
+  try {
+    // Try to search for existing customer by email
+    const searchResults = await searchFlutterwaveCustomers({ email: customer.email });
+    
+    if (searchResults && searchResults.length > 0) {
+      return searchResults[0]; // Return first match
+    }
+    
+    // Customer doesn't exist, create new one
+    return await createFlutterwaveCustomer(customer);
+  } catch (error) {
+    console.error('Error getting or creating Flutterwave customer:', error);
+    // If search fails, try to create directly
+    try {
+      return await createFlutterwaveCustomer(customer);
+    } catch (createError) {
+      console.error('Error creating customer after search failed:', createError);
+      throw createError;
+    }
+  }
 } 

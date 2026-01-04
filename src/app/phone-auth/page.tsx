@@ -7,7 +7,7 @@ import PhoneSignup from '@/components/auth/PhoneSignup';
 
 export default function PhoneAuthPage() {
   const searchParams = useSearchParams();
-  const redirect = searchParams?.get('redirect') || '/profile';
+  const redirect = searchParams?.get('redirect') || '/';
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -18,7 +18,7 @@ export default function PhoneAuthPage() {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{' '}
-            <Link href={`/login${redirect !== '/profile' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`} className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link href={`/login?redirect=${encodeURIComponent(redirect)}`} className="font-medium text-indigo-600 hover:text-indigo-500">
               sign in with email
             </Link>
           </p>
@@ -41,7 +41,7 @@ export default function PhoneAuthPage() {
           <div className="mt-6 grid grid-cols-2 gap-3">
             <div>
               <Link
-                href={`/login${redirect !== '/profile' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`}
+                href={`/login?redirect=${encodeURIComponent(redirect)}`}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
                 Email
@@ -49,7 +49,7 @@ export default function PhoneAuthPage() {
             </div>
             <div>
               <Link
-                href={`/signup${redirect !== '/profile' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`}
+                href={`/register?redirect=${encodeURIComponent(redirect)}`}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
               >
                 Account Signup

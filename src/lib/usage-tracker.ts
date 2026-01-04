@@ -1,6 +1,22 @@
 import { db } from '@/lib/firebase-admin';
 import { FeatureType } from '@/lib/subscription';
 
+function coerceToDate(value: unknown, fallback: Date): Date {
+  if (!value) return fallback;
+  if (value instanceof Date) return value;
+  if (typeof value === 'object' && value !== null && 'toDate' in value) {
+    const maybeToDate = (value as { toDate?: () => Date }).toDate;
+    if (typeof maybeToDate === 'function') {
+      const result = maybeToDate();
+      if (result instanceof Date && !Number.isNaN(result.getTime())) return result;
+    }
+  }
+
+  const parsed = new Date(value as any);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  return fallback;
+}
+
 export type UsageStats = {
   features: Record<string, {
     daily: {
@@ -45,7 +61,11 @@ export async function getUserUsageStats(userId: string): Promise<UsageStats> {
 /**
  * Increment usage count for a specific feature
  */
-export async function incrementUsage(userId: string, feature: FeatureType): Promise<void> {
+export async function incrementUsage(
+  userId: string,
+  feature: FeatureType,
+  amount: number = 1
+): Promise<void> {
   try {
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
@@ -75,9 +95,7 @@ export async function incrementUsage(userId: string, feature: FeatureType): Prom
     const featureStats = usageStats.features[feature];
     
     // Reset daily count if it's a new day
-    const lastDailyReset = featureStats.daily.lastReset instanceof Date 
-      ? featureStats.daily.lastReset 
-      : new Date(featureStats.daily.lastReset);
+    const lastDailyReset = coerceToDate(featureStats.daily.lastReset, now);
       
     if (now.getDate() !== lastDailyReset.getDate() || 
         now.getMonth() !== lastDailyReset.getMonth() || 
@@ -87,9 +105,7 @@ export async function incrementUsage(userId: string, feature: FeatureType): Prom
     }
     
     // Reset monthly count if it's a new month
-    const lastMonthlyReset = featureStats.monthly.lastReset instanceof Date 
-      ? featureStats.monthly.lastReset 
-      : new Date(featureStats.monthly.lastReset);
+    const lastMonthlyReset = coerceToDate(featureStats.monthly.lastReset, now);
       
     if (now.getMonth() !== lastMonthlyReset.getMonth() || 
         now.getFullYear() !== lastMonthlyReset.getFullYear()) {
@@ -98,8 +114,9 @@ export async function incrementUsage(userId: string, feature: FeatureType): Prom
     }
     
     // Increment counts
-    featureStats.daily.count++;
-    featureStats.monthly.count++;
+    const safeAmount = Number.isFinite(amount) ? Math.max(1, Math.floor(amount)) : 1;
+    featureStats.daily.count += safeAmount;
+    featureStats.monthly.count += safeAmount;
     
     // Update user document
     await userRef.update({

@@ -1,23 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-// import { updateUserData } from "@/lib/firestore";
-import { db, isFirebaseAvailable } from "@/lib/firebase/config";
-import {
-  collection,
-  getDocs,
-  doc,
-  updateDoc,
-  DocumentData,
-  Timestamp,
-  query,
-  where,
-} from "firebase/firestore";
 import CreateUserModal from '@/components/admin/CreateUserModal';
 import { getSubscriptionDetails, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
-import { User as FirebaseUser } from 'firebase/auth';
+import { supabase } from '@/lib/supabase/client';
 
 interface User {
   id: string;
@@ -91,9 +79,17 @@ export default function AdminUsersPage() {
         setLoading(true);
         setError(null);
         console.log('Fetching users from API...');
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        if (!accessToken) {
+          throw new Error('Not authenticated. Please log in again.');
+        }
+
         const response = await fetch('/api/admin/users', {
           cache: 'no-store',
           headers: {
+            Authorization: `Bearer ${accessToken}`,
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
@@ -148,10 +144,17 @@ export default function AdminUsersPage() {
   const handleSaveChanges = async () => {
     if (!editingUser || !isClient) return;
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       const response = await fetch(`/api/admin/users/${editingUser.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           displayName: editingUser.displayName,
@@ -184,10 +187,17 @@ export default function AdminUsersPage() {
     const { password, ...userDataWithoutPassword } = userData;
     
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       const response = await fetch('/api/admin/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           ...userDataWithoutPassword,
@@ -214,11 +224,18 @@ export default function AdminUsersPage() {
 
   const handleRoleChange = async (userId: string, newRole: 'admin' | 'user') => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       // Use the API endpoint instead of direct Firestore access
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ role: newRole }),
       });
@@ -242,11 +259,18 @@ export default function AdminUsersPage() {
 
   const handleSubscriptionChange = async (userId: string, newTier: string) => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       // Use the API endpoint instead of direct Firestore access
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ subscriptionTier: newTier }),
       });
@@ -275,8 +299,17 @@ export default function AdminUsersPage() {
     }
     
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please log in again.');
+      }
+
       const response = await fetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
       
       if (!response.ok) {
@@ -534,7 +567,7 @@ export default function AdminUsersPage() {
                           <span className="text-indigo-800 font-semibold text-sm">
                             {user.displayName 
                               ? user.displayName.charAt(0).toUpperCase() 
-                              : user.email.charAt(0).toUpperCase()}
+                              : (user.email ? user.email.charAt(0).toUpperCase() : 'U')}
                           </span>
                         </div>
                         <div className="ml-4">
@@ -542,7 +575,7 @@ export default function AdminUsersPage() {
                             {user.displayName || 'No Name'}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {user.email}
+                            {user.email || 'No email'}
                           </div>
                         </div>
                       </div>

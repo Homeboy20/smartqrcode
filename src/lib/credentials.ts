@@ -1,4 +1,6 @@
-import { getAllDecryptedCredentials, getDecryptedCredential } from '@/app/api/admin/credentials/route';
+import 'server-only';
+
+import { getAllDecryptedCredentials, getDecryptedCredential } from '@/lib/credentialsVault.server';
 
 /**
  * Get a credential from either environment variables or encrypted storage
@@ -73,8 +75,8 @@ export interface PaymentCredentials {
   PAYPAL_PLAN_ID_BUSINESS?: string;
   
   // Flutterwave
-  FLUTTERWAVE_PUBLIC_KEY: string;
-  FLUTTERWAVE_SECRET_KEY: string;
+  FLUTTERWAVE_CLIENT_ID: string;
+  FLUTTERWAVE_CLIENT_SECRET: string;
   FLUTTERWAVE_ENCRYPTION_KEY?: string;
 }
 
@@ -162,11 +164,11 @@ export async function getPaymentGatewayCredentials(gateway: 'stripe' | 'paypal' 
         break;
         
       case 'flutterwave':
-        if (!allCreds.FLUTTERWAVE_PUBLIC_KEY || !allCreds.FLUTTERWAVE_SECRET_KEY) {
+        if (!allCreds.FLUTTERWAVE_CLIENT_ID || !allCreds.FLUTTERWAVE_CLIENT_SECRET) {
           return null;
         }
-        gatewayCredentials.FLUTTERWAVE_PUBLIC_KEY = allCreds.FLUTTERWAVE_PUBLIC_KEY;
-        gatewayCredentials.FLUTTERWAVE_SECRET_KEY = allCreds.FLUTTERWAVE_SECRET_KEY;
+        gatewayCredentials.FLUTTERWAVE_CLIENT_ID = allCreds.FLUTTERWAVE_CLIENT_ID;
+        gatewayCredentials.FLUTTERWAVE_CLIENT_SECRET = allCreds.FLUTTERWAVE_CLIENT_SECRET;
         if (allCreds.FLUTTERWAVE_ENCRYPTION_KEY) {
           gatewayCredentials.FLUTTERWAVE_ENCRYPTION_KEY = allCreds.FLUTTERWAVE_ENCRYPTION_KEY;
         }
@@ -203,50 +205,3 @@ export async function getCredentialWithFallback(key: string): Promise<string | u
   // Otherwise fall back to environment variable
   return process.env[key];
 }
-
-// Client-safe credential functions
-// These don't import server-only modules and use environment variables
-// or API calls to get credentials
-
-/**
- * Get a credential from environment variables
- * @param key The credential key to retrieve
- * @returns The credential value or null if not found
- */
-export function getClientCredential(key: string): string | null {
-  // For client-side, we can only access NEXT_PUBLIC_* variables
-  if (typeof window !== 'undefined' && key.startsWith('NEXT_PUBLIC_') && process.env[key]) {
-    return process.env[key] as string;
-  }
-  return null;
-}
-
-/**
- * Get Firebase configuration for client initialization
- */
-export function getClientFirebaseConfig(): Record<string, string | undefined> {
-  if (typeof window === 'undefined') {
-    // Server-side - can access process.env
-    return {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-    };
-  } else {
-    // Client-side - access from window.__NEXT_DATA__.props.pageProps
-    // Default to empty strings to prevent undefined errors
-    return {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '',
-      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || '',
-    };
-  }
-} 

@@ -26,7 +26,7 @@ interface Payment {
 }
 
 export default function AdminPaymentsPage() {
-  const { user } = useAuth();
+  const { user, getIdToken } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,11 +40,14 @@ export default function AdminPaymentsPage() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/admin/payments?days=${dateRange}`, {
+      const token = await getIdToken();
+      
+      const response = await fetch(`/api/admin/transactions`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -53,7 +56,25 @@ export default function AdminPaymentsPage() {
       }
       
       const data = await response.json();
-      setPayments(data.payments || []);
+      // Map transactions to payments format
+      const mappedPayments = (data.transactions || []).map((txn: any) => ({
+        id: txn.id,
+        userId: txn.userId || txn.user_id,
+        userEmail: txn.userEmail || txn.user_email,
+        amount: txn.amount,
+        currency: txn.currency,
+        status: txn.status,
+        paymentMethod: txn.paymentMethod || txn.payment_method || 'card',
+        paymentMethodDetails: {
+          type: txn.paymentMethod || txn.payment_method || 'card',
+          gateway: txn.paymentGateway || txn.payment_gateway
+        },
+        date: txn.createdAt || txn.created_at,
+        description: `Payment for ${txn.plan || 'service'}`,
+        metadata: txn.metadata || {},
+        subscriptionId: txn.plan
+      }));
+      setPayments(mappedPayments);
     } catch (err) {
       console.error('Failed to fetch payments:', err);
       setError(err instanceof Error ? err.message : 'Failed to load payments');
@@ -109,12 +130,19 @@ export default function AdminPaymentsPage() {
     }
     
     try {
-      const response = await fetch(`/api/admin/payments/${id}/refund`, {
-        method: 'POST',
+      const token = await getIdToken();
+      
+      // Update transaction status to refunded
+      const response = await fetch(`/api/admin/transactions/${id}`, {
+        method: 'PUT',
         headers: {
           'Cache-Control': 'no-cache',
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          status: 'refunded'
+        })
       });
       
       if (!response.ok) {

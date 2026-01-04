@@ -45,7 +45,6 @@ export default function QRModalExample() {
         onClose={closeModal}
         value={qrValue}
         title="Your QR Code"
-        downloadable={true}
       />
       
       <div className="mt-4 text-sm text-gray-600">

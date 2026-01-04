@@ -2,7 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 
 // Define the payment providers types
-export type PaymentProvider = 'stripe' | 'paypal' | 'flutterwave';
+export type PaymentProvider = 'paystack' | 'stripe' | 'paypal' | 'flutterwave';
 
 // Define the component props
 interface PaymentProviderSelectorProps {
@@ -14,10 +14,15 @@ interface PaymentProviderSelectorProps {
 export default function PaymentProviderSelector({
   selectedProvider,
   onSelectProvider,
-  availableProviders = ['stripe', 'paypal', 'flutterwave'],
+  availableProviders = ['paystack', 'flutterwave'],
 }: PaymentProviderSelectorProps) {
   // Provider display info
   const providerInfo = {
+    paystack: {
+      name: 'Paystack',
+      logo: '/images/paystack-logo.svg',
+      description: 'Pay with cards, bank, or USSD',
+    },
     stripe: {
       name: 'Stripe',
       logo: '/images/stripe-logo.svg',
@@ -82,6 +87,11 @@ export default function PaymentProviderSelector({
               <div className="ml-4 flex-shrink-0 w-16 h-10 relative">
                 <div className="absolute inset-0 flex items-center justify-center">
                   {/* Placeholder for logo - in production, replace with actual logos */}
+                  {provider === 'paystack' && (
+                    <svg className="h-6 text-indigo-600" viewBox="0 0 512 512" fill="currentColor">
+                      <path d="M85 128c-15 0-27 12-27 27v202c0 15 12 27 27 27h342c15 0 27-12 27-27V155c0-15-12-27-27-27H85zm0-32h342c33 0 59 26 59 59v202c0 33-26 59-59 59H85c-33 0-59-26-59-59V155c0-33 26-59 59-59z" />
+                    </svg>
+                  )}
                   {provider === 'stripe' && (
                     <svg className="h-6 text-blue-500" viewBox="0 0 60 25" fill="currentColor">
                       <path d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v2.94c-1.32.81-2.96 1.18-4.86 1.18-4.13 0-7.05-2.94-7.05-7.45 0-3.9 2.4-7.41 6.79-7.41 3.98 0 6.17 3.14 6.17 7.28 0 .36 0 1.08-.24 1.86zm-8.1-2.94h4.5c0-1.37-.91-2.21-2.18-2.21-1.32 0-2.14.91-2.32 2.21zM40.95 20c-1.5 0-2.43-.8-2.43-2.13 0-1.86 1.7-2.72 4.81-2.72v-.7c0-1.34-.62-1.89-1.87-1.89-.94 0-1.92.33-2.75.84V11c.9-.37 2.25-.8 3.88-.8 2.98 0 4.11 1.75 4.11 4.7V20h-3.2l-.28-1.01h-.1c-.83.8-1.92 1.23-3.17 1.23zm.77-2.78c.7 0 1.32-.37 1.6-.73v-1.49c-1.31 0-1.9.36-1.9 1.18 0 .58.31.95.85 1.04h.45zM30.6 20.03c-3.2 0-4.9-2.5-4.9-7.37 0-4.8 1.7-7.5 4.9-7.5 1.32 0 2.15.33 2.98.95V.01h3.88V20h-3.2l-.28-1.01h-.1c-.87.76-1.92 1.23-3.28 1.23V20v.03zm.8-3.13c.76 0 1.32-.18 1.7-.73V8.98c-.38-.4-.94-.55-1.7-.55-1.23 0-1.95 1.3-1.95 4.13 0 2.9.72 4.2 1.95 4.2v.07zM22.32 20h-3.89V5.89h3.89V20zM22.54.8c0 1.16-.94 2.1-2.1 2.1a2.1 2.1 0 0 1 0-4.2c1.16 0 2.1.94 2.1 2.1zM15.07 5.67c1.5 0 2.97.4 3.87.98v3.25a6.89 6.89 0 0 0-3.57-1.16c-1.36 0-1.92.55-1.92 1.16 0 .66.32 1.01 1.74 1.56 2.97 1.12 3.97 2.43 3.97 4.7 0 2.72-2.14 4.07-5.02 4.07-1.6 0-3.53-.5-4.57-1.2v-3.38c1.16.8 2.94 1.42 4.5 1.42 1.2 0 1.95-.4 1.95-1.27s-.59-1.23-2.06-1.78c-2.65-1.02-3.61-2.28-3.61-4.4.04-2.6 1.95-3.95 4.72-3.95zM1.95 12.26C1.95 8.34 4.69 5.6 8.62 5.6c1.23 0 2.32.22 3.06.62v3.24a5.47 5.47 0 0 0-2.83-.8c-1.97 0-3.02 1.16-3.02 3.42v.04c0 2.16 1.13 3.49 3.2 3.49.37 0 .73-.08 1.1-.16v-2.21H7.8V10.5h6.66V19c-1.6.87-3.57 1.23-5.84 1.23-4.61 0-6.67-2.83-6.67-7.97z"/>

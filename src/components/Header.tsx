@@ -3,11 +3,16 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, loading, logout, isAdmin } = useSupabaseAuth();
+  const { settings: appSettings } = useAppSettings();
+
+  const siteName = appSettings?.branding?.siteName || 'ScanMagic';
+  const logoUrl = appSettings?.branding?.logoUrl || '';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -32,6 +37,11 @@ export default function Header() {
     { href: "/about/", label: "About", icon: "ℹ️" },
   ];
 
+  const legalLinks = [
+    { href: "/privacypolicy", label: "Privacy" },
+    { href: "/terms&condition", label: "Terms" },
+  ];
+
   return (
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${
       isScrolled 
@@ -42,15 +52,21 @@ export default function Header() {
         <div className="flex justify-between items-center">
           {/* Logo & Branding */}
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg group-hover:shadow-indigo-200 transition-shadow">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg group-hover:shadow-indigo-200 transition-shadow overflow-hidden">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${siteName} logo`}
+                  className="h-full w-full object-contain bg-white"
+                />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+              )}
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-gray-900">
-                Scan<span className="text-indigo-600">Magic</span>
-              </span>
+              <span className="text-xl font-bold text-gray-900">{siteName}</span>
               <span className="text-xs text-gray-500 hidden sm:block">QR Code & Barcode Generator</span>
             </div>
           </Link>
@@ -66,7 +82,16 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            {user && (
+            {legalLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium transition-all"
+              >
+                {link.label}
+              </Link>
+            ))}
+            {user && !isAdmin && (
               <Link 
                 href="/dashboard/" 
                 className="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium transition-all"
@@ -160,7 +185,18 @@ export default function Header() {
                   {link.label}
                 </Link>
               ))}
-              {user && (
+              {legalLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center gap-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-all py-3 px-4 rounded-lg"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <span>📄</span>
+                  {link.label}
+                </Link>
+              ))}
+              {user && !isAdmin && (
                 <Link 
                   href="/dashboard/" 
                   className="flex items-center gap-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-all py-3 px-4 rounded-lg"
@@ -193,7 +229,7 @@ export default function Header() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
-                        <p className="text-xs text-gray-500">Free Plan</p>
+                        <p className="text-xs text-gray-500">{isAdmin ? 'Admin account' : 'Signed in'}</p>
                       </div>
                     </div>
                     <button
