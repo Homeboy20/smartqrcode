@@ -11,7 +11,7 @@
     "build": "node scripts/check-node-version.js && node scripts/check-firebase-config.js && next build",
     "export": "next export",
     "build:static": "next build && next export",
-    "start": "next start",
+    "start": "node scripts/start.js",
     "lint": "next lint",
     "netlify:build": "node scripts/netlify-build.js",
     "test:credentials": "ts-node --transpile-only --project tsconfig.scripts.json -r tsconfig-paths/register scripts/test-credentials.ts",
