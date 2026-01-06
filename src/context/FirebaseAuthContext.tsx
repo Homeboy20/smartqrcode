@@ -264,7 +264,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const setupRecaptcha = async (containerId: string): Promise<RecaptchaVerifier> => {
-    if (!auth) throw new Error('Firebase Auth not initialized');
+    if (!auth) {
+      console.warn('Firebase Auth not initialized - phone auth unavailable');
+      throw new Error('Firebase Auth not initialized');
+    }
     const win = window as any;
 
     // If we already created + rendered a verifier for this same container, reuse it.
@@ -318,7 +321,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     phoneNumber: string,
     recaptchaVerifier: RecaptchaVerifier
   ): Promise<ConfirmationResult> => {
-    if (!auth) throw new Error('Firebase Auth not initialized');
+    if (!auth) {
+      console.warn('Firebase Auth not initialized - phone auth unavailable');
+      throw new Error('Firebase Auth not initialized');
+    }
     clearError();
     return await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
   };
