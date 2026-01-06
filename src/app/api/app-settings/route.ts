@@ -21,6 +21,16 @@ export async function GET(request: NextRequest) {
           siteName: 'ScanMagic',
           logoUrl: '',
         },
+        firebase: {
+          enabled: false,
+          apiKey: '',
+          authDomain: '',
+          projectId: '',
+          storageBucket: '',
+          messagingSenderId: '',
+          appId: '',
+          measurementId: '',
+        },
       });
     }
 
@@ -55,6 +65,16 @@ export async function GET(request: NextRequest) {
         siteName: 'ScanMagic',
         logoUrl: '',
       },
+      firebase: {
+        enabled: false,
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: '',
+        measurementId: '',
+      },
     };
 
     const response = { 
@@ -63,6 +83,17 @@ export async function GET(request: NextRequest) {
       branding: settings.branding || {
         siteName: 'ScanMagic',
         logoUrl: '',
+      },
+      // Firebase Web App config is safe to expose client-side.
+      firebase: settings.firebase || {
+        enabled: false,
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: '',
+        measurementId: '',
       },
     };
     
@@ -82,6 +113,16 @@ export async function GET(request: NextRequest) {
       branding: {
         siteName: 'ScanMagic',
         logoUrl: '',
+      },
+      firebase: {
+        enabled: false,
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: '',
+        measurementId: '',
       },
     });
   }

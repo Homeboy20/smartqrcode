@@ -62,10 +62,19 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      return json(500, {
-        error: 'Upload failed',
-        details: uploadError.message,
-        hint: 'Ensure the Storage bucket exists and is public if you want anyone to view the logo.',
+      const details = uploadError.message || 'Unknown storage error';
+      const hint =
+        'Ensure the Supabase Storage bucket exists (default: branding-assets). If the bucket is private, make it public or adjust your app to use signed URLs.';
+
+      const maybeNotFound = /not\s*found|bucket/i.test(details);
+      const status = maybeNotFound ? 400 : 500;
+
+      return json(status, {
+        error: `Upload failed: ${details}`,
+        details,
+        hint,
+        bucket,
+        path: objectPath,
       });
     }
 

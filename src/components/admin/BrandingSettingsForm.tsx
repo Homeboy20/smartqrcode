@@ -107,7 +107,14 @@ export default function BrandingSettingsForm() {
 
       const payload = await response.json().catch(() => ({} as any));
       if (!response.ok) {
-        throw new Error(payload?.error || 'Logo upload failed');
+        const messageParts = [payload?.error || 'Logo upload failed'];
+        if (payload?.details && payload.details !== payload?.error) {
+          messageParts.push(String(payload.details));
+        }
+        if (payload?.hint) {
+          messageParts.push(String(payload.hint));
+        }
+        throw new Error(messageParts.filter(Boolean).join(' | '));
       }
 
       const url = String(payload?.url || '');

@@ -12,6 +12,16 @@ export interface AppSettings {
     siteName: string;
     logoUrl: string;
   };
+  firebase?: {
+    enabled: boolean;
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    storageBucket: string;
+    messagingSenderId: string;
+    appId: string;
+    measurementId?: string;
+  };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -26,11 +36,22 @@ const DEFAULT_SETTINGS: AppSettings = {
     siteName: 'ScanMagic',
     logoUrl: '',
   },
+  firebase: {
+    enabled: false,
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: '',
+    measurementId: '',
+  },
 };
 
 function normalizeSettings(candidate: unknown): AppSettings {
   const incoming = (candidate ?? {}) as Partial<AppSettings>;
   const incomingBranding = (incoming.branding ?? {}) as Partial<AppSettings['branding']>;
+  const incomingFirebase = (incoming.firebase ?? {}) as Partial<NonNullable<AppSettings['firebase']>>;
 
   return {
     ...DEFAULT_SETTINGS,
@@ -42,6 +63,19 @@ function normalizeSettings(candidate: unknown): AppSettings {
     branding: {
       ...DEFAULT_SETTINGS.branding,
       ...incomingBranding,
+    },
+    firebase: {
+      ...(DEFAULT_SETTINGS.firebase ?? {
+        enabled: false,
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: '',
+        measurementId: '',
+      }),
+      ...incomingFirebase,
     },
   };
 }
