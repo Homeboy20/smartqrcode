@@ -18,10 +18,39 @@ export function getClientCredential(key: string): string | null {
 /**
  * Get Firebase configuration for client initialization.
  *
- * On the server this reads from `process.env`.
- * On the client, Next injects `NEXT_PUBLIC_*` values.
+ * Priority order:
+ * 1. Database configuration (from admin panel via /api/app-settings)
+ * 2. Environment variables (NEXT_PUBLIC_*)
  */
 export function getClientFirebaseConfig(): Record<string, string | undefined> {
+  // Try to get from cached app settings first
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem('app_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.settings?.firebase?.enabled) {
+          const fb = parsed.settings.firebase;
+          // Only use if at least the essential fields are present
+          if (fb.apiKey && fb.projectId) {
+            return {
+              apiKey: fb.apiKey,
+              authDomain: fb.authDomain,
+              projectId: fb.projectId,
+              storageBucket: fb.storageBucket,
+              messagingSenderId: fb.messagingSenderId,
+              appId: fb.appId,
+              measurementId: fb.measurementId,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error reading Firebase config from app_settings:', e);
+    }
+  }
+
+  // Fall back to environment variables
   if (typeof window === 'undefined') {
     return {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

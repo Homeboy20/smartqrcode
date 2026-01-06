@@ -47,6 +47,16 @@ export async function GET(request: NextRequest) {
         siteName: 'ScanMagic',
         logoUrl: '',
       },
+      firebase: {
+        enabled: false,
+        apiKey: '',
+        authDomain: '',
+        projectId: '',
+        storageBucket: '',
+        messagingSenderId: '',
+        appId: '',
+        measurementId: '',
+      },
     };
 
     const raw = ((data as any)?.value ?? {}) as any;
@@ -61,6 +71,10 @@ export async function GET(request: NextRequest) {
       branding: {
         ...defaults.branding,
         ...(raw?.branding ?? {}),
+      },
+      firebase: {
+        ...defaults.firebase,
+        ...(raw?.firebase ?? {}),
       },
     };
 

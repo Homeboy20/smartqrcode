@@ -1,6 +1,6 @@
 'use client';
 
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps, FirebaseApp, deleteApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
@@ -19,8 +19,8 @@ let storage = undefined as unknown as FirebaseStorage;
 
 let firebaseAvailable = false;
 
-// Initialize Firebase only on the client side
-if (isBrowser) {
+// Function to initialize Firebase
+const initializeFirebase = () => {
   try {
     // Get Firebase configuration
     const config = getClientFirebaseConfig();
@@ -38,7 +38,8 @@ if (isBrowser) {
       } else {
         // Otherwise initialize a new app
         firebaseApp = initializeApp(config);
-        console.log('Firebase initialized successfully');
+        console.log('Firebase initialized successfully from:', 
+          config.apiKey ? 'database config' : 'env vars');
       }
       
       // If we have a valid app, initialize services
@@ -47,6 +48,7 @@ if (isBrowser) {
         db = getFirestore(firebaseApp);
         storage = getStorage(firebaseApp);
         firebaseAvailable = true;
+        return true;
       }
     } else {
       // Firebase not configured - this is optional, no error needed
@@ -55,6 +57,38 @@ if (isBrowser) {
   } catch (error) {
     console.error('Error initializing Firebase:', error);
   }
+  return false;
+};
+
+// Re-initialize Firebase when settings change
+export const reinitializeFirebase = async () => {
+  if (!isBrowser) return false;
+  
+  try {
+    // Delete existing app if it exists
+    if (firebaseApp) {
+      await deleteApp(firebaseApp);
+      firebaseApp = undefined;
+      firebaseAvailable = false;
+    }
+    
+    // Re-initialize
+    return initializeFirebase();
+  } catch (error) {
+    console.error('Error reinitializing Firebase:', error);
+    return false;
+  }
+};
+
+// Initialize Firebase only on the client side
+if (isBrowser) {
+  initializeFirebase();
+  
+  // Listen for settings updates
+  window.addEventListener('app-settings-updated', () => {
+    console.log('App settings updated, reinitializing Firebase...');
+    reinitializeFirebase();
+  });
 }
 
 // Export the initialized services and app

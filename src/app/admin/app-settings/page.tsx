@@ -15,6 +15,16 @@ interface AppSettings {
     siteName: string;
     logoUrl: string;
   };
+  firebase?: {
+    enabled: boolean;
+    apiKey: string;
+    authDomain: string;
+    projectId: string;
+    storageBucket: string;
+    messagingSenderId: string;
+    appId: string;
+    measurementId?: string;
+  };
 }
 
 export default function AppSettingsPage() {
@@ -35,6 +45,16 @@ export default function AppSettingsPage() {
     branding: {
       siteName: 'ScanMagic',
       logoUrl: '',
+    },
+    firebase: {
+      enabled: false,
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+      measurementId: '',
     },
   });
 
@@ -332,6 +352,170 @@ export default function AppSettingsPage() {
               </div>
             </div>
           )}
+
+          {/* Save Button */}
+          <div className="px-4 py-4 sm:px-6 bg-gray-50">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={saveSettings}
+                disabled={saving}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Saving...' : 'Save Settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Firebase Configuration */}
+        <div className="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="px-4 py-5 sm:p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex-1 pr-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Firebase Configuration</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Configure Firebase credentials for optional features like phone authentication and SMS verification.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({
+                  ...prev,
+                  firebase: { ...prev.firebase!, enabled: !prev.firebase!.enabled }
+                }))}
+                className={`${
+                  settings.firebase?.enabled ? 'bg-indigo-600' : 'bg-gray-200'
+                } relative inline-flex flex-shrink-0 h-8 w-14 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+              >
+                <span className="sr-only">Enable Firebase</span>
+                <span
+                  className={`${
+                    settings.firebase?.enabled ? 'translate-x-6' : 'translate-x-0'
+                  } pointer-events-none inline-block h-7 w-7 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200`}
+                />
+              </button>
+            </div>
+
+            {settings.firebase?.enabled && (
+              <div className="mt-6 space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        Firebase credentials stored here override environment variables. Leave fields empty to use NEXT_PUBLIC_* env vars instead.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={settings.firebase?.apiKey || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, apiKey: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="AIzaSy..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Auth Domain</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.authDomain || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, authDomain: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="your-app.firebaseapp.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Project ID</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.projectId || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, projectId: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="your-project-id"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Storage Bucket</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.storageBucket || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, storageBucket: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="your-app.appspot.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Messaging Sender ID</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.messagingSenderId || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, messagingSenderId: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="123456789"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">App ID</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.appId || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, appId: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="1:123456789:web:abc123"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Measurement ID (Optional)</label>
+                    <input
+                      type="text"
+                      value={settings.firebase?.measurementId || ''}
+                      onChange={(e) => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, measurementId: e.target.value }
+                      }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      placeholder="G-XXXXXXXXXX"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Save Button */}
           <div className="px-4 py-4 sm:px-6 bg-gray-50">
