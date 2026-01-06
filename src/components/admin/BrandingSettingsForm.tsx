@@ -6,7 +6,6 @@ import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 type BrandingSettings = {
   siteName: string;
   logoUrl: string;
-  logoSvgUrl: string;
   faviconUrl: string;
 };
 
@@ -21,7 +20,6 @@ type AnySettings = Record<string, any>;
 const DEFAULT_BRANDING: BrandingSettings = {
   siteName: 'ScanMagic',
   logoUrl: '',
-  logoSvgUrl: '',
   faviconUrl: '',
 };
 
@@ -63,9 +61,13 @@ export default function BrandingSettingsForm() {
 
         const data = (await response.json()) as AppSettingsResponse;
         const loadedSettings = (data?.settings ?? {}) as AnySettings;
-        const next = {
+        const rawBranding = (loadedSettings?.branding ?? {}) as any;
+        const next: BrandingSettings = {
           ...DEFAULT_BRANDING,
-          ...(loadedSettings?.branding ?? {}),
+          siteName: String(rawBranding?.siteName ?? DEFAULT_BRANDING.siteName),
+          // Migrate any previously-saved SVG logo field into the single logoUrl.
+          logoUrl: String(rawBranding?.logoUrl ?? rawBranding?.logoSvgUrl ?? DEFAULT_BRANDING.logoUrl),
+          faviconUrl: String(rawBranding?.faviconUrl ?? DEFAULT_BRANDING.faviconUrl),
         };
 
         if (!cancelled) {
@@ -87,7 +89,7 @@ export default function BrandingSettingsForm() {
     };
   }, [session]);
 
-  const uploadBrandingAsset = async (file: File, kind: 'logo' | 'logoSvg' | 'favicon') => {
+  const uploadBrandingAsset = async (file: File, kind: 'logo' | 'favicon') => {
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -129,7 +131,6 @@ export default function BrandingSettingsForm() {
 
       setBranding(prev => {
         if (kind === 'favicon') return { ...prev, faviconUrl: url };
-        if (kind === 'logoSvg') return { ...prev, logoSvgUrl: url };
         return { ...prev, logoUrl: url };
       });
     } finally {
@@ -253,7 +254,7 @@ export default function BrandingSettingsForm() {
             <label className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 cursor-pointer">
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,.svg"
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -277,42 +278,6 @@ export default function BrandingSettingsForm() {
             >
               Remove
             </button>
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="brandingLogoSvgUrl" className="block text-sm font-medium text-gray-700">
-            SVG Logo URL
-          </label>
-          <input
-            id="brandingLogoSvgUrl"
-            type="url"
-            value={branding.logoSvgUrl}
-            onChange={(e) => setBranding(prev => ({ ...prev, logoSvgUrl: e.target.value }))}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="https://.../logo.svg"
-            disabled={saving}
-          />
-
-          <div className="mt-3 flex items-center gap-3">
-            <label className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 cursor-pointer">
-              <input
-                type="file"
-                accept="image/svg+xml,.svg"
-                className="sr-only"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    uploadBrandingAsset(file, 'logoSvg').catch(err => {
-                      setError(err instanceof Error ? err.message : 'SVG logo upload failed');
-                    });
-                  }
-                  e.currentTarget.value = '';
-                }}
-                disabled={saving}
-              />
-              Upload SVG
-            </label>
           </div>
         </div>
 

@@ -4,11 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useAppSettings } from '@/hooks/useAppSettings';
 
 export default function AdminHeader() {
   const pathname = usePathname();
   const { user, logout } = useSupabaseAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { settings: appSettings } = useAppSettings();
+  const siteName = appSettings?.branding?.siteName || 'ScanMagic';
   
   // Get the current path for returnTo parameter
   const returnToPath = pathname || '/admin';
@@ -39,7 +42,7 @@ export default function AdminHeader() {
             {/* Logo/Brand */}
             <div className="flex-shrink-0 flex items-center">
               <Link href="/admin" className="text-xl font-bold text-indigo-600 ml-2 sm:ml-0">
-                Smart QR Admin
+                {siteName} Admin
               </Link>
             </div>
           </div>
