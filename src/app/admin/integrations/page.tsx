@@ -70,7 +70,7 @@ export default function IntegrationsPage() {
       category: 'storage',
       status: 'active',
       icon: '⚡',
-      setupUrl: '/admin/credentials',
+      setupUrl: '/admin/app-settings',
       docsUrl: 'https://supabase.com/docs'
     },
     {
@@ -78,9 +78,9 @@ export default function IntegrationsPage() {
       name: 'Firebase',
       description: 'Authentication and admin SDK integration',
       category: 'auth',
-      status: 'active',
+      status: 'inactive',
       icon: '🔥',
-      setupUrl: '/admin/credentials',
+      setupUrl: '/admin/app-settings',
       docsUrl: 'https://firebase.google.com/docs'
     }
   ]);
