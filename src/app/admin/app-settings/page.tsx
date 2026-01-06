@@ -33,6 +33,7 @@ export default function AppSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [firebaseUploadError, setFirebaseUploadError] = useState<string | null>(null);
   
   const [settings, setSettings] = useState<AppSettings>({
     freeMode: false,
@@ -108,6 +109,75 @@ export default function AppSettingsPage() {
         [feature]: !prev.freeModeFeatures[feature]
       }
     }));
+  };
+
+  const applyFirebaseWebConfig = (raw: any) => {
+    const candidate = raw?.firebase ?? raw?.firebaseConfig ?? raw;
+
+    // Detect service-account JSON and block it.
+    if (
+      candidate?.type === 'service_account' ||
+      candidate?.private_key ||
+      candidate?.client_email
+    ) {
+      setFirebaseUploadError(
+        'This looks like a Firebase service account JSON (contains private_key/client_email). Do not upload this to the admin panel. Use server environment secrets (e.g., GOOGLE_APPLICATION_CREDENTIALS / Firebase Admin credentials) instead.'
+      );
+      return;
+    }
+
+    const apiKey = String(candidate?.apiKey ?? candidate?.api_key ?? '');
+    const authDomain = String(candidate?.authDomain ?? candidate?.auth_domain ?? '');
+    const projectId = String(candidate?.projectId ?? candidate?.project_id ?? '');
+    const storageBucket = String(candidate?.storageBucket ?? candidate?.storage_bucket ?? '');
+    const messagingSenderId = String(candidate?.messagingSenderId ?? candidate?.messaging_sender_id ?? '');
+    const appId = String(candidate?.appId ?? candidate?.app_id ?? '');
+    const measurementId = String(candidate?.measurementId ?? candidate?.measurement_id ?? '');
+
+    if (!apiKey || !projectId) {
+      setFirebaseUploadError(
+        'Invalid Firebase web config JSON. Expected at least apiKey and projectId (this should be the Firebase Web App configuration, not a service account key).'
+      );
+      return;
+    }
+
+    setFirebaseUploadError(null);
+    setSettings(prev => ({
+      ...prev,
+      firebase: {
+        ...(prev.firebase ?? {
+          enabled: false,
+          apiKey: '',
+          authDomain: '',
+          projectId: '',
+          storageBucket: '',
+          messagingSenderId: '',
+          appId: '',
+          measurementId: '',
+        }),
+        enabled: true,
+        apiKey,
+        authDomain,
+        projectId,
+        storageBucket,
+        messagingSenderId,
+        appId,
+        measurementId,
+      },
+    }));
+  };
+
+  const handleFirebaseConfigFileUpload = async (file: File | null) => {
+    if (!file) return;
+    setFirebaseUploadError(null);
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      applyFirebaseWebConfig(parsed);
+    } catch (e: any) {
+      setFirebaseUploadError(e?.message ? `Failed to parse JSON: ${e.message}` : 'Failed to parse JSON file');
+    }
   };
 
   const saveSettings = async () => {
@@ -412,6 +482,32 @@ export default function AppSettingsPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">Upload Firebase Web Config (JSON)</h4>
+                      <p className="mt-1 text-xs text-gray-600">
+                        Upload a JSON file containing your Firebase web app config (apiKey, authDomain, projectId, etc.).
+                        Service account JSON files are blocked for safety.
+                      </p>
+                    </div>
+                    <div className="w-full sm:w-auto">
+                      <input
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={(e) => handleFirebaseConfigFileUpload(e.target.files?.[0] ?? null)}
+                        className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {firebaseUploadError && (
+                    <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-md p-3 text-sm">
+                      {firebaseUploadError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
