@@ -86,7 +86,35 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         .eq('id', userId)
         .single();
 
-      if (!error && data) {
+      if (error) {
+        // If user record doesn't exist (PGRST116), try to create it
+        if (error.code === 'PGRST116') {
+          console.log('User record not found, creating...');
+          try {
+            const response = await fetch('/api/auth/ensure-user', {
+              method: 'POST',
+            });
+            if (response.ok) {
+              console.log('User record created, retrying admin check...');
+              // Retry after creating the user record
+              const { data: retryData, error: retryError } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', userId)
+                .single();
+              
+              if (!retryError && retryData) {
+                setIsAdmin(retryData.role === 'admin');
+              }
+            }
+          } catch (createErr) {
+            console.error('Error creating user record:', createErr);
+          }
+        }
+        return;
+      }
+
+      if (data) {
         setIsAdmin(data.role === 'admin');
       }
     } catch (err) {
