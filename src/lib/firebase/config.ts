@@ -49,7 +49,8 @@ if (isBrowser) {
         firebaseAvailable = true;
       }
     } else {
-      console.error(`Missing Firebase config values: ${missingConfig.join(', ')}`);
+      // Firebase not configured - this is optional, no error needed
+      console.log('Firebase not configured (optional service)');
     }
   } catch (error) {
     console.error('Error initializing Firebase:', error);
