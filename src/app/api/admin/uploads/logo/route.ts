@@ -53,7 +53,20 @@ function getBrandingUploadConfig(kind: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authResult = await verifyAdminAccess(req);
+    let authResult: { isAdmin: boolean };
+    try {
+      authResult = await verifyAdminAccess(req);
+    } catch (e: any) {
+      const message = String(e?.message || 'Authentication failed');
+      if (/no authentication token|invalid authentication token|invalid or expired token/i.test(message)) {
+        return json(401, { error: message });
+      }
+      if (/admin access required/i.test(message)) {
+        return json(403, { error: message });
+      }
+      return json(500, { error: message });
+    }
+
     if (!authResult.isAdmin) {
       return json(403, { error: 'Admin access required' });
     }

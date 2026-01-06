@@ -11,6 +11,8 @@ export interface AppSettings {
   branding: {
     siteName: string;
     logoUrl: string;
+    logoSvgUrl?: string;
+    faviconUrl?: string;
   };
   firebase?: {
     enabled: boolean;
@@ -35,6 +37,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   branding: {
     siteName: 'ScanMagic',
     logoUrl: '',
+    logoSvgUrl: '',
+    faviconUrl: '',
   },
   firebase: {
     enabled: false,
