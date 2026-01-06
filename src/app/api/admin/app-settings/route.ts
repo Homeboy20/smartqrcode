@@ -46,6 +46,8 @@ export async function GET(request: NextRequest) {
       branding: {
         siteName: 'ScanMagic',
         logoUrl: '',
+        logoSvgUrl: '',
+        faviconUrl: '',
       },
       firebase: {
         enabled: false,

@@ -12,7 +12,7 @@ export default function Header() {
   const { settings: appSettings } = useAppSettings();
 
   const siteName = appSettings?.branding?.siteName || 'ScanMagic';
-  const logoUrl = appSettings?.branding?.logoUrl || '';
+  const logoUrl = appSettings?.branding?.logoSvgUrl || appSettings?.branding?.logoUrl || '';
 
   useEffect(() => {
     const handleScroll = () => {

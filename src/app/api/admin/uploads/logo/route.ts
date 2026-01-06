@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });
 }
@@ -13,6 +16,39 @@ function sanitizeFilename(name: string) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 120);
+}
+
+function getBrandingUploadConfig(kind: string) {
+  // kind is user-controlled input; map it to a safe, known set.
+  switch (kind) {
+    case 'favicon':
+      return {
+        folder: 'branding/favicon',
+        maxBytes: 512 * 1024,
+        isAllowedContentType: (t: string) =>
+          t === 'image/x-icon' ||
+          t === 'image/vnd.microsoft.icon' ||
+          t === 'image/png' ||
+          t === 'image/svg+xml' ||
+          t === 'image/webp',
+        description: 'favicon',
+      };
+    case 'logoSvg':
+      return {
+        folder: 'branding/logo-svg',
+        maxBytes: 512 * 1024,
+        isAllowedContentType: (t: string) => t === 'image/svg+xml',
+        description: 'SVG logo',
+      };
+    case 'logo':
+    default:
+      return {
+        folder: 'branding/logo',
+        maxBytes: 2 * 1024 * 1024,
+        isAllowedContentType: (t: string) => t.startsWith('image/'),
+        description: 'logo',
+      };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -32,27 +68,39 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
     const file = form.get('file');
+    const kindRaw = String(form.get('kind') || 'logo');
+    const kind = kindRaw === 'favicon' || kindRaw === 'logoSvg' || kindRaw === 'logo' ? kindRaw : 'logo';
+    const config = getBrandingUploadConfig(kind);
 
-    if (!(file instanceof File)) {
+    // In some Node runtimes, `file` may not satisfy `instanceof File`.
+    // We only require it to be a Blob-like object with `arrayBuffer()`.
+    if (!file || typeof (file as any).arrayBuffer !== 'function') {
       return json(400, { error: 'Missing file' });
     }
 
-    const contentType = file.type || '';
-    if (!contentType.startsWith('image/')) {
-      return json(400, { error: 'Only image files are supported.' });
+    const contentType = String((file as any).type || '');
+    if (!contentType) {
+      return json(400, { error: 'File type is missing. Please upload a valid image.' });
+    }
+    if (!config.isAllowedContentType(contentType)) {
+      return json(400, {
+        error: `Only ${config.description} image types are supported.`,
+        details: `Unsupported content type: ${contentType}`,
+      });
     }
 
-    const maxBytes = 2 * 1024 * 1024; // 2MB
-    if (file.size > maxBytes) {
-      return json(400, { error: 'File is too large (max 2MB).' });
+    const size = Number((file as any).size || 0);
+    if (size > config.maxBytes) {
+      return json(400, { error: `File is too large (max ${Math.round(config.maxBytes / 1024)}KB).` });
     }
 
     const bucket = process.env.NEXT_PUBLIC_BRANDING_UPLOADS_BUCKET || 'branding-assets';
 
-    const safeName = sanitizeFilename(file.name || 'logo');
-    const objectPath = `branding/logo/${crypto.randomUUID()}-${safeName}`;
+    const name = String((file as any).name || config.description || 'asset');
+    const safeName = sanitizeFilename(name);
+    const objectPath = `${config.folder}/${crypto.randomUUID()}-${safeName}`;
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = new Uint8Array(await (file as any).arrayBuffer());
 
     const { error: uploadError } = await adminClient.storage
       .from(bucket)
@@ -85,6 +133,7 @@ export async function POST(req: NextRequest) {
       url: publicData.publicUrl,
       path: objectPath,
       contentType,
+      kind,
     });
   } catch (e: any) {
     return json(500, { error: e?.message || 'Upload failed' });

@@ -6,6 +6,8 @@ import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 type BrandingSettings = {
   siteName: string;
   logoUrl: string;
+  logoSvgUrl: string;
+  faviconUrl: string;
 };
 
 type AppSettingsResponse = {
@@ -19,6 +21,8 @@ type AnySettings = Record<string, any>;
 const DEFAULT_BRANDING: BrandingSettings = {
   siteName: 'ScanMagic',
   logoUrl: '',
+  logoSvgUrl: '',
+  faviconUrl: '',
 };
 
 export default function BrandingSettingsForm() {
@@ -83,7 +87,7 @@ export default function BrandingSettingsForm() {
     };
   }, [session]);
 
-  const uploadLogo = async (file: File) => {
+  const uploadBrandingAsset = async (file: File, kind: 'logo' | 'logoSvg' | 'favicon') => {
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -96,6 +100,7 @@ export default function BrandingSettingsForm() {
 
       const form = new FormData();
       form.append('file', file);
+      form.append('kind', kind);
 
       const response = await fetch('/api/admin/uploads/logo', {
         method: 'POST',
@@ -122,7 +127,11 @@ export default function BrandingSettingsForm() {
         throw new Error('Logo upload failed: missing URL');
       }
 
-      setBranding(prev => ({ ...prev, logoUrl: url }));
+      setBranding(prev => {
+        if (kind === 'favicon') return { ...prev, faviconUrl: url };
+        if (kind === 'logoSvg') return { ...prev, logoSvgUrl: url };
+        return { ...prev, logoUrl: url };
+      });
     } finally {
       setSaving(false);
     }
@@ -249,7 +258,7 @@ export default function BrandingSettingsForm() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    uploadLogo(file).catch(err => {
+                    uploadBrandingAsset(file, 'logo').catch(err => {
                       setError(err instanceof Error ? err.message : 'Logo upload failed');
                     });
                   }
@@ -265,6 +274,87 @@ export default function BrandingSettingsForm() {
               className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
               onClick={() => setBranding(prev => ({ ...prev, logoUrl: '' }))}
               disabled={saving || !branding.logoUrl}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="brandingLogoSvgUrl" className="block text-sm font-medium text-gray-700">
+            SVG Logo URL
+          </label>
+          <input
+            id="brandingLogoSvgUrl"
+            type="url"
+            value={branding.logoSvgUrl}
+            onChange={(e) => setBranding(prev => ({ ...prev, logoSvgUrl: e.target.value }))}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="https://.../logo.svg"
+            disabled={saving}
+          />
+
+          <div className="mt-3 flex items-center gap-3">
+            <label className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 cursor-pointer">
+              <input
+                type="file"
+                accept="image/svg+xml,.svg"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    uploadBrandingAsset(file, 'logoSvg').catch(err => {
+                      setError(err instanceof Error ? err.message : 'SVG logo upload failed');
+                    });
+                  }
+                  e.currentTarget.value = '';
+                }}
+                disabled={saving}
+              />
+              Upload SVG
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="brandingFaviconUrl" className="block text-sm font-medium text-gray-700">
+            Favicon URL
+          </label>
+          <input
+            id="brandingFaviconUrl"
+            type="url"
+            value={branding.faviconUrl}
+            onChange={(e) => setBranding(prev => ({ ...prev, faviconUrl: e.target.value }))}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="https://.../favicon.ico"
+            disabled={saving}
+          />
+
+          <div className="mt-3 flex items-center gap-3">
+            <label className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 cursor-pointer">
+              <input
+                type="file"
+                accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/webp,.ico,.png,.svg,.webp"
+                className="sr-only"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    uploadBrandingAsset(file, 'favicon').catch(err => {
+                      setError(err instanceof Error ? err.message : 'Favicon upload failed');
+                    });
+                  }
+                  e.currentTarget.value = '';
+                }}
+                disabled={saving}
+              />
+              Upload favicon
+            </label>
+
+            <button
+              type="button"
+              className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+              onClick={() => setBranding(prev => ({ ...prev, faviconUrl: '' }))}
+              disabled={saving || !branding.faviconUrl}
             >
               Remove
             </button>

@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
         branding: {
           siteName: 'ScanMagic',
           logoUrl: '',
+          logoSvgUrl: '',
+          faviconUrl: '',
         },
         firebase: {
           enabled: false,
@@ -64,6 +66,8 @@ export async function GET(request: NextRequest) {
       branding: {
         siteName: 'ScanMagic',
         logoUrl: '',
+        logoSvgUrl: '',
+        faviconUrl: '',
       },
       firebase: {
         enabled: false,
@@ -83,6 +87,8 @@ export async function GET(request: NextRequest) {
       branding: settings.branding || {
         siteName: 'ScanMagic',
         logoUrl: '',
+        logoSvgUrl: '',
+        faviconUrl: '',
       },
       // Firebase Web App config is safe to expose client-side.
       firebase: settings.firebase || {
@@ -113,6 +119,8 @@ export async function GET(request: NextRequest) {
       branding: {
         siteName: 'ScanMagic',
         logoUrl: '',
+        logoSvgUrl: '',
+        faviconUrl: '',
       },
       firebase: {
         enabled: false,

@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { AuthProvider } from '@/context/FirebaseAuthContext';
 import { SupabaseAuthProvider } from '@/context/SupabaseAuthContext';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { usePathname } from 'next/navigation';
 
 export default function ClientLayout({
@@ -14,6 +15,7 @@ export default function ClientLayout({
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
+  const { settings: appSettings } = useAppSettings();
   const isAdminPage = pathname?.startsWith('/admin');
   const needsFirebaseAuth =
     pathname?.startsWith('/phone-auth') ||
@@ -22,6 +24,26 @@ export default function ClientLayout({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    const faviconUrl = appSettings?.branding?.faviconUrl;
+    if (!faviconUrl) return;
+
+    const upsert = (rel: string) => {
+      const existing = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement | null;
+      if (existing) {
+        existing.href = faviconUrl;
+        return;
+      }
+      const link = document.createElement('link');
+      link.rel = rel;
+      link.href = faviconUrl;
+      document.head.appendChild(link);
+    };
+
+    upsert('icon');
+    upsert('shortcut icon');
+  }, [appSettings?.branding?.faviconUrl]);
 
   // For admin pages, just wrap with providers but don't add any layout elements
   if (isAdminPage) {
