@@ -51,6 +51,24 @@ function getBrandingUploadConfig(kind: string) {
   }
 }
 
+async function ensurePublicBucketExists(adminClient: any, bucket: string) {
+  try {
+    // If the bucket doesn't exist, create it so uploads work out-of-the-box.
+    const { error } = await adminClient.storage.createBucket(bucket, {
+      public: true,
+    });
+
+    // Ignore "already exists" style errors (race with another request).
+    if (error && !/exists|already/i.test(String(error.message || ''))) {
+      return { ok: false as const, error };
+    }
+
+    return { ok: true as const };
+  } catch (e: any) {
+    return { ok: false as const, error: e };
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     let authResult: { isAdmin: boolean };
@@ -124,6 +142,31 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) {
       const details = uploadError.message || 'Unknown storage error';
+
+      // If the bucket is missing, try to create it once and retry the upload.
+      if (/bucket not found/i.test(details)) {
+        const ensured = await ensurePublicBucketExists(adminClient, bucket);
+        if (ensured.ok) {
+          const { error: retryError } = await adminClient.storage
+            .from(bucket)
+            .upload(objectPath, bytes, {
+              contentType: contentType || 'application/octet-stream',
+              upsert: false,
+            });
+
+          if (!retryError) {
+            const { data: publicData } = adminClient.storage.from(bucket).getPublicUrl(objectPath);
+            return json(200, {
+              ok: true,
+              url: publicData.publicUrl,
+              path: objectPath,
+              contentType,
+              kind,
+            });
+          }
+        }
+      }
+
       const hint =
         'Ensure the Supabase Storage bucket exists (default: branding-assets). If the bucket is private, make it public or adjust your app to use signed URLs.';
 
