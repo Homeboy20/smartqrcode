@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,6 +20,22 @@ function run(command, args, extraEnv = {}) {
   });
 }
 
+function copyRecursiveSync(src, dest) {
+  if (!fs.existsSync(src)) return;
+  
+  const stats = fs.statSync(src);
+  if (stats.isDirectory()) {
+    if (!fs.existsSync(dest)) {
+      fs.mkdirSync(dest, { recursive: true });
+    }
+    fs.readdirSync(src).forEach((child) => {
+      copyRecursiveSync(path.join(src, child), path.join(dest, child));
+    });
+  } else {
+    fs.copyFileSync(src, dest);
+  }
+}
+
 const projectRoot = process.cwd();
 const standaloneServer = path.join(projectRoot, '.next', 'standalone', 'server.js');
 
@@ -28,6 +44,26 @@ const port = process.env.PORT || '3000';
 const host = process.env.HOST || '0.0.0.0';
 
 if (fs.existsSync(standaloneServer)) {
+  console.log('Preparing standalone server...');
+  
+  // Copy static assets to standalone directory
+  const staticSrc = path.join(projectRoot, '.next', 'static');
+  const staticDest = path.join(projectRoot, '.next', 'standalone', '.next', 'static');
+  
+  if (fs.existsSync(staticSrc)) {
+    console.log('Copying static assets...');
+    copyRecursiveSync(staticSrc, staticDest);
+  }
+  
+  // Copy public folder to standalone directory
+  const publicSrc = path.join(projectRoot, 'public');
+  const publicDest = path.join(projectRoot, '.next', 'standalone', 'public');
+  
+  if (fs.existsSync(publicSrc)) {
+    console.log('Copying public files...');
+    copyRecursiveSync(publicSrc, publicDest);
+  }
+  
   console.log(`Starting Next.js standalone server on ${host}:${port}...`);
   run(process.execPath, [standaloneServer], { PORT: port, HOSTNAME: host });
 } else {
