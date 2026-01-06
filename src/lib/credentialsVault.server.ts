@@ -6,7 +6,8 @@ import { db as getDb } from '@/lib/firebase/admin';
 function getFirestoreDb() {
   const dbInstance = getDb();
   if (!dbInstance) {
-    throw new Error('Firebase Admin SDK not initialized');
+    console.warn('Firebase Admin SDK not initialized - credentials vault unavailable');
+    return null;
   }
   return dbInstance;
 }
@@ -53,6 +54,11 @@ export function decryptData(encryptedData: string, iv: string): string {
  * Returns the record written to Firestore.
  */
 export async function saveEncryptedCredentials(credentials: Record<string, string>, userId: string) {
+  const db = getFirestoreDb();
+  if (!db) {
+    throw new Error('Firebase not configured - credentials storage unavailable');
+  }
+
   const encryptedCredentials: Record<string, any> = {};
 
   for (const [key, value] of Object.entries(credentials)) {
@@ -71,7 +77,6 @@ export async function saveEncryptedCredentials(credentials: Record<string, strin
     updatedBy: userId,
   };
 
-  const db = getFirestoreDb();
   await db.collection('appSettings').doc('apiCredentials').set(credentialRecord);
 
   await db.collection('securityLogs').add({
@@ -91,6 +96,13 @@ export async function saveEncryptedCredentials(credentials: Record<string, strin
  */
 export async function getCredentialPlaceholders() {
   const db = getFirestoreDb();
+  if (!db) {
+    return {
+      credentials: {},
+      updatedAt: null,
+    };
+  }
+
   const doc = await db.collection('appSettings').doc('apiCredentials').get();
 
   if (!doc.exists) {
@@ -120,6 +132,10 @@ export async function getCredentialPlaceholders() {
 export async function getDecryptedCredential(key: string): Promise<string | null> {
   try {
     const db = getFirestoreDb();
+    if (!db) {
+      return null;
+    }
+
     const doc = await db.collection('appSettings').doc('apiCredentials').get();
 
     if (!doc.exists) {
@@ -148,6 +164,10 @@ export async function getDecryptedCredential(key: string): Promise<string | null
 export async function getAllDecryptedCredentials(): Promise<Record<string, string>> {
   try {
     const db = getFirestoreDb();
+    if (!db) {
+      return {};
+    }
+
     const doc = await db.collection('appSettings').doc('apiCredentials').get();
 
     if (!doc.exists) {

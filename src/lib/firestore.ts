@@ -13,7 +13,7 @@ import {
   serverTimestamp,
   limit
 } from 'firebase/firestore';
-import { db } from './firebase/config';
+import { db, isFirebaseAvailable } from './firebase/config';
 import { User } from 'firebase/auth';
 
 // User-related database operations
@@ -335,6 +335,11 @@ export const defaultGatewayConfig: PaymentGatewayConfig = {
 
 // Save payment gateway configuration
 export const saveGatewayConfig = async (config: PaymentGatewayConfig): Promise<boolean> => {
+  if (!isFirebaseAvailable()) {
+    console.warn('Firebase not available - gateway config not saved');
+    return false;
+  }
+  
   try {
     await setDoc(doc(db, 'app_settings', 'payment_gateways'), {
       ...config,
@@ -349,6 +354,11 @@ export const saveGatewayConfig = async (config: PaymentGatewayConfig): Promise<b
 
 // Get payment gateway configuration
 export const getGatewayConfig = async (): Promise<PaymentGatewayConfig> => {
+  if (!isFirebaseAvailable()) {
+    console.warn('Firebase not available - using default gateway config');
+    return defaultGatewayConfig;
+  }
+  
   try {
     const configDoc = await getDoc(doc(db, 'app_settings', 'payment_gateways'));
     
