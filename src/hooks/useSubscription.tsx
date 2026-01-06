@@ -32,10 +32,49 @@ export function useSubscription(): UseSubscriptionReturn {
           .from('users')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (fetchError) {
           throw fetchError;
+        }
+
+        // If no user record exists yet, create it via ensure-user endpoint
+        if (!data) {
+          console.log('User record not found, creating...');
+          await fetch('/api/auth/ensure-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          // Retry fetching user data
+          const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          if (retryError || !retryData) {
+            throw retryError || new Error('Failed to create user record');
+          }
+          
+          // Use the retry data
+          const featuresUsage = (retryData?.features_usage as any) || {};
+          const mapped: UserData = {
+            id: user.id,
+            email: retryData?.email || user.email || '',
+            displayName: retryData?.display_name || (user.user_metadata as any)?.display_name || (user.user_metadata as any)?.full_name || null,
+            photoURL: retryData?.photo_url || (user.user_metadata as any)?.avatar_url || (user.user_metadata as any)?.picture || '',
+            subscriptionTier: ((retryData?.subscription_tier as SubscriptionTier) || 'free') as SubscriptionTier,
+            role: (retryData?.role as any) || 'user',
+            featuresUsage: {
+              qrCodesGenerated: Number(featuresUsage.qrCodesGenerated || 0),
+              barcodesGenerated: Number(featuresUsage.barcodesGenerated || 0),
+              bulkGenerations: Number(featuresUsage.bulkGenerations || 0),
+              aiCustomizations: Number(featuresUsage.aiCustomizations || 0),
+            },
+          };
+          setUserData(mapped);
+          setLoading(false);
+          return;
         }
 
         const featuresUsage = (data?.features_usage as any) || {};

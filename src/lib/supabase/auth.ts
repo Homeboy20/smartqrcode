@@ -35,11 +35,20 @@ export async function verifySupabaseAuth(accessToken: string) {
     .from('users')
     .select('role')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   if (userError) {
     console.error('Error checking admin status:', userError);
     // If user doesn't exist in users table, they're not an admin
+    return {
+      userId: user.id,
+      email: user.email || '',
+      isAdmin: false
+    };
+  }
+
+  // If no user record found, they're not an admin
+  if (!userData) {
     return {
       userId: user.id,
       email: user.email || '',

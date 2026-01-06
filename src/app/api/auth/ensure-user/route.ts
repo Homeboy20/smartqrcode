@@ -29,7 +29,7 @@ export async function POST() {
       .from('users')
       .select('id')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (existingUser) {
       return NextResponse.json({

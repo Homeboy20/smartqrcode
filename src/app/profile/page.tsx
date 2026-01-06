@@ -91,10 +91,17 @@ export default function ProfilePage() {
           .from('users')
           .select('display_name, photo_url, subscription_tier, role, features_usage, created_at')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (fetchError) throw fetchError;
         if (cancelled) return;
+
+        // If no user record exists, create it
+        if (!data) {
+          await fetch('/api/auth/ensure-user', { method: 'POST' });
+          // Use defaults for now, profile will update on next load
+          if (cancelled) return;
+        }
 
         const dbDisplayName = (data as any)?.display_name as string | null | undefined;
         const dbPhotoUrl = (data as any)?.photo_url as string | null | undefined;
