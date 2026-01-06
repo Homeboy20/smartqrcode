@@ -24,14 +24,15 @@ const projectRoot = process.cwd();
 const standaloneServer = path.join(projectRoot, '.next', 'standalone', 'server.js');
 
 const port = process.env.PORT || '3000';
-const hostname = process.env.HOSTNAME || '0.0.0.0';
+// Use HOST or default to 0.0.0.0 for binding (HOSTNAME is often the container ID)
+const host = process.env.HOST || '0.0.0.0';
 
 if (fs.existsSync(standaloneServer)) {
-  console.log(`Starting Next.js standalone server on ${hostname}:${port}...`);
-  run(process.execPath, [standaloneServer], { PORT: port, HOSTNAME: hostname });
+  console.log(`Starting Next.js standalone server on ${host}:${port}...`);
+  run(process.execPath, [standaloneServer], { PORT: port, HOSTNAME: host });
 } else {
   // Fallback for non-standalone builds.
   const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  console.log(`Starting Next.js (next start) on ${hostname}:${port}...`);
-  run(npxCmd, ['next', 'start', '-H', hostname, '-p', port], {});
+  console.log(`Starting Next.js (next start) on ${host}:${port}...`);
+  run(npxCmd, ['next', 'start', '-H', host, '-p', port], {});
 }
