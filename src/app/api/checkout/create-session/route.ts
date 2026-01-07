@@ -8,11 +8,23 @@ import {
 } from '@/lib/flutterwave';
 import { subscriptionPricing } from '@/lib/subscriptions';
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
+import { 
+  detectCountryFromHeaders, 
+  getCurrencyForCountry, 
+  getLocalPrice, 
+  getRecommendedProvider,
+  type CurrencyCode 
+} from '@/lib/currency';
 
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     const supabaseAdmin = getSupabaseAdmin();
+    
+    // Detect user's country and currency
+    const countryCode = detectCountryFromHeaders(request.headers);
+    const currencyConfig = getCurrencyForCountry(countryCode);
+    console.log(`Detected country: ${countryCode}, currency: ${currencyConfig.code}`);
     
     // Try to get user from token if provided
     let verifiedUser = null;
@@ -33,7 +45,7 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
 
-    return await processCheckout(verifiedUser, body, supabaseAdmin);
+    return await processCheckout(verifiedUser, body, supabaseAdmin, currencyConfig.code, countryCode);
   } catch (error) {
     console.error('Error creating checkout session:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to create checkout session';
@@ -57,23 +69,35 @@ function getSupabaseAdmin() {
   });
 }
 
-async function processCheckout(user: any, body: any, supabaseAdmin: SupabaseClient) {
-  const { planId, provider = 'paystack', successUrl, cancelUrl, email, paymentMethod } = body;
+async function processCheckout(
+  user: any, 
+  body: any, 
+  supabaseAdmin: SupabaseClient, 
+  currency: CurrencyCode, 
+  countryCode: string
+) {
+  const { planId, successUrl, cancelUrl, email, paymentMethod } = body;
 
   if (!planId || !successUrl || !cancelUrl) {
     return NextResponse.json({ error: 'Missing required fields: planId, successUrl, and cancelUrl are required' }, { status: 400 });
   }
 
+  // Auto-select provider based on currency if not specified
+  const provider = body.provider || getRecommendedProvider(currency);
+  
   const supportedProviders = ['paystack', 'flutterwave'];
   if (!supportedProviders.includes(provider)) {
     return NextResponse.json({ error: `Unsupported provider. Allowed: ${supportedProviders.join(', ')}` }, { status: 400 });
   }
 
-  const amount = subscriptionPricing[planId as keyof typeof subscriptionPricing] || 0;
+  // Get price in local currency
+  const amount = planId === 'free' ? 0 : getLocalPrice(planId as 'pro' | 'business', currency);
 
   if (amount === 0) {
     return NextResponse.json({ error: 'Invalid plan ID or free plan selected' }, { status: 400 });
   }
+  
+  console.log(`Processing checkout: ${planId} plan, ${amount} ${currency}, provider: ${provider}`);
 
   // Use email from user if authenticated, otherwise from body
   const userEmail = user?.email || email;
@@ -129,7 +153,7 @@ async function processCheckout(user: any, body: any, supabaseAdmin: SupabaseClie
     const payment = await initializeSubscriptionPayment({
       email: userEmail,
       amount,
-      currency: 'NGN',
+      currency,
       plan: paystackPlanCodes[planId],
       reference,
       callbackUrl: `${successUrl}?reference=${reference}`,
@@ -139,6 +163,8 @@ async function processCheckout(user: any, body: any, supabaseAdmin: SupabaseClie
         userEmail,
         provider,
         paymentMethod: paymentMethod || 'card',
+        currency,
+        countryCode,
       },
     });
 
@@ -183,7 +209,7 @@ async function processCheckout(user: any, body: any, supabaseAdmin: SupabaseClie
     // Create payment with customer reference
     const payment = await createFlutterwaveSubscriptionPayment({
       amount,
-      currency: 'NGN',
+      currency,
       customerEmail: userEmail,
       customerName: customerName,
       planName,
@@ -196,6 +222,8 @@ async function processCheckout(user: any, body: any, supabaseAdmin: SupabaseClie
         provider,
         paymentMethod: paymentMethod || 'card',
         flwCustomerId: customer.id,
+        currency,
+        countryCode,
       },
       testMode: process.env.NODE_ENV !== 'production',
     });

@@ -1,10 +1,32 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { subscriptionFeatures, subscriptionPricing, SubscriptionTier } from '@/lib/subscriptions';
+import { subscriptionFeatures, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import PaymentProviderSelector, { PaymentProvider } from '@/components/PaymentProviderSelector';
+
+interface CurrencyInfo {
+  country: string;
+  currency: {
+    code: string;
+    symbol: string;
+    name: string;
+  };
+  recommendedProvider: 'paystack' | 'flutterwave';
+  pricing: {
+    pro: {
+      amount: number;
+      formatted: string;
+      usd: number;
+    };
+    business: {
+      amount: number;
+      formatted: string;
+      usd: number;
+    };
+  };
+}
 
 export default function PricingPage() {
   const { user, getAccessToken } = useSupabaseAuth();
@@ -14,12 +36,38 @@ export default function PricingPage() {
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'mobile_money' | 'apple_pay' | 'google_pay'>('mobile_money');
   const [email, setEmail] = useState('');
+  const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
+  const [loadingCurrency, setLoadingCurrency] = useState(true);
 
   useEffect(() => {
     if (user?.email) {
       setEmail(user.email);
     }
   }, [user?.email]);
+
+  useEffect(() => {
+    // Fetch currency information on mount
+    fetch('/api/pricing')
+      .then((res) => res.json())
+      .then((data) => {
+        setCurrencyInfo(data);
+        setSelectedProvider(data.recommendedProvider);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch currency info:', err);
+        // Use defaults on error
+        setCurrencyInfo({
+          country: 'US',
+          currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
+          recommendedProvider: 'flutterwave',
+          pricing: {
+            pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
+            business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
+          },
+        });
+      })
+      .finally(() => setLoadingCurrency(false));
+  }, []);
 
   const handleUpgrade = async (tier: SubscriptionTier) => {
     // Set tier and show modal immediately - no login required!
@@ -172,14 +220,19 @@ export default function PricingPage() {
     );
   };
 
-  if (loading) {
+  if (loading || loadingCurrency) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        <p className="ml-4">Loading subscription details...</p>
+        <p className="ml-4">Loading pricing...</p>
       </div>
     );
   }
+
+  const proPrice = currencyInfo?.pricing.pro.formatted || '$9.99';
+  const businessPrice = currencyInfo?.pricing.business.formatted || '$29.99';
+  const currencySymbol = currencyInfo?.currency.symbol || '$';
+  const currencyCode = currencyInfo?.currency.code || 'USD';
 
   return (
     <div className="bg-gradient-to-b from-gray-50 to-white">
@@ -192,6 +245,11 @@ export default function PricingPage() {
           <p className="mt-4 text-xl text-gray-600 max-w-3xl mx-auto">
             Choose the perfect plan for your business. All plans include 14-day money-back guarantee.
           </p>
+          {currencyCode !== 'USD' && (
+            <p className="mt-2 text-sm text-gray-500">
+              Prices shown in {currencyInfo?.currency.name} ({currencyCode}) • Detected from {currencyInfo?.country}
+            </p>
+          )}
           
           {/* Social Proof */}
           <div className="mt-8 flex justify-center items-center space-x-8 text-sm text-gray-500">
@@ -259,12 +317,14 @@ export default function PricingPage() {
                 </h3>
                 <p className="mt-2 text-center text-sm text-indigo-600 font-medium">Best for growing businesses</p>
                 <div className="mt-6 flex justify-center items-baseline">
-                  <span className="text-6xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">${subscriptionPricing.pro}</span>
+                  <span className="text-6xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{proPrice}</span>
                   <span className="ml-2 text-xl font-medium text-gray-500">/month</span>
                 </div>
-                <p className="mt-2 text-center text-sm text-gray-500">
-                  <span className="line-through">$49</span> Save 40%
-                </p>
+                {currencyCode !== 'USD' && (
+                  <p className="mt-2 text-center text-sm text-gray-500">
+                    ≈ ${currencyInfo?.pricing.pro.usd}
+                  </p>
+                )}
               </div>
             </div>
             <div className="px-6 pt-6 pb-8 bg-white sm:p-10">
@@ -300,9 +360,14 @@ export default function PricingPage() {
                 </h3>
                 <p className="mt-2 text-center text-sm text-gray-500">For large teams & enterprises</p>
                 <div className="mt-6 flex justify-center items-baseline">
-                  <span className="text-6xl font-extrabold text-gray-900">${subscriptionPricing.business}</span>
+                  <span className="text-6xl font-extrabold text-gray-900">{businessPrice}</span>
                   <span className="ml-2 text-xl font-medium text-gray-500">/month</span>
                 </div>
+                {currencyCode !== 'USD' && (
+                  <p className="mt-2 text-center text-sm text-gray-500">
+                    ≈ ${currencyInfo?.pricing.business.usd}
+                  </p>
+                )}
               </div>
             </div>
             <div className="px-6 pt-6 pb-8 bg-gray-50 sm:p-10">
