@@ -24,6 +24,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
+  isFirebaseAvailable: boolean;
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, displayName?: string) => Promise<boolean>;
   logout: () => Promise<boolean>;
@@ -43,6 +44,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   error: null,
+  isFirebaseAvailable: false,
   signIn: async () => false,
   signUp: async () => false,
   logout: async () => false,
@@ -265,7 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setupRecaptcha = async (containerId: string): Promise<RecaptchaVerifier> => {
     if (!auth) {
-      console.warn('Firebase Auth not initialized - phone auth unavailable');
+      console.info('Firebase Auth not initialized - phone auth unavailable');
       throw new Error('Firebase Auth not initialized');
     }
     const win = window as any;
@@ -322,7 +324,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     recaptchaVerifier: RecaptchaVerifier
   ): Promise<ConfirmationResult> => {
     if (!auth) {
-      console.warn('Firebase Auth not initialized - phone auth unavailable');
+      console.info('Firebase Auth not initialized - phone auth unavailable');
       throw new Error('Firebase Auth not initialized');
     }
     clearError();
@@ -355,6 +357,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         loading,
         error,
+        isFirebaseAvailable: !!auth,
         signIn,
         signUp,
         logout,
