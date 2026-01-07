@@ -29,6 +29,9 @@ interface PaymentCredentials {
   PAYSTACK_PLAN_CODE_PRO: string;
   PAYSTACK_PLAN_CODE_BUSINESS: string;
   
+  // Firebase
+  FIREBASE_SERVICE_ACCOUNT_JSON: string;
+  
   // Allow for dynamic indexing
   [key: string]: string;
 }
@@ -58,13 +61,17 @@ export default function PaymentCredentialsForm() {
     PAYSTACK_PUBLIC_KEY: '',
     PAYSTACK_SECRET_KEY: '',
     PAYSTACK_PLAN_CODE_PRO: '',
-    PAYSTACK_PLAN_CODE_BUSINESS: ''
+    PAYSTACK_PLAN_CODE_BUSINESS: '',
+    
+    // Firebase
+    FIREBASE_SERVICE_ACCOUNT_JSON: ''
   });
   
   // Payment gateway configuration state
   const [gatewayConfig, setGatewayConfig] = useState<PaymentGatewayConfig>(defaultGatewayConfig);
   
-  const [activeTab, setActiveTab] = useState<'stripe' | 'paypal' | 'flutterwave' | 'paystack'>('paystack');
+  const [activeTab, setActiveTab] = useState<'stripe' | 'paypal' | 'flutterwave' | 'paystack' | 'firebase'>('paystack');
+  const [firebaseJsonInput, setFirebaseJsonInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +147,12 @@ export default function PaymentCredentialsForm() {
               console.log(`PaymentCredentialsForm: Updated credential ${key}`);
             }
           });
+          
+          // If Firebase JSON exists, populate the textarea
+          if (receivedCredentials.FIREBASE_SERVICE_ACCOUNT_JSON) {
+            setFirebaseJsonInput(receivedCredentials.FIREBASE_SERVICE_ACCOUNT_JSON);
+          }
+          
           return newCredentials;
         });
       }
@@ -175,6 +188,30 @@ export default function PaymentCredentialsForm() {
       ...prev,
       [name]: value
     }));
+  };
+  
+  const handleFirebaseJsonPaste = () => {
+    try {
+      const parsed = JSON.parse(firebaseJsonInput);
+      
+      // Validate it's a Firebase service account JSON
+      if (!parsed.type || parsed.type !== 'service_account' || !parsed.project_id || !parsed.private_key) {
+        setError('Invalid Firebase service account JSON. Please paste the complete JSON from your Firebase service account key file.');
+        return;
+      }
+      
+      // Store the entire JSON as a string
+      setCredentials(prev => ({
+        ...prev,
+        FIREBASE_SERVICE_ACCOUNT_JSON: firebaseJsonInput
+      }));
+      
+      setSuccess('Firebase credentials parsed successfully! Click "Save Settings" to store them securely.');
+      setError(null);
+    } catch (err) {
+      setError('Invalid JSON format. Please ensure you copied the entire Firebase service account JSON correctly.');
+      console.error('Firebase JSON parse error:', err);
+    }
   };
 
   const handleGatewayToggle = (gateway: 'stripe' | 'paypal' | 'flutterwave' | 'paystack', field: 'enabled' | 'testMode') => {
@@ -370,6 +407,13 @@ export default function PaymentCredentialsForm() {
           >
             Paystack
           </button>
+          <button
+            type="button"
+            className={getTabClass('firebase')}
+            onClick={() => setActiveTab('firebase')}
+          >
+            Firebase
+          </button>
           
           {/* Debug button - only visible in development */}
           {process.env.NODE_ENV === 'development' && (
@@ -403,32 +447,34 @@ export default function PaymentCredentialsForm() {
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Gateway controls for current tab */}
-        <div className="bg-gray-50 p-4 rounded-md border border-gray-200 mb-6">
-          <h3 className="text-md font-medium text-gray-700 mb-4">Gateway Configuration</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ToggleSwitch 
-              enabled={gatewayConfig[activeTab].enabled} 
-              onChange={() => handleGatewayToggle(activeTab, 'enabled')} 
-              label={`Enable ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`} 
-            />
-            <ToggleSwitch 
-              enabled={gatewayConfig[activeTab].testMode} 
-              onChange={() => handleGatewayToggle(activeTab, 'testMode')} 
-              label="Test Mode" 
-            />
+        {/* Gateway controls for current tab - only for payment gateways, not Firebase */}
+        {activeTab !== 'firebase' && (
+          <div className="bg-gray-50 p-4 rounded-md border border-gray-200 mb-6">
+            <h3 className="text-md font-medium text-gray-700 mb-4">Gateway Configuration</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ToggleSwitch 
+                enabled={gatewayConfig[activeTab].enabled} 
+                onChange={() => handleGatewayToggle(activeTab, 'enabled')} 
+                label={`Enable ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`} 
+              />
+              <ToggleSwitch 
+                enabled={gatewayConfig[activeTab].testMode} 
+                onChange={() => handleGatewayToggle(activeTab, 'testMode')} 
+                label="Test Mode" 
+              />
+            </div>
+            {!gatewayConfig[activeTab].enabled && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
+                <span className="font-medium">Note:</span> This payment gateway is currently disabled. Enable it to allow customers to pay using this method.
+              </div>
+            )}
+            {gatewayConfig[activeTab].testMode && gatewayConfig[activeTab].enabled && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
+                <span className="font-medium">Test Mode Active:</span> No real payments will be processed. Use test cards for testing.
+              </div>
+            )}
           </div>
-          {!gatewayConfig[activeTab].enabled && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md">
-              <span className="font-medium">Note:</span> This payment gateway is currently disabled. Enable it to allow customers to pay using this method.
-            </div>
-          )}
-          {gatewayConfig[activeTab].testMode && gatewayConfig[activeTab].enabled && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md">
-              <span className="font-medium">Test Mode Active:</span> No real payments will be processed. Use test cards for testing.
-            </div>
-          )}
-        </div>
+        )}
         
         {activeTab === 'stripe' && (
           <div className="space-y-4">
@@ -694,6 +740,86 @@ export default function PaymentCredentialsForm() {
                 className={inputStyle}
                 placeholder="PLN_..."
               />
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'firebase' && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path>
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800">How to get your Firebase Service Account JSON</h3>
+                  <div className="mt-2 text-sm text-blue-700">
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Go to Firebase Console → Project Settings</li>
+                      <li>Click on "Service Accounts" tab</li>
+                      <li>Click "Generate New Private Key"</li>
+                      <li>Download the JSON file</li>
+                      <li>Open the file and copy ALL the JSON content</li>
+                      <li>Paste it in the textarea below</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="firebaseJsonInput" className={labelStyle}>
+                Firebase Service Account JSON
+              </label>
+              <textarea
+                id="firebaseJsonInput"
+                value={firebaseJsonInput}
+                onChange={(e) => setFirebaseJsonInput(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono text-xs"
+                placeholder='Paste your entire Firebase service account JSON here, e.g.:
+{
+  "type": "service_account",
+  "project_id": "your-project-id",
+  "private_key_id": "...",
+  "private_key": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n",
+  "client_email": "firebase-adminsdk-xxxxx@your-project.iam.gserviceaccount.com",
+  ...
+}'
+                rows={12}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Paste the complete JSON content from your Firebase service account key file
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleFirebaseJsonPaste}
+                className="inline-flex items-center px-4 py-2 border border-indigo-600 text-sm font-medium rounded-md shadow-sm text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Parse & Validate JSON
+              </button>
+              
+              {credentials.FIREBASE_SERVICE_ACCOUNT_JSON && (
+                <div className="flex items-center text-sm text-green-600">
+                  <svg className="h-5 w-5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Firebase credentials ready to save
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Security Note</h4>
+              <p className="text-xs text-gray-600">
+                Your Firebase service account JSON will be encrypted with AES-256 before being stored. 
+                This includes your private key and all sensitive information. The credentials are only 
+                decrypted server-side when needed for Firebase operations.
+              </p>
             </div>
           </div>
         )}
