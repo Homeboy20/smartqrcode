@@ -13,6 +13,12 @@ export default function Header() {
 
   const siteName = appSettings?.branding?.siteName || 'ScanMagic';
   const logoUrl = appSettings?.branding?.logoSvgUrl || appSettings?.branding?.logoUrl || '';
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    // Reset error state when logo URL changes
+    setLogoError(false);
+  }, [logoUrl]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,11 +59,12 @@ export default function Header() {
           {/* Logo & Branding */}
           <Link href="/" className="flex items-center space-x-3 group">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-lg group-hover:shadow-indigo-200 transition-shadow overflow-hidden">
-              {logoUrl ? (
+              {logoUrl && !logoError ? (
                 <img
                   src={logoUrl}
                   alt={`${siteName} logo`}
                   className="h-full w-full object-contain bg-white"
+                  onError={() => setLogoError(true)}
                 />
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
@@ -30,10 +31,16 @@ export default function Navbar() {
 
   const siteName = appSettings?.branding?.siteName || 'ScanMagic';
   const logoUrl = appSettings?.branding?.logoUrl || appSettings?.branding?.logoSvgUrl || '';
+  const [logoError, setLogoError] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    // Reset error state when logo URL changes
+    setLogoError(false);
+  }, [logoUrl]);
   
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
@@ -51,8 +58,13 @@ export default function Navbar() {
         <div className="flex lg:flex-1">
           <Link href="/" className="-m-1.5 p-1.5">
             <span className="sr-only">{siteName}</span>
-            {logoUrl ? (
-              <img src={logoUrl} alt={`${siteName} logo`} className="h-8 w-auto object-contain" />
+            {logoUrl && !logoError ? (
+              <img 
+                src={logoUrl} 
+                alt={`${siteName} logo`} 
+                className="h-8 w-auto object-contain" 
+                onError={() => setLogoError(true)}
+              />
             ) : (
               <svg className="h-8 w-auto text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
@@ -191,8 +203,13 @@ export default function Navbar() {
             <div className="flex items-center justify-between">
               <Link href="/" className="-m-1.5 p-1.5">
                 <span className="sr-only">{siteName}</span>
-                {logoUrl ? (
-                  <img src={logoUrl} alt={`${siteName} logo`} className="h-8 w-auto object-contain" />
+                {logoUrl && !logoError ? (
+                  <img 
+                    src={logoUrl} 
+                    alt={`${siteName} logo`} 
+                    className="h-8 w-auto object-contain" 
+                    onError={() => setLogoError(true)}
+                  />
                 ) : (
                   <svg className="h-8 w-auto text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
