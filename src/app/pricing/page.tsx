@@ -513,7 +513,7 @@ export default function PricingPage() {
                   {/* Price */}
                   <div className="mt-4 flex items-baseline">
                     <span className="text-5xl font-extrabold text-white">
-                      ${selectedTier === 'pro' ? subscriptionPricing.pro : subscriptionPricing.business}
+                      {selectedTier === 'pro' ? proPrice : businessPrice}
                     </span>
                     <span className="ml-2 text-xl text-indigo-100">/month</span>
                   </div>
