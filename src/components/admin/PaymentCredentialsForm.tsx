@@ -166,7 +166,8 @@ export default function PaymentCredentialsForm() {
     } else {
       console.log('PaymentCredentialsForm: No user logged in, skipping credential fetch');
     }
-  }, [user, getAccessToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
