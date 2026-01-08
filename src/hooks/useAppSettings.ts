@@ -98,7 +98,8 @@ export function useAppSettings() {
           const parsed = JSON.parse(cached);
           // Check if cache is less than 5 minutes old
           if (parsed.timestamp && Date.now() - parsed.timestamp < 5 * 60 * 1000) {
-            console.log('useAppSettings: Loaded from cache:', parsed.settings);
+            const isDev = process.env.NODE_ENV === 'development';
+            if (isDev) console.log('useAppSettings: Loaded from cache');
             return normalizeSettings(parsed.settings);
           }
         }
@@ -106,15 +107,17 @@ export function useAppSettings() {
         console.error('Error loading cached settings:', error);
       }
     }
-    console.log('useAppSettings: Using default settings');
     return DEFAULT_SETTINGS;
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    
     async function fetchSettings() {
       try {
-        console.log('useAppSettings: Fetching from API...');
+        const isDev = process.env.NODE_ENV === 'development';
+        if (isDev) console.log('useAppSettings: Fetching from API...');
         // Add cache busting parameter
         const response = await fetch(`/api/app-settings?t=${Date.now()}`, {
           cache: 'no-store',
@@ -125,7 +128,10 @@ export function useAppSettings() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log('useAppSettings: Received from API:', data);
+          if (!isMounted) return;
+          
+          const isDev = process.env.NODE_ENV === 'development';
+          if (isDev) console.log('useAppSettings: Received from API');
           const normalized = normalizeSettings(data);
           setSettings(normalized);
           
@@ -136,12 +142,22 @@ export function useAppSettings() {
                 settings: normalized,
                 timestamp: Date.now()
               }));
-              console.log('useAppSettings: Cached to localStorage');
+              if (isDev) console.log('useAppSettings: Cached to localStorage');
               
-              // Trigger Firebase reinitialization if Firebase settings changed
-              if (normalized.firebase?.enabled) {
-                console.log('useAppSettings: Firebase enabled, triggering reinitialization...');
-                window.dispatchEvent(new CustomEvent('firebase-config-updated'));
+              // Trigger Firebase reinitialization only if Firebase has valid config
+              const hasValidFirebaseConfig = 
+                normalized.firebase?.enabled && 
+                normalized.firebase?.apiKey && 
+                normalized.firebase?.projectId;
+              
+              if (hasValidFirebaseConfig) {
+                if (isDev) console.log('useAppSettings: Valid Firebase config detected, triggering reinitialization...');
+                // Use setTimeout to ensure localStorage is fully written
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('firebase-config-updated'));
+                }, 50);
+              } else if (normalized.firebase?.enabled) {
+                console.warn('⚠️ Firebase is enabled but missing configuration values. Configure in Admin Panel → App Settings.');
               }
             } catch (error) {
               console.error('Error caching settings:', error);
@@ -153,7 +169,9 @@ export function useAppSettings() {
       } catch (error) {
         console.error('Error fetching app settings:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -161,7 +179,8 @@ export function useAppSettings() {
     
     // Listen for settings updates from admin page
     const handleSettingsUpdate = () => {
-      console.log('useAppSettings: Received settings update event, refetching...');
+      const isDev = process.env.NODE_ENV === 'development';
+      if (isDev) console.log('useAppSettings: Received settings update event, refetching...');
       fetchSettings();
     };
     
@@ -174,7 +193,8 @@ export function useAppSettings() {
       channel = new BroadcastChannel('app-settings');
       channel.onmessage = (event) => {
         if (event.data.type === 'settings-updated') {
-          console.log('useAppSettings: Received broadcast, refetching...');
+          const isDev = process.env.NODE_ENV === 'development';
+          if (isDev) console.log('useAppSettings: Received broadcast, refetching...');
           fetchSettings();
         }
       };
@@ -186,6 +206,7 @@ export function useAppSettings() {
     const interval = setInterval(fetchSettings, 5 * 60 * 1000);
     
     return () => {
+      isMounted = false;
       clearInterval(interval);
       window.removeEventListener('app-settings-updated', handleSettingsUpdate);
       if (channel) {

@@ -86,19 +86,19 @@ if (isBrowser) {
   setTimeout(() => {
     const success = initializeFirebase();
     if (!success) {
-      console.log('Firebase initialization failed on first attempt, will retry after settings load');
+      console.log('⏳ Firebase initialization deferred - waiting for app settings to load...');
     }
   }, 100);
   
   // Listen for settings updates
   window.addEventListener('app-settings-updated', () => {
-    console.log('App settings updated, reinitializing Firebase...');
+    console.log('📱 App settings updated, reinitializing Firebase...');
     reinitializeFirebase();
   });
   
   // Listen for Firebase config updates specifically
   window.addEventListener('firebase-config-updated', () => {
-    console.log('Firebase config updated from app settings, reinitializing...');
+    console.log('🔥 Firebase config updated from database, reinitializing...');
     reinitializeFirebase();
   });
 }
