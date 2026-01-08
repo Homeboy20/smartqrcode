@@ -2,6 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
 
+type FirebaseSettings = {
+  enabled?: boolean;
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+  phoneAuthEnabled?: boolean;
+  recaptchaSiteKey?: string;
+};
+
+function mergeFirebaseSettings(raw: any, defaults: FirebaseSettings): FirebaseSettings {
+  const firebaseConfig = (raw?.firebaseConfig ?? raw?.firebase_config ?? {}) as FirebaseSettings;
+  const firebase = (raw?.firebase ?? {}) as FirebaseSettings;
+
+  return {
+    ...defaults,
+    ...firebaseConfig,
+    ...firebase,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Verify admin access
@@ -76,11 +100,12 @@ export async function GET(request: NextRequest) {
         ...defaults.branding,
         ...(raw?.branding ?? {}),
       },
-      firebase: {
-        ...defaults.firebase,
-        ...(raw?.firebase ?? {}),
-      },
+      firebase: mergeFirebaseSettings(raw, defaults.firebase),
     };
+
+    // Avoid returning legacy keys to the admin UI.
+    delete (settings as any).firebaseConfig;
+    delete (settings as any).firebase_config;
 
     return NextResponse.json({ settings });
   } catch (error: any) {
@@ -129,6 +154,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize settings before saving (support legacy firebaseConfig field)
+    const normalizedSettings = { ...(settings as any) };
+    const firebaseDefaults: FirebaseSettings = {
+      enabled: false,
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+      measurementId: '',
+      phoneAuthEnabled: false,
+      recaptchaSiteKey: '',
+    };
+    normalizedSettings.firebase = mergeFirebaseSettings(normalizedSettings, firebaseDefaults);
+    delete normalizedSettings.firebaseConfig;
+    delete normalizedSettings.firebase_config;
+
     if (isDev) console.log('[admin/app-settings POST] Upserting settings...');
     const nowIso = new Date().toISOString();
     const { data: saved, error: upsertError } = await supabase
@@ -136,7 +179,7 @@ export async function POST(request: NextRequest) {
       .upsert(
         {
           key: 'general',
-          value: settings,
+          value: normalizedSettings,
           updated_at: nowIso,
         },
         {
@@ -164,7 +207,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Settings saved successfully',
-      settings: (saved as any)?.value ?? settings,
+      settings: (saved as any)?.value ?? normalizedSettings,
     });
   } catch (error: any) {
     console.error('[admin/app-settings POST] Error saving app settings:', error);

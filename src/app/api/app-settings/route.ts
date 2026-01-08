@@ -1,6 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAnonClient } from '@/lib/supabase/server';
 
+type FirebaseSettings = {
+  enabled?: boolean;
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+  phoneAuthEnabled?: boolean;
+  recaptchaSiteKey?: string;
+};
+
+function mergeFirebaseSettings(input: any): FirebaseSettings {
+  const defaults: FirebaseSettings = {
+    enabled: false,
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: '',
+    measurementId: '',
+    phoneAuthEnabled: false,
+    recaptchaSiteKey: '',
+  };
+
+  const firebaseConfig = (input?.firebaseConfig ?? input?.firebase_config ?? {}) as FirebaseSettings;
+  const firebase = (input?.firebase ?? {}) as FirebaseSettings;
+
+  // Merge order: defaults -> legacy firebaseConfig -> firebase
+  // This preserves `firebase.enabled` while allowing legacy config fields to fill gaps.
+  return {
+    ...defaults,
+    ...firebaseConfig,
+    ...firebase,
+  };
+}
+
 // Public endpoint to check if app is in free mode
 export async function GET(request: NextRequest) {
   try {
@@ -83,6 +122,8 @@ export async function GET(request: NextRequest) {
       },
     };
 
+    const mergedFirebase = mergeFirebaseSettings(settings);
+
     const response = { 
       freeMode: settings.freeMode,
       freeModeFeatures: settings.freeModeFeatures,
@@ -93,18 +134,7 @@ export async function GET(request: NextRequest) {
         faviconUrl: '',
       },
       // Firebase Web App config is safe to expose client-side.
-      firebase: settings.firebase || {
-        enabled: false,
-        apiKey: '',
-        authDomain: '',
-        projectId: '',
-        storageBucket: '',
-        messagingSenderId: '',
-        appId: '',
-        measurementId: '',
-        phoneAuthEnabled: false,
-        recaptchaSiteKey: '',
-      },
+      firebase: mergedFirebase,
     };
     
     if (isDev) console.log('[app-settings API] Returning response');

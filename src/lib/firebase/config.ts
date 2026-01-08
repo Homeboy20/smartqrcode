@@ -9,6 +9,8 @@ import { getClientFirebaseConfig } from '@/lib/credentials.client';
 // Initialize Firebase with environment variables
 let firebaseApp: FirebaseApp | undefined;
 
+const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+
 // Check if we're in the browser
 const isBrowser = typeof window !== 'undefined';
 
@@ -34,11 +36,11 @@ const initializeFirebase = () => {
       // Use existing app instance if available
       if (getApps().length > 0) {
         firebaseApp = getApps()[0];
-        console.log('✅ Using existing Firebase app');
+        if (isDev) console.log('✅ Using existing Firebase app');
       } else {
         // Otherwise initialize a new app
         firebaseApp = initializeApp(config);
-        console.log('✅ Firebase initialized successfully');
+        if (isDev) console.log('✅ Firebase initialized successfully');
       }
       
       // If we have a valid app, initialize services
@@ -51,8 +53,10 @@ const initializeFirebase = () => {
       }
     } else {
       // Firebase not configured - this is optional, no error needed
-      console.log('⚠️ Firebase not configured (missing:', missingConfig.join(', ') + ')');
-      console.log('Firebase is optional. Configure in Admin Panel → App Settings if needed.');
+      if (isDev) {
+        console.log('⚠️ Firebase not configured (missing:', missingConfig.join(', ') + ')');
+        console.log('Firebase is optional. Configure in Admin Panel → App Settings if needed.');
+      }
     }
   } catch (error) {
     console.error('❌ Error initializing Firebase:', error);
@@ -86,19 +90,19 @@ if (isBrowser) {
   setTimeout(() => {
     const success = initializeFirebase();
     if (!success) {
-      console.log('⏳ Firebase initialization deferred - waiting for app settings to load...');
+      if (isDev) console.log('⏳ Firebase initialization deferred - waiting for app settings to load...');
     }
   }, 100);
   
   // Listen for settings updates
   window.addEventListener('app-settings-updated', () => {
-    console.log('📱 App settings updated, reinitializing Firebase...');
+    if (isDev) console.log('📱 App settings updated, reinitializing Firebase...');
     reinitializeFirebase();
   });
   
   // Listen for Firebase config updates specifically
   window.addEventListener('firebase-config-updated', () => {
-    console.log('🔥 Firebase config updated from database, reinitializing...');
+    if (isDev) console.log('🔥 Firebase config updated from database, reinitializing...');
     reinitializeFirebase();
   });
 }

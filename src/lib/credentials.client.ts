@@ -31,8 +31,14 @@ export function getClientFirebaseConfig(): Record<string, string | undefined> {
       const cached = localStorage.getItem('app_settings');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.settings?.firebase?.enabled) {
-          const fb = parsed.settings.firebase;
+        const firebaseFromCache = parsed.settings?.firebase ?? {};
+        const firebaseConfigFromCache = parsed.settings?.firebaseConfig ?? parsed.settings?.firebase_config ?? {};
+        const fb = {
+          ...firebaseConfigFromCache,
+          ...firebaseFromCache,
+        } as any;
+
+        if (fb?.enabled) {
           // Only use if at least the essential fields are present
           if (fb.apiKey && fb.projectId) {
             if (isDev) console.log('🔥 Firebase config loaded from database (cached)');
@@ -46,7 +52,7 @@ export function getClientFirebaseConfig(): Record<string, string | undefined> {
               measurementId: fb.measurementId,
             };
           }
-        } else if (isDev && parsed.settings?.firebase) {
+        } else if (isDev && (parsed.settings?.firebase || parsed.settings?.firebaseConfig || parsed.settings?.firebase_config)) {
           console.log('⚠️ Firebase disabled in app_settings');
         }
       }
