@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
         messagingSenderId: '',
         appId: '',
         measurementId: '',
+        phoneAuthEnabled: false,
+        recaptchaSiteKey: '',
       },
     };
 

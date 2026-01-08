@@ -1,17 +1,19 @@
 
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 
 import { useAuth } from '@/context/FirebaseAuthContext';
+import { useAppSettings } from '@/hooks/useAppSettings';
 
 type VerificationStep = 'inputPhone' | 'verifyCode';
 
 export default function PhoneSignup() {
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') || '/';
+  const { settings: appSettings, loading: settingsLoading } = useAppSettings();
 
   const {
     error: firebaseError,
@@ -34,8 +36,35 @@ export default function PhoneSignup() {
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   
-  // If Firebase is not available, show a message
-  if (!isFirebaseAvailable) {
+  // Check if phone auth is properly configured
+  const isPhoneAuthConfigured = 
+    isFirebaseAvailable && 
+    appSettings?.firebase?.enabled && 
+    appSettings?.firebase?.phoneAuthEnabled &&
+    appSettings?.firebase?.recaptchaSiteKey;
+  
+  // If Firebase or phone auth is not configured, show a message
+  if (settingsLoading) {
+    return (
+      <div className="bg-gray-50 border border-gray-200 p-4 rounded-md">
+        <div className="flex items-center">
+          <svg className="animate-spin h-5 w-5 text-indigo-600 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-sm text-gray-600">Loading authentication settings...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!isPhoneAuthConfigured) {
+    const missingConfig = [];
+    if (!isFirebaseAvailable) missingConfig.push('Firebase not initialized');
+    if (!appSettings?.firebase?.enabled) missingConfig.push('Firebase not enabled');
+    if (!appSettings?.firebase?.phoneAuthEnabled) missingConfig.push('Phone authentication not enabled');
+    if (!appSettings?.firebase?.recaptchaSiteKey) missingConfig.push('reCAPTCHA site key not configured');
+    
     return (
       <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
         <div className="flex">
@@ -47,9 +76,21 @@ export default function PhoneSignup() {
           <div className="ml-3">
             <h3 className="text-sm font-medium text-yellow-800">Phone Authentication Unavailable</h3>
             <div className="mt-2 text-sm text-yellow-700">
+              <p className="mb-2">
+                Phone authentication requires proper configuration.
+              </p>
+              {missingConfig.length > 0 && (
+                <div className="bg-yellow-100 rounded p-2 mb-2">
+                  <p className="font-semibold mb-1">Missing configuration:</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-xs">
+                    {missingConfig.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p>
-                Phone authentication requires Firebase configuration. Please use email authentication instead, 
-                or contact the administrator to enable Firebase phone authentication.
+                Please use email authentication instead, or contact the administrator to enable Firebase phone authentication.
               </p>
             </div>
             <div className="mt-4">

@@ -24,6 +24,8 @@ interface AppSettings {
     messagingSenderId: string;
     appId: string;
     measurementId?: string;
+    phoneAuthEnabled?: boolean;
+    recaptchaSiteKey?: string;
   };
 }
 
@@ -57,6 +59,8 @@ export default function AppSettingsPage() {
       messagingSenderId: '',
       appId: '',
       measurementId: '',
+      phoneAuthEnabled: false,
+      recaptchaSiteKey: '',
     },
   });
 
@@ -609,6 +613,94 @@ export default function AppSettingsPage() {
                       placeholder="G-XXXXXXXXXX"
                     />
                   </div>
+                </div>
+
+                {/* Phone Authentication Settings */}
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex-1 pr-4">
+                      <h4 className="text-base font-medium text-gray-900">Phone Authentication</h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Enable phone number authentication with SMS verification. Requires reCAPTCHA v2 (Invisible) configuration.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSettings(prev => ({
+                        ...prev,
+                        firebase: { ...prev.firebase!, phoneAuthEnabled: !prev.firebase?.phoneAuthEnabled }
+                      }))}
+                      className={`${
+                        settings.firebase?.phoneAuthEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                      } relative inline-flex flex-shrink-0 h-8 w-14 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+                    >
+                      <span className="sr-only">Enable Phone Authentication</span>
+                      <span
+                        className={`${
+                          settings.firebase?.phoneAuthEnabled ? 'translate-x-6' : 'translate-x-0'
+                        } pointer-events-none inline-block h-7 w-7 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200`}
+                      />
+                    </button>
+                  </div>
+
+                  {settings.firebase?.phoneAuthEnabled && (
+                    <div className="space-y-4 bg-gray-50 p-4 rounded-md">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h5 className="text-sm font-medium text-yellow-800">Setup Required</h5>
+                            <div className="mt-1 text-sm text-yellow-700">
+                              <ol className="list-decimal list-inside space-y-1">
+                                <li>Enable Phone authentication in <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Firebase Console</a></li>
+                                <li>Create a reCAPTCHA v2 (Invisible) site key at <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer" className="underline">Google reCAPTCHA</a></li>
+                                <li>Add your domain to authorized domains in Firebase Console</li>
+                              </ol>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          reCAPTCHA Site Key (v2 Invisible)
+                          <span className="text-red-500 ml-1">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.firebase?.recaptchaSiteKey || ''}
+                          onChange={(e) => setSettings(prev => ({
+                            ...prev,
+                            firebase: { ...prev.firebase!, recaptchaSiteKey: e.target.value }
+                          }))}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          placeholder="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Get your site key from <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-500">Google reCAPTCHA Admin Console</a>
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-blue-700">
+                              <strong>Phone auth access:</strong> Once configured and saved, users can sign in via <code className="bg-blue-100 px-1 py-0.5 rounded">/phone-auth</code>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

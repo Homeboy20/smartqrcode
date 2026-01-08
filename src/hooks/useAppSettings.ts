@@ -23,6 +23,8 @@ export interface AppSettings {
     messagingSenderId: string;
     appId: string;
     measurementId?: string;
+    phoneAuthEnabled?: boolean;
+    recaptchaSiteKey?: string;
   };
 }
 
@@ -49,6 +51,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     messagingSenderId: '',
     appId: '',
     measurementId: '',
+    phoneAuthEnabled: false,
+    recaptchaSiteKey: '',
   },
 };
 
