@@ -33,6 +33,7 @@ export function getClientFirebaseConfig(): Record<string, string | undefined> {
           const fb = parsed.settings.firebase;
           // Only use if at least the essential fields are present
           if (fb.apiKey && fb.projectId) {
+            console.log('🔥 Firebase config loaded from database (cached)');
             return {
               apiKey: fb.apiKey,
               authDomain: fb.authDomain,
@@ -43,7 +44,11 @@ export function getClientFirebaseConfig(): Record<string, string | undefined> {
               measurementId: fb.measurementId,
             };
           }
+        } else {
+          console.log('⚠️ Firebase disabled in app_settings or not configured');
         }
+      } else {
+        console.log('⚠️ No app_settings in localStorage yet');
       }
     } catch (e) {
       console.error('Error reading Firebase config from app_settings:', e);
@@ -63,6 +68,7 @@ export function getClientFirebaseConfig(): Record<string, string | undefined> {
     };
   }
 
+  console.log('🔥 Firebase config using environment variables');
   return {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',

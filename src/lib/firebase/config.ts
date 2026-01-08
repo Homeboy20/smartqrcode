@@ -34,12 +34,11 @@ const initializeFirebase = () => {
       // Use existing app instance if available
       if (getApps().length > 0) {
         firebaseApp = getApps()[0];
-        console.log('Using existing Firebase app');
+        console.log('✅ Using existing Firebase app');
       } else {
         // Otherwise initialize a new app
         firebaseApp = initializeApp(config);
-        console.log('Firebase initialized successfully from:', 
-          config.apiKey ? 'database config' : 'env vars');
+        console.log('✅ Firebase initialized successfully');
       }
       
       // If we have a valid app, initialize services
@@ -52,10 +51,11 @@ const initializeFirebase = () => {
       }
     } else {
       // Firebase not configured - this is optional, no error needed
-      console.log('Firebase not configured (optional service)');
+      console.log('⚠️ Firebase not configured (missing:', missingConfig.join(', ') + ')');
+      console.log('Firebase is optional. Configure in Admin Panel → App Settings if needed.');
     }
   } catch (error) {
-    console.error('Error initializing Firebase:', error);
+    console.error('❌ Error initializing Firebase:', error);
   }
   return false;
 };
@@ -82,11 +82,23 @@ export const reinitializeFirebase = async () => {
 
 // Initialize Firebase only on the client side
 if (isBrowser) {
-  initializeFirebase();
+  // Delay initialization to allow app settings to load first
+  setTimeout(() => {
+    const success = initializeFirebase();
+    if (!success) {
+      console.log('Firebase initialization failed on first attempt, will retry after settings load');
+    }
+  }, 100);
   
   // Listen for settings updates
   window.addEventListener('app-settings-updated', () => {
     console.log('App settings updated, reinitializing Firebase...');
+    reinitializeFirebase();
+  });
+  
+  // Listen for Firebase config updates specifically
+  window.addEventListener('firebase-config-updated', () => {
+    console.log('Firebase config updated from app settings, reinitializing...');
     reinitializeFirebase();
   });
 }

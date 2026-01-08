@@ -133,6 +133,12 @@ export function useAppSettings() {
                 timestamp: Date.now()
               }));
               console.log('useAppSettings: Cached to localStorage');
+              
+              // Trigger Firebase reinitialization if Firebase settings changed
+              if (normalized.firebase?.enabled) {
+                console.log('useAppSettings: Firebase enabled, triggering reinitialization...');
+                window.dispatchEvent(new CustomEvent('firebase-config-updated'));
+              }
             } catch (error) {
               console.error('Error caching settings:', error);
             }
