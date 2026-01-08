@@ -5,6 +5,8 @@ import { createServerClient } from '@/lib/supabase/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });
 }
@@ -53,6 +55,7 @@ function getBrandingUploadConfig(kind: string) {
 
 async function ensurePublicBucketExists(adminClient: any, bucket: string) {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
     // If the bucket doesn't exist, create it so uploads work out-of-the-box.
     const { error } = await adminClient.storage.createBucket(bucket, {
       public: true,
@@ -156,7 +159,7 @@ export async function POST(req: NextRequest) {
 
           if (!retryError) {
             const { data: publicData } = adminClient.storage.from(bucket).getPublicUrl(objectPath);
-            console.log('[Upload Success after bucket creation] Returning public URL:', publicData.publicUrl);
+              if (isDev) console.log('[Upload Success after bucket creation] Returning public URL:', publicData.publicUrl);
             return json(200, {
               ok: true,
               url: publicData.publicUrl,
@@ -185,7 +188,7 @@ export async function POST(req: NextRequest) {
 
     const { data: publicData } = adminClient.storage.from(bucket).getPublicUrl(objectPath);
 
-    console.log('[Upload Success] Returning public URL:', publicData.publicUrl);
+  if (isDev) console.log('[Upload Success] Returning public URL:', publicData.publicUrl);
 
     return json(200, {
       ok: true,

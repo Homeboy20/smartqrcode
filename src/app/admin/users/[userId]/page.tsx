@@ -25,6 +25,8 @@ export default function UserDetailPage() {
   const router = useRouter();
   const params = useParams();
   const userId = params?.userId as string;
+
+  const isDev = process.env.NODE_ENV === 'development';
   
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,8 +49,8 @@ export default function UserDetailPage() {
       try {
         setLoading(true);
         setError(null);
-        
-        console.log('Fetching user with ID:', userId);
+
+        if (isDev) console.log('Fetching user with ID:', userId);
 
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
@@ -72,7 +74,7 @@ export default function UserDetailPage() {
         }
         
         const data = await response.json();
-        console.log('Received user data:', data);
+        if (isDev) console.log('Received user data:', data);
 
         // API may return `{ user: {...} }` (older shape) or the user object directly.
         const rawUser = (data && (data.user ?? data)) as any;

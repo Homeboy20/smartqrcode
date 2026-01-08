@@ -4,7 +4,8 @@ import { createAnonClient } from '@/lib/supabase/server';
 // Public endpoint to check if app is in free mode
 export async function GET(request: NextRequest) {
   try {
-    console.log('[app-settings API] Fetching settings from database...');
+    const isDev = process.env.NODE_ENV === 'development';
+    if (isDev) console.log('[app-settings API] Fetching settings from database...');
 
     const supabase = createAnonClient();
     if (!supabase) {
@@ -48,10 +49,9 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    if (!data) {
-      console.log('[app-settings API] No data found, using defaults');
-    } else {
-      console.log('[app-settings API] Found data:', data);
+    if (isDev) {
+      if (!data) console.log('[app-settings API] No data found, using defaults');
+      else console.log('[app-settings API] Found data');
     }
 
     // Return only free mode status (don't expose all settings)
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
       },
     };
     
-    console.log('[app-settings API] Returning:', response);
+    if (isDev) console.log('[app-settings API] Returning response');
     return NextResponse.json(response);
   } catch (error: any) {
     console.error('Error fetching app settings:', error);

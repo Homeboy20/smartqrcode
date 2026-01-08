@@ -43,7 +43,7 @@ export default function AdminLogin() {
       if (!accessToken) throw new Error('Login succeeded but session token is missing');
 
       // One quick check against an admin-only endpoint.
-      const response = await fetch('/api/admin/credentials', {
+      const response = await fetch('/api/admin/payment-settings', {
         method: 'GET',
         headers: { Authorization: `Bearer ${accessToken}` },
       });

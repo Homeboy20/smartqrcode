@@ -24,6 +24,7 @@ interface User {
 
 export default function AdminUsersPage() {
   const { user, loading: authLoading } = useSupabaseAuth();
+  const isDev = process.env.NODE_ENV === 'development';
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export default function AdminUsersPage() {
       try {
         setLoading(true);
         setError(null);
-        console.log('Fetching users from API...');
+        if (isDev) console.log('Fetching users from API...');
 
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
@@ -100,10 +101,10 @@ export default function AdminUsersPage() {
         }
         
         const data = await response.json();
-        console.log('Received user data:', data);
+        if (isDev) console.log('Received user data:', data);
         
         if (data.users && Array.isArray(data.users)) {
-          console.log(`Setting ${data.users.length} users to state`);
+          if (isDev) console.log(`Setting ${data.users.length} users to state`);
           setUsers(data.users);
         } else {
           console.error('Received invalid user data format:', data);

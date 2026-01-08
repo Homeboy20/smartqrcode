@@ -92,7 +92,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[admin/app-settings POST] Starting save...');
+    const isDev = process.env.NODE_ENV === 'development';
+    if (isDev) console.log('[admin/app-settings POST] Starting save...');
     
     // Verify admin access
     const authResult = await verifyAdminAccess(request);
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { settings } = body;
-    console.log('[admin/app-settings POST] Received settings:', JSON.stringify(settings));
+    if (isDev) console.log('[admin/app-settings POST] Received settings');
 
     if (!settings) {
       return NextResponse.json(
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('[admin/app-settings POST] Upserting settings...');
+    if (isDev) console.log('[admin/app-settings POST] Upserting settings...');
     const nowIso = new Date().toISOString();
     const { data: saved, error: upsertError } = await supabase
       .from('app_settings')
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
       throw upsertError;
     }
 
-    console.log('[admin/app-settings POST] Settings saved successfully! Saved value:', JSON.stringify((saved as any)?.value));
+    if (isDev) console.log('[admin/app-settings POST] Settings saved successfully');
     return NextResponse.json({
       success: true,
       message: 'Settings saved successfully',

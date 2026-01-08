@@ -5,6 +5,7 @@ import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSet
 // POST - Test payment provider connection
 export async function POST(request: NextRequest) {
   try {
+    const isDev = process.env.NODE_ENV === 'development';
     await verifyAdminAccess(request);
 
     const body = await request.json().catch(() => ({}));
@@ -25,7 +26,9 @@ export async function POST(request: NextRequest) {
     }
 
     const credentials = runtime.credentials;
-    console.log(`Testing ${provider} with credentials:`, Object.keys(credentials || {}));
+    if (isDev) {
+      console.log(`Testing ${provider} with credential keys:`, Object.keys(credentials || {}));
+    }
 
     let testResult = { success: false, message: '' };
 
@@ -72,8 +75,6 @@ async function testPaystackConnection(credentials: { secretKey?: string; publicK
   }
 
   try {
-    console.log('Testing Paystack with secretKey:', credentials.secretKey?.substring(0, 10) + '...');
-    
     const response = await fetch('https://api.paystack.co/transaction/verify/test', {
       method: 'GET',
       headers: {
@@ -82,9 +83,7 @@ async function testPaystackConnection(credentials: { secretKey?: string; publicK
       },
     });
 
-    console.log('Paystack test response status:', response.status);
     const data = await response.json().catch(() => ({}));
-    console.log('Paystack test response data:', data);
 
     // 401 means invalid API key
     if (response.status === 401) {
@@ -130,10 +129,7 @@ async function testFlutterwaveConnection(credentials: { clientSecret?: string; c
       },
     });
 
-    console.log('Flutterwave test response status:', response.status);
-    
     const data = await response.json().catch(() => ({}));
-    console.log('Flutterwave test response data:', data);
 
     if (response.status === 401) {
       return { success: false, message: 'Invalid Flutterwave Client Secret - Authentication failed' };

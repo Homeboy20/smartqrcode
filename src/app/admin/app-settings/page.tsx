@@ -29,6 +29,7 @@ interface AppSettings {
 
 export default function AppSettingsPage() {
   const { session } = useSupabaseAuth();
+  const isDev = process.env.NODE_ENV === 'development';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -65,7 +66,7 @@ export default function AppSettingsPage() {
       try {
         const accessToken = session?.access_token;
         if (!accessToken) {
-          console.log('No session, skipping fetch');
+          if (isDev) console.log('No session, skipping fetch');
           setLoading(false);
           return;
         }
@@ -191,7 +192,7 @@ export default function AppSettingsPage() {
         throw new Error('Authentication required');
       }
 
-      console.log('Saving settings:', settings);
+      if (isDev) console.log('Saving settings:', settings);
       const response = await fetch('/api/admin/app-settings', {
         method: 'POST',
         headers: {
@@ -202,7 +203,7 @@ export default function AppSettingsPage() {
       });
 
       const responseData = await response.json();
-      console.log('Save response:', responseData);
+      if (isDev) console.log('Save response:', responseData);
 
       if (!response.ok) {
         // Show detailed error message including instructions

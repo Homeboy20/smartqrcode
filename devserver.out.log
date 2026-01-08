@@ -1,0 +1,477 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3002
+  - Environments: .env.local
+  - Experiments (use with caution):
+    · appDocumentPreloading
+    · missingSuspenseWithCSRBailout
+
+ ✓ Starting...
+ ✓ Ready in 3.7s
+ ○ Compiling /api/app-settings ...
+ ✓ Compiled /api/app-settings in 1036ms (142 modules)
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?id=cd7df12e-349e-4a4a-9a25-75d6c37b08ad&vscodeBrowserReqId=1767867343901 200 in 1351ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 14.6s (858 modules)
+useAppSettings: Using default settings
+ ✓ Compiled in 1383ms (334 modules)
+ GET /admin/ 200 in 16371ms
+ ✓ Compiled /admin-login in 469ms (547 modules)
+ ✓ Compiled in 2.9s (322 modules)
+[app-settings API] Fetching settings from database...
+[app-settings API] Fetching settings from database...
+ GET /favicon.ico 200 in 3813ms
+ GET /api/app-settings/?t=1767867542047 200 in 14273ms
+ GET /api/app-settings/?t=1767867542055 200 in 14277ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767867842989 200 in 2261ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767868142987 200 in 1001ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767868442107 200 in 1466ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767868742991 200 in 999ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767869043192 200 in 1073ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767869342987 200 in 1115ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767869668147 200 in 1113ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767869968350 200 in 979ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767870268124 200 in 1016ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767870568153 200 in 1012ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767870868062 200 in 1050ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767871142990 200 in 950ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767871468000 200 in 1086ms
+[app-settings API] Fetching settings from database...
+ GET /api/app-settings/?t=1767871768045 200 in 10933ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767872068042 200 in 999ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767872368062 200 in 957ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767872668046 200 in 967ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767872968235 200 in 1125ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767873268082 200 in 1295ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767873568034 200 in 962ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767873868087 200 in 1049ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767874168065 200 in 1084ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767874468028 200 in 1017ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767874768042 200 in 1009ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767875068027 200 in 1015ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767875368062 200 in 1333ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767875668080 200 in 1205ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767875968078 200 in 5910ms
+[app-settings API] Fetching settings from database...
+ GET /api/app-settings/?t=1767876268001 200 in 10743ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767876567994 200 in 925ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767876868203 200 in 1247ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767877168057 200 in 1025ms
+[app-settings API] Fetching settings from database...
+ GET /api/app-settings/?t=1767877468041 200 in 11116ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767877768032 200 in 943ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767878068037 200 in 1048ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767878368064 200 in 981ms
+[app-settings API] Fetching settings from database...
+ GET /api/app-settings/?t=1767878642988 200 in 10676ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767878968045 200 in 1048ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767879268050 200 in 1029ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767879568062 200 in 926ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767879868038 200 in 1128ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767880168059 200 in 994ms
+[app-settings API] Fetching settings from database...
+[app-settings API] Found data
+[app-settings API] Returning response
+ GET /api/app-settings/?t=1767880468041 200 in 1055ms
+ ✓ Compiled in 2.2s (336 modules)
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 2.9s (848 modules)
+ ✓ Compiled in 967ms (338 modules)
+useAppSettings: Using default settings
+ ✓ Compiled in 1530ms (338 modules)
+ GET /admin-login/?returnTo=%2Fadmin%2F 200 in 1587ms
+ ✓ Compiled in 1659ms (848 modules)
+useAppSettings: Using default settings
+useAppSettings: Using default settings
+useAppSettings: Using default settings
+ GET /_next/static/css/app/layout.css?v=1767880740340 404 in 1946ms
+ GET /_next/static/chunks/main-app.js?v=1767880740340 404 in 1953ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 1945ms
+useAppSettings: Using default settings
+ GET /_next/static/chunks/app/admin-login/page.js 404 in 30ms
+ ✓ Compiled in 464ms (338 modules)
+ ✓ Compiled in 813ms (338 modules)
+ ✓ Compiled in 452ms (338 modules)
+ ✓ Compiled in 972ms (338 modules)
+ ✓ Compiled in 666ms (338 modules)
+ ✓ Compiled in 957ms (338 modules)
+ ✓ Compiled in 812ms (338 modules)
+ ✓ Compiled in 562ms (338 modules)
+ ✓ Compiled in 759ms (338 modules)
+ ✓ Compiled in 469ms (338 modules)
+ ✓ Compiled in 527ms (338 modules)
+ ✓ Compiled in 525ms (338 modules)
+ ✓ Compiled in 814ms (338 modules)
+ ✓ Compiled in 1031ms (338 modules)
+ ✓ Compiled in 577ms (338 modules)
+ ✓ Compiled in 449ms (338 modules)
+ ✓ Compiled in 438ms (338 modules)
+ ✓ Compiled in 580ms (338 modules)
+ ✓ Compiled in 455ms (338 modules)
+ ✓ Compiled in 588ms (338 modules)
+ ✓ Compiled in 533ms (338 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 4.4s (1074 modules)
+useAppSettings: Using default settings
+ GET /admin-login/?returnTo=%2Fadmin%2F 404 in 479ms
+ ✓ Compiled /favicon.ico in 457ms (582 modules)
+ GET /favicon.ico 200 in 660ms
+useAppSettings: Using default settings
+ GET /admin-login/?returnTo=%2Fadmin%2F 200 in 593ms
+useAppSettings: Using default settings
+ GET /admin-login/?returnTo=%2Fadmin%2F 200 in 196ms
+useAppSettings: Using default settings
+ GET /_next/static/chunks/app/admin-login/page.js 404 in 97ms
+ GET /favicon.ico 200 in 29ms
+ ✓ Compiled in 586ms (524 modules)
+ ✓ Compiled in 531ms (524 modules)
+ ✓ Compiled in 472ms (524 modules)
+ ✓ Compiled in 482ms (524 modules)
+ ✓ Compiled in 588ms (524 modules)
+ ✓ Compiled in 438ms (524 modules)
+ ✓ Compiled in 697ms (524 modules)
+ ✓ Compiled in 436ms (524 modules)
+ ✓ Compiled in 576ms (524 modules)
+ ✓ Compiled in 445ms (524 modules)
+ ✓ Compiled in 572ms (524 modules)
+ ✓ Compiled in 422ms (524 modules)
+ ✓ Compiled in 561ms (524 modules)
+ ✓ Compiled in 414ms (524 modules)
+ ✓ Compiled in 402ms (524 modules)
+ ✓ Compiled in 406ms (524 modules)
+ ✓ Compiled in 545ms (524 modules)
+ ✓ Compiled in 418ms (524 modules)
+ ✓ Compiled in 637ms (524 modules)
+ ✓ Compiled in 420ms (524 modules)
+ ✓ Compiled in 703ms (524 modules)
+ ✓ Compiled in 510ms (524 modules)
+ ✓ Compiled in 581ms (524 modules)
+ ✓ Compiled in 416ms (524 modules)
+ ✓ Compiled in 376ms (524 modules)
+ ✓ Compiled in 526ms (524 modules)
+ ✓ Compiled in 399ms (524 modules)
+ ✓ Compiled in 606ms (524 modules)
+ ✓ Compiled in 400ms (524 modules)
+ ✓ Compiled in 680ms (524 modules)
+ ✓ Compiled in 430ms (524 modules)
+ ✓ Compiled in 728ms (524 modules)
+ ✓ Compiled in 422ms (524 modules)
+ ✓ Compiled in 582ms (524 modules)
+ ✓ Compiled in 422ms (524 modules)
+ ✓ Compiled in 422ms (524 modules)
+ ✓ Compiled in 685ms (524 modules)
+ ✓ Compiled in 441ms (524 modules)
+ ✓ Compiled in 638ms (524 modules)
+ ✓ Compiled in 434ms (524 modules)
+ ✓ Compiled in 559ms (524 modules)
+ ✓ Compiled in 420ms (524 modules)
+ ✓ Compiled in 529ms (524 modules)
+ ✓ Compiled in 385ms (524 modules)
+ ✓ Compiled in 634ms (524 modules)
+ ✓ Compiled in 475ms (524 modules)
+ ✓ Compiled in 405ms (524 modules)
+ ✓ Compiled in 622ms (524 modules)
+ ✓ Compiled in 414ms (524 modules)
+ ✓ Compiled in 532ms (524 modules)
+ ✓ Compiled in 410ms (524 modules)
+ ✓ Compiled in 618ms (524 modules)
+ ✓ Compiled in 426ms (524 modules)
+ ✓ Compiled in 582ms (524 modules)
+ ✓ Compiled in 458ms (524 modules)
+ ✓ Compiled in 559ms (524 modules)
+ ✓ Compiled in 635ms (524 modules)
+ ✓ Compiled in 391ms (524 modules)
+ ✓ Compiled in 561ms (524 modules)
+ ✓ Compiled in 383ms (524 modules)
+ ✓ Compiled in 394ms (524 modules)
+ ✓ Compiled in 427ms (524 modules)
+ ✓ Compiled in 811ms (524 modules)
+ ✓ Compiled in 483ms (524 modules)
+ ✓ Compiled in 530ms (524 modules)
+ ✓ Compiled in 410ms (524 modules)
+ ✓ Compiled in 575ms (524 modules)
+ ✓ Compiled in 425ms (524 modules)
+ ✓ Compiled in 430ms (524 modules)
+ ✓ Compiled in 410ms (524 modules)
+ ✓ Compiled in 474ms (524 modules)
+ ✓ Compiled in 713ms (524 modules)
+ ✓ Compiled in 531ms (524 modules)
+ ✓ Compiled in 659ms (524 modules)
+ ✓ Compiled in 500ms (524 modules)
+ ✓ Compiled in 661ms (524 modules)
+ ✓ Compiled in 457ms (524 modules)
+ ✓ Compiled in 599ms (524 modules)
+ ✓ Compiled in 1360ms (524 modules)
+ ✓ Compiled in 928ms (521 modules)
+ ✓ Compiled in 442ms (521 modules)
+ ✓ Compiled in 462ms (521 modules)
+ ✓ Compiled in 660ms (521 modules)
+ ✓ Compiled in 399ms (521 modules)
+ ✓ Compiled in 542ms (521 modules)
+ ✓ Compiled in 466ms (521 modules)
+ ✓ Compiled in 893ms (521 modules)
+ ✓ Compiled in 543ms (521 modules)
+ ✓ Compiled in 651ms (521 modules)
+ ✓ Compiled in 393ms (521 modules)
+ ✓ Compiled in 404ms (521 modules)
+ ✓ Compiled in 590ms (521 modules)
+ ✓ Compiled in 392ms (521 modules)
+ ✓ Compiled in 524ms (521 modules)
+ ✓ Compiled in 375ms (521 modules)
+ ✓ Compiled in 560ms (521 modules)
+ ✓ Compiled in 434ms (521 modules)
+ ✓ Compiled in 510ms (521 modules)
+ ✓ Compiled in 395ms (521 modules)
+ ✓ Compiled in 547ms (521 modules)
+ ✓ Compiled in 373ms (521 modules)
+ ✓ Compiled in 369ms (521 modules)
+ ✓ Compiled in 385ms (521 modules)
+ ✓ Compiled in 388ms (521 modules)
+ ✓ Compiled in 415ms (521 modules)
+ ✓ Compiled in 401ms (521 modules)
+ ✓ Compiled in 635ms (521 modules)
+ ✓ Compiled in 466ms (521 modules)
+ ✓ Compiled in 463ms (521 modules)
+ ✓ Compiled in 426ms (521 modules)
+ ✓ Compiled in 737ms (521 modules)
+ ✓ Compiled in 419ms (521 modules)
+ ✓ Compiled in 516ms (521 modules)
+ ✓ Compiled in 429ms (521 modules)
+ ✓ Compiled in 551ms (521 modules)
+ ✓ Compiled in 395ms (521 modules)
+ ✓ Compiled in 365ms (521 modules)
+ ✓ Compiled in 546ms (521 modules)
+ ✓ Compiled in 353ms (521 modules)
+ ✓ Compiled in 560ms (521 modules)
+ ✓ Compiled in 422ms (521 modules)
+ ✓ Compiled in 540ms (521 modules)
+ ✓ Compiled in 447ms (521 modules)
+ ✓ Compiled in 531ms (521 modules)
+ ✓ Compiled in 374ms (521 modules)
+ ✓ Compiled in 500ms (521 modules)
+ ✓ Compiled in 374ms (521 modules)
+ ✓ Compiled in 644ms (521 modules)
+ ✓ Compiled in 365ms (521 modules)
+ ✓ Compiled in 499ms (521 modules)
+ ✓ Compiled in 406ms (521 modules)
+ ✓ Compiled in 532ms (521 modules)
+ ✓ Compiled in 364ms (521 modules)
+ ✓ Compiled in 703ms (521 modules)
+ ✓ Compiled in 477ms (521 modules)
+ ✓ Compiled in 520ms (521 modules)
+ ✓ Compiled in 434ms (521 modules)
+ ✓ Compiled in 497ms (521 modules)
+ ✓ Compiled in 353ms (521 modules)
+ ✓ Compiled in 610ms (521 modules)
+ ✓ Compiled in 444ms (521 modules)
+ ✓ Compiled in 534ms (521 modules)
+ ✓ Compiled in 446ms (521 modules)
+ ✓ Compiled in 486ms (521 modules)
+ ✓ Compiled in 353ms (521 modules)
+ ✓ Compiled in 590ms (521 modules)
+ ✓ Compiled in 437ms (521 modules)
+ ✓ Compiled in 508ms (521 modules)
+ ✓ Compiled in 417ms (521 modules)
+ ✓ Compiled in 552ms (521 modules)
+ ✓ Compiled in 403ms (521 modules)
+ ✓ Compiled in 545ms (521 modules)
+ ✓ Compiled in 367ms (521 modules)
+ ✓ Compiled in 419ms (521 modules)
+ ✓ Compiled in 701ms (521 modules)
+ ✓ Compiled in 435ms (521 modules)
+ ✓ Compiled in 506ms (521 modules)
+ ✓ Compiled in 786ms (521 modules)
+ ✓ Compiled in 1158ms (521 modules)
+ ✓ Compiled in 934ms (521 modules)
+ ✓ Compiled in 448ms (521 modules)
+ ✓ Compiled in 430ms (521 modules)
+ ✓ Compiled in 402ms (521 modules)
+ ✓ Compiled in 439ms (521 modules)
+ ✓ Compiled in 645ms (521 modules)
+ ✓ Compiled in 392ms (521 modules)
+ ✓ Compiled in 576ms (521 modules)
+ ✓ Compiled in 435ms (521 modules)
+ ✓ Compiled in 539ms (521 modules)
+ ✓ Compiled in 378ms (521 modules)
+ ✓ Compiled in 593ms (521 modules)
+ ✓ Compiled in 408ms (521 modules)
+ ✓ Compiled in 455ms (521 modules)
+ ✓ Compiled in 810ms (521 modules)
+ ✓ Compiled in 556ms (521 modules)
+ ✓ Compiled in 445ms (521 modules)
+ ✓ Compiled in 424ms (521 modules)
+ ✓ Compiled in 561ms (521 modules)
+ ✓ Compiled in 384ms (521 modules)
+ ✓ Compiled in 531ms (521 modules)
+ ✓ Compiled in 387ms (521 modules)
+ ✓ Compiled in 722ms (521 modules)
+ ✓ Compiled in 439ms (521 modules)
+ ✓ Compiled in 545ms (521 modules)
+ ✓ Compiled in 411ms (521 modules)
+ ✓ Compiled in 597ms (521 modules)
+ ✓ Compiled in 396ms (521 modules)
+ ✓ Compiled in 437ms (521 modules)
+ ✓ Compiled in 561ms (521 modules)
+ ✓ Compiled in 401ms (521 modules)
+ ✓ Compiled in 517ms (521 modules)
+ ✓ Compiled in 413ms (521 modules)
+ ✓ Compiled in 816ms (521 modules)
+ ○ Compiling /admin/credentials ...
+ ✓ Compiled /admin/credentials in 4.7s (1085 modules)
+useAppSettings: Using default settings
+ GET /admin/credentials/ 200 in 7167ms
+ ✓ Compiled in 2.1s (525 modules)
+ ✓ Compiled in 1444ms (525 modules)
+ ✓ Compiled in 1013ms (525 modules)
+ ✓ Compiled in 795ms (525 modules)
+ ✓ Compiled in 1140ms (525 modules)
+ ✓ Compiled in 880ms (525 modules)
+ ✓ Compiled in 4.4s (525 modules)
+ ✓ Compiled in 2.4s (525 modules)
+ ✓ Compiled in 1118ms (525 modules)
+ ✓ Compiled in 1058ms (525 modules)
+ ✓ Compiled in 1150ms (525 modules)
+ ✓ Compiled in 611ms (525 modules)
+ ✓ Compiled in 738ms (525 modules)
+ ✓ Compiled in 770ms (525 modules)
+ ✓ Compiled in 648ms (525 modules)
+ ✓ Compiled in 1022ms (525 modules)
+ ✓ Compiled in 819ms (525 modules)
+ ✓ Compiled in 964ms (525 modules)
+ ✓ Compiled in 569ms (525 modules)
+ ✓ Compiled in 783ms (525 modules)
+ ✓ Compiled in 1001ms (525 modules)
+ ✓ Compiled in 561ms (525 modules)
+ ✓ Compiled in 735ms (525 modules)
+ ✓ Compiled in 614ms (525 modules)
+ ✓ Compiled in 2s (525 modules)
+ ✓ Compiled in 1213ms (525 modules)
+ ✓ Compiled in 648ms (525 modules)
+ ✓ Compiled in 651ms (525 modules)
+ ✓ Compiled in 477ms (525 modules)
+ ✓ Compiled in 694ms (525 modules)
+ ✓ Compiled in 753ms (525 modules)
+ ✓ Compiled in 585ms (525 modules)
+ ✓ Compiled in 657ms (525 modules)
+ ✓ Compiled in 503ms (525 modules)
+ ✓ Compiled in 617ms (525 modules)
+ ✓ Compiled in 580ms (525 modules)
+ ✓ Compiled in 683ms (525 modules)
+ ✓ Compiled in 444ms (525 modules)
+ ✓ Compiled in 643ms (525 modules)

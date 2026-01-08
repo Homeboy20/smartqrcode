@@ -29,7 +29,6 @@ export default function SettingsForm() {
 
   // TODO: Fetch current settings and auth method
   useEffect(() => {
-    console.log("Placeholder: Fetch current settings and auth method.");
     // Fetch settings and determine initial firebaseAuthMethod based on what's configured
   }, []);
 
@@ -60,16 +59,6 @@ export default function SettingsForm() {
     setLoading(true);
     setError(null);
     setSuccess(null);
-
-    console.log("Saving settings (placeholder) with method:", firebaseAuthMethod);
-    console.log("Settings Data:", settings);
-    if (firebaseAuthMethod === 'file') {
-      console.log("Selected File:", selectedFile ? selectedFile.name : 'None');
-      // !!! --- SECURITY WARNING --- !!!
-      // Uploading the selectedFile needs a secure backend process.
-      // It's HIGHLY recommended to use environment variables instead.
-      // This example only logs the selection.
-    }
 
     try {
       // Placeholder for actual API call
