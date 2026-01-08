@@ -37,6 +37,8 @@ export default function AppSettingsPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [firebaseUploadError, setFirebaseUploadError] = useState<string | null>(null);
+  const [showPasteArea, setShowPasteArea] = useState(false);
+  const [pasteValue, setPasteValue] = useState('');
   
   const [settings, setSettings] = useState<AppSettings>({
     freeMode: false,
@@ -182,6 +184,52 @@ export default function AppSettingsPage() {
       applyFirebaseWebConfig(parsed);
     } catch (e: any) {
       setFirebaseUploadError(e?.message ? `Failed to parse JSON: ${e.message}` : 'Failed to parse JSON file');
+    }
+  };
+
+  const handleFirebaseConfigPaste = () => {
+    if (!pasteValue.trim()) {
+      setFirebaseUploadError('Please paste Firebase configuration');
+      return;
+    }
+    
+    setFirebaseUploadError(null);
+    
+    try {
+      // Try to parse as JSON first
+      let parsed;
+      let cleanedValue = pasteValue.trim();
+      
+      // Remove JavaScript variable declarations and trailing semicolons
+      cleanedValue = cleanedValue
+        .replace(/^(const|let|var)\s+\w+\s*=\s*/, '')
+        .replace(/;?\s*$/, '')
+        .trim();
+      
+      // Handle both JSON and JavaScript object literal
+      try {
+        // First try as-is (for valid JSON)
+        parsed = JSON.parse(cleanedValue);
+      } catch {
+        // If that fails, try wrapping in parentheses and using Function constructor
+        try {
+          parsed = new Function('return ' + cleanedValue)();
+        } catch {
+          // Last resort: try adding quotes around unquoted keys
+          const withQuotes = cleanedValue.replace(/(\w+):/g, '"$1":');
+          parsed = JSON.parse(withQuotes);
+        }
+      }
+      
+      applyFirebaseWebConfig(parsed);
+      setPasteValue('');
+      setShowPasteArea(false);
+    } catch (e: any) {
+      setFirebaseUploadError(
+        e?.message 
+          ? `Failed to parse configuration: ${e.message}` 
+          : 'Failed to parse configuration. Please paste valid Firebase config object or JSON.'
+      );
     }
   };
 
@@ -511,6 +559,67 @@ export default function AppSettingsPage() {
                   {firebaseUploadError && (
                     <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-md p-3 text-sm">
                       {firebaseUploadError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Paste Configuration Section */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-900">Paste Firebase Configuration</h4>
+                      <p className="mt-1 text-xs text-gray-600">
+                        Paste your Firebase config object directly from Firebase Console. Supports both JSON and JavaScript object formats.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPasteArea(!showPasteArea);
+                        setFirebaseUploadError(null);
+                        if (showPasteArea) setPasteValue('');
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      {showPasteArea ? 'Cancel' : 'Paste Config'}
+                    </button>
+                  </div>
+
+                  {showPasteArea && (
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Firebase Configuration
+                        </label>
+                        <textarea
+                          value={pasteValue}
+                          onChange={(e) => setPasteValue(e.target.value)}
+                          placeholder={`Paste your Firebase config here, e.g.:
+{
+  apiKey: "AIza...",
+  authDomain: "myapp.firebaseapp.com",
+  projectId: "myapp-12345",
+  storageBucket: "myapp.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123:web:abc123"
+}`}
+                          rows={10}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500">
+                          Supports: <code className="bg-gray-200 px-1 py-0.5 rounded">firebaseConfig = {"{ ... }"}</code> or plain JSON
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleFirebaseConfigPaste}
+                          disabled={!pasteValue.trim()}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Apply Configuration
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
