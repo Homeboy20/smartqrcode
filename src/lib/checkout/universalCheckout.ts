@@ -208,7 +208,31 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
 
   // If there is a DB row, respect the admin toggle.
   if ((runtime as any).exists) {
-    return Boolean((runtime as any).isActive);
+    if (!Boolean((runtime as any).isActive)) return false;
+
+    // Also require that the provider has the minimum required credentials.
+    // If stored secrets are encrypted but CREDENTIALS_ENCRYPTION_KEY is missing,
+    // runtime.credentials may be empty; env vars can still satisfy these.
+    if (provider === 'paystack') {
+      const secretKey =
+        (runtime as any)?.credentials?.secretKey || process.env.PAYSTACK_SECRET_KEY || '';
+      const pro =
+        (runtime as any)?.credentials?.planCodePro || process.env.PAYSTACK_PLAN_CODE_PRO || '';
+      const business =
+        (runtime as any)?.credentials?.planCodeBusiness ||
+        process.env.PAYSTACK_PLAN_CODE_BUSINESS ||
+        '';
+      return Boolean(secretKey && pro && business);
+    }
+
+    if (provider === 'flutterwave') {
+      const clientSecret =
+        (runtime as any)?.credentials?.clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+      return Boolean(clientSecret);
+    }
+
+    // For not-yet-integrated providers, keep disabled.
+    return false;
   }
 
   // Env-only fallback for legacy deployments (no row exists):

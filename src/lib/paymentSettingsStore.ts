@@ -161,11 +161,23 @@ export async function getProviderRuntimeConfig(provider: PaymentProvider) {
     return { exists: false, isActive: false, credentials: {} as Record<string, string> };
   }
 
-  return {
-    exists: true,
-    isActive: Boolean(data.is_active),
-    credentials: decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials),
-  };
+  try {
+    return {
+      exists: true,
+      isActive: Boolean(data.is_active),
+      credentials: decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials),
+    };
+  } catch (e: any) {
+    const message = e?.message || 'Failed to decrypt stored payment credentials';
+    // If encryption key is missing, do not hard-crash checkout flows.
+    // Treat stored secrets as unavailable; callers may still fall back to env credentials.
+    return {
+      exists: true,
+      isActive: Boolean(data.is_active),
+      credentials: {} as Record<string, string>,
+      decryptError: message,
+    } as any;
+  }
 }
 
 export async function saveProviderSettings(options: {
