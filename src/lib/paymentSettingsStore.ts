@@ -158,10 +158,11 @@ export async function getProviderRuntimeConfig(provider: PaymentProvider) {
     .maybeSingle();
 
   if (error || !data) {
-    return { isActive: false, credentials: {} as Record<string, string> };
+    return { exists: false, isActive: false, credentials: {} as Record<string, string> };
   }
 
   return {
+    exists: true,
     isActive: Boolean(data.is_active),
     credentials: decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials),
   };

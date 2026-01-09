@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { initializeSubscriptionPayment, createPaystackCustomer } from '@/lib/paystack';
-import { 
-  createFlutterwaveSubscriptionPayment,
-  getOrCreateFlutterwaveCustomer,
-  type FlutterwaveCustomer 
-} from '@/lib/flutterwave';
-import { subscriptionPricing } from '@/lib/subscriptions';
-import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 import { 
   detectCountryFromHeaders, 
   getCurrencyForCountry, 
-  getLocalPrice, 
   getRecommendedProvider,
   type CurrencyCode 
 } from '@/lib/currency';
+import { createUniversalCheckoutSession } from '@/lib/checkout/universalCheckout';
 
 export async function POST(request: NextRequest) {
   try {
@@ -82,166 +74,46 @@ async function processCheckout(
     return NextResponse.json({ error: 'Missing required fields: planId, successUrl, and cancelUrl are required' }, { status: 400 });
   }
 
-  // Auto-select provider based on currency if not specified
-  const provider = body.provider || getRecommendedProvider(currency);
-  
-  const supportedProviders = ['paystack', 'flutterwave'];
-  if (!supportedProviders.includes(provider)) {
-    return NextResponse.json({ error: `Unsupported provider. Allowed: ${supportedProviders.join(', ')}` }, { status: 400 });
-  }
-
-  // Get price in local currency
-  const amount = planId === 'free' ? 0 : getLocalPrice(planId as 'pro' | 'business', currency);
-
-  if (amount === 0) {
+  if (planId !== 'pro' && planId !== 'business') {
     return NextResponse.json({ error: 'Invalid plan ID or free plan selected' }, { status: 400 });
   }
-  
-  console.log(`Processing checkout: ${planId} plan, ${amount} ${currency}, provider: ${provider}`);
+
+  // Auto-select provider based on currency if not specified
+  const provider = body.provider || getRecommendedProvider(currency);
+
+  console.log(`Processing checkout: ${planId} plan, ${currency}, provider: ${provider}`);
 
   // Use email from user if authenticated, otherwise from body
   const userEmail = user?.email || email;
-  const userId = user?.id || `guest_${Date.now()}`;
   
   if (!userEmail) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 });
   }
 
-  if (provider === 'paystack') {
-    const paystackRuntime = await getProviderRuntimeConfig('paystack');
-    const paystackPlanCodes: Record<string, string> = {
-      pro: paystackRuntime.credentials.planCodePro || process.env.PAYSTACK_PLAN_CODE_PRO || '',
-      business: paystackRuntime.credentials.planCodeBusiness || process.env.PAYSTACK_PLAN_CODE_BUSINESS || '',
-    };
-
-    if (!paystackPlanCodes[planId]) {
-      return NextResponse.json({ error: 'Invalid plan ID for Paystack. Available plans: pro, business' }, { status: 400 });
-    }
-
-    // Only look up customer code if user is authenticated
-    let paystackCustomerCode;
-    if (user?.id) {
-      const { data: userData } = await supabaseAdmin
-        .from('users')
-        .select('paystack_customer_code')
-        .eq('id', user.id)
-        .single();
-
-      paystackCustomerCode = userData?.paystack_customer_code;
-
-      if (!paystackCustomerCode) {
-        const paystackCustomer = await createPaystackCustomer({
-          email: userEmail,
-          firstName: user.user_metadata?.full_name?.split(' ')[0] || undefined,
-          lastName: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || undefined,
-          metadata: {
-            userId: user.id,
-          },
-        });
-
-        paystackCustomerCode = paystackCustomer.customer_code;
-
-        await supabaseAdmin
-          .from('users')
-          .update({ paystack_customer_code: paystackCustomerCode })
-          .eq('id', user.id);
-      }
-    }
-
-    const reference = `${planId}_${userId}_${Date.now()}`;
-
-    const payment = await initializeSubscriptionPayment({
-      email: userEmail,
-      amount,
-      currency,
-      plan: paystackPlanCodes[planId],
-      reference,
-      callbackUrl: `${successUrl}?reference=${reference}`,
-      metadata: {
-        userId,
-        planId,
-        userEmail,
-        provider,
-        paymentMethod: paymentMethod || 'card',
-        currency,
-        countryCode,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        provider: 'paystack',
-        reference,
-        url: payment.authorization_url,
-        testMode: process.env.NODE_ENV !== 'production',
-      },
-      { status: 200 },
-    );
-  }
-
-  // Flutterwave flow with V4 customer management
-  const reference = `${planId}_${userId}_${Date.now()}`;
-  const planName = `${planId.charAt(0).toUpperCase() + planId.slice(1)} Plan`;
-
   try {
-    // Create or get Flutterwave customer
-    const customerName = user?.user_metadata?.full_name || userEmail.split('@')[0];
-    const nameParts = customerName.split(' ');
-    
-    const flwCustomer: FlutterwaveCustomer = {
-      email: userEmail,
-      name: {
-        first: nameParts[0] || '',
-        last: nameParts.slice(1).join(' ') || nameParts[0] || '',
-      },
-      meta: {
-        userId,
-        planId,
-        source: 'smartqrcode',
-      },
-    };
-
-    // Get or create customer in Flutterwave
-    const customer = await getOrCreateFlutterwaveCustomer(flwCustomer);
-    
-    console.log('Flutterwave customer:', customer.id);
-
-    // Create payment with customer reference
-    const payment = await createFlutterwaveSubscriptionPayment({
-      amount,
+    const session = await createUniversalCheckoutSession({
+      planId,
       currency,
-      customerEmail: userEmail,
-      customerName: customerName,
-      planName,
-      reference,
-      redirectUrl: `${successUrl}?reference=${reference}`,
-      metadata: {
-        userId,
-        planId,
-        userEmail,
-        provider,
-        paymentMethod: paymentMethod || 'card',
-        flwCustomerId: customer.id,
-        currency,
-        countryCode,
-      },
-      testMode: process.env.NODE_ENV !== 'production',
+      countryCode,
+      successUrl,
+      cancelUrl,
+      email: userEmail,
+      paymentMethod,
+      provider,
+      user,
+      supabaseAdmin,
     });
 
-    return NextResponse.json(
-      {
-        provider: 'flutterwave',
-        reference,
-        url: payment.paymentLink,
-        flwRef: payment.flwRef,
-        testMode: process.env.NODE_ENV !== 'production',
-      },
-      { status: 200 },
-    );
+    return NextResponse.json(session, { status: 200 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to initialize Flutterwave payment';
-    console.error('Flutterwave init failed:', message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Failed to create checkout session';
+    const status =
+      message.startsWith('Unsupported provider') ||
+      message.startsWith('Invalid plan') ||
+      message.startsWith('Selected provider does not support')
+        ? 400
+        : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
 

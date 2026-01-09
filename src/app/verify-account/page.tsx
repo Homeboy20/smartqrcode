@@ -4,11 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/FirebaseAuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  getCountryCallingCodeOptions,
+  findBestCountryMatchFromE164,
+  findOptionByCountry,
+} from '@/lib/phone/countryCallingCodes';
+import { normalizeToE164 } from '@/lib/phone/e164';
 
 export default function VerifyAccountPage() {
   const { user, loading, error, sendVerificationEmail, setupRecaptcha, sendPhoneVerificationCode, verifyPhoneCode } = useAuth();
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('email');
+  const [selectedCountry, setSelectedCountry] = useState('US');
+  const [countryQuery, setCountryQuery] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -17,6 +25,46 @@ export default function VerifyAccountPage() {
   const [verifying, setVerifying] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const router = useRouter();
+
+  const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
+  const selectedOption = React.useMemo(
+    () => countryOptions.find((o) => o.country === selectedCountry) || countryOptions[0],
+    [countryOptions, selectedCountry]
+  );
+  const filteredCountryOptions = React.useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return countryOptions;
+
+    const matches = countryOptions.filter((opt) => {
+      const haystack = `${opt.name} ${opt.country} +${opt.callingCode}`.toLowerCase();
+      return haystack.includes(q);
+    });
+
+    if (selectedOption && !matches.some((m) => m.country === selectedOption.country)) {
+      return [selectedOption, ...matches];
+    }
+
+    return matches;
+  }, [countryOptions, countryQuery, selectedOption]);
+
+  // Default-select the user's country (best-effort) based on the same country detection used in pricing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/pricing', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        const detected = (data as any)?.country as string | undefined;
+        const opt = findOptionByCountry(detected);
+        if (!cancelled && opt) setSelectedCountry(opt.country);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   
   // Check if user is already verified
   useEffect(() => {
@@ -59,13 +107,13 @@ export default function VerifyAccountPage() {
         }
         
         try {
-          const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+          const { e164 } = normalizeToE164({ raw: phoneNumber, defaultCountry: selectedCountry });
           
           // Store the phone number in the window object for later use
-          (window as any).phoneNumber = formattedPhoneNumber;
+          (window as any).phoneNumber = e164;
 
           const recaptchaVerifier = await setupRecaptcha('recaptcha-container');
-          const confirmation = await sendPhoneVerificationCode(formattedPhoneNumber, recaptchaVerifier);
+          const confirmation = await sendPhoneVerificationCode(e164, recaptchaVerifier);
           setConfirmationResult(confirmation);
           setCodeSent(true);
           setStatusMessage('Verification code sent to your phone. Please enter it below.');
@@ -199,15 +247,43 @@ export default function VerifyAccountPage() {
                     Phone Number
                   </label>
                   <input
+                    id="phoneCountrySearch"
+                    type="text"
+                    inputMode="search"
+                    placeholder="Search country (e.g. Nigeria, NG, +234)"
+                    value={countryQuery}
+                    onChange={(e) => setCountryQuery(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  />
+                  <select
+                    id="phoneCountry"
+                    value={selectedCountry}
+                    onChange={(e) => setSelectedCountry(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  >
+                    {filteredCountryOptions.map((opt) => (
+                      <option key={opt.country} value={opt.country}>
+                        {opt.name} (+{opt.callingCode})
+                      </option>
+                    ))}
+                  </select>
+                  <input
                     type="tel"
                     id="phoneNumber"
-                    placeholder="+1234567890"
+                    placeholder={`8012345678 or +${selectedOption?.callingCode}...`}
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setPhoneNumber(next);
+                      if (next.trim().startsWith('+')) {
+                        const match = findBestCountryMatchFromE164(next.trim());
+                        if (match) setSelectedCountry(match.country);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                   <p className="text-sm text-gray-500">
-                    Please include your country code (e.g. +1 for US)
+                    Select your country and enter your number, or paste a full international number starting with +.
                   </p>
                 </div>
                 

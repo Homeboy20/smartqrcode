@@ -110,6 +110,7 @@ export async function createFlutterwavePaymentLink({
   reference,
   callbackUrl,
   redirectUrl,
+  paymentMethod,
   metadata = {},
 }: {
   amount: number;
@@ -120,6 +121,7 @@ export async function createFlutterwavePaymentLink({
   reference: string;
   callbackUrl?: string;
   redirectUrl: string;
+  paymentMethod?: 'card' | 'mobile_money';
   metadata?: Record<string, any>;
 }) {
   try {
@@ -127,7 +129,7 @@ export async function createFlutterwavePaymentLink({
       tx_ref: reference,
       amount: amount.toString(),
       currency,
-      payment_options: 'card,mobilemoney,ussd,account,banktransfer',
+      payment_options: getFlutterwavePaymentOptions(paymentMethod),
       redirect_url: redirectUrl,
       customer: {
         email: customerEmail,
@@ -193,7 +195,14 @@ export interface FlutterwavePaymentParams {
   reference: string;
   redirectUrl: string;
   metadata?: Record<string, any>;
+  paymentMethod?: 'card' | 'mobile_money';
   testMode?: boolean; // Add test mode parameter
+}
+
+function getFlutterwavePaymentOptions(paymentMethod?: 'card' | 'mobile_money') {
+  if (paymentMethod === 'card') return 'card';
+  if (paymentMethod === 'mobile_money') return 'mobilemoney,ussd,account,banktransfer';
+  return 'card,mobilemoney,ussd,account,banktransfer';
 }
 
 // Create subscription payment using V4 API
@@ -207,6 +216,7 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
     reference, 
     redirectUrl, 
     metadata = {},
+    paymentMethod,
     testMode = false 
   } = params;
   
@@ -218,7 +228,7 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
       amount: amount.toString(),
       currency,
       redirect_url: redirectUrl,
-      payment_options: 'card,mobilemoney,ussd,account,banktransfer',
+      payment_options: getFlutterwavePaymentOptions(paymentMethod),
       customer: {
         email: customerEmail,
         name: customerName || customerEmail.split('@')[0],

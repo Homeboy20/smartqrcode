@@ -7,12 +7,19 @@ import {
   getRecommendedProvider,
   SUBSCRIPTION_PRICING
 } from '@/lib/currency';
+import { chooseDefaultProvider, getAvailableCheckoutProviders } from '@/lib/checkout/universalCheckout';
 
 export async function GET(request: NextRequest) {
   try {
     // Detect country from headers
     const countryCode = detectCountryFromHeaders(request.headers);
     const currencyConfig = getCurrencyForCountry(countryCode);
+
+    const availableProviders = await getAvailableCheckoutProviders();
+    const recommendedProvider = chooseDefaultProvider({
+      currency: currencyConfig.code,
+      availableProviders,
+    });
     
     // Get pricing for all tiers
     const pricing = {
@@ -35,7 +42,8 @@ export async function GET(request: NextRequest) {
         symbol: currencyConfig.symbol,
         name: currencyConfig.name,
       },
-      recommendedProvider: getRecommendedProvider(currencyConfig.code),
+      availableProviders,
+      recommendedProvider,
       pricing,
     });
   } catch (error) {
@@ -49,7 +57,8 @@ export async function GET(request: NextRequest) {
         symbol: '$',
         name: 'US Dollar',
       },
-      recommendedProvider: 'flutterwave',
+      availableProviders: ['flutterwave', 'paystack'],
+      recommendedProvider: getRecommendedProvider('USD'),
       pricing: {
         pro: {
           amount: 9.99,

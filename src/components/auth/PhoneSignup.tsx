@@ -7,6 +7,12 @@ import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 
 import { useAuth } from '@/context/FirebaseAuthContext';
 import { useAppSettings } from '@/hooks/useAppSettings';
+import {
+  getCountryCallingCodeOptions,
+  findBestCountryMatchFromE164,
+  findOptionByCountry,
+} from '@/lib/phone/countryCallingCodes';
+import { normalizeToE164 } from '@/lib/phone/e164';
 
 type VerificationStep = 'inputPhone' | 'verifyCode';
 
@@ -26,6 +32,8 @@ export default function PhoneSignup() {
   } = useAuth();
 
   const [verificationStep, setVerificationStep] = useState<VerificationStep>('inputPhone');
+  const [selectedCountry, setSelectedCountry] = useState('US');
+  const [countryQuery, setCountryQuery] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -35,6 +43,46 @@ export default function PhoneSignup() {
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+
+  const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
+  const selectedOption = React.useMemo(
+    () => countryOptions.find((o) => o.country === selectedCountry) || countryOptions[0],
+    [countryOptions, selectedCountry]
+  );
+  const filteredCountryOptions = React.useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return countryOptions;
+
+    const matches = countryOptions.filter((opt) => {
+      const haystack = `${opt.name} ${opt.country} +${opt.callingCode}`.toLowerCase();
+      return haystack.includes(q);
+    });
+
+    // Ensure the currently selected option remains selectable even if it doesn't match the filter.
+    if (selectedOption && !matches.some((m) => m.country === selectedOption.country)) {
+      return [selectedOption, ...matches];
+    }
+    return matches;
+  }, [countryOptions, countryQuery, selectedOption]);
+
+  // Default-select the user's country (best-effort) based on the same country detection used in pricing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/pricing', { cache: 'no-store' });
+        const data = await res.json().catch(() => null);
+        const detected = (data as any)?.country as string | undefined;
+        const opt = findOptionByCountry(detected);
+        if (!cancelled && opt) setSelectedCountry(opt.country);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   
   // Check if phone auth is properly configured
   const isPhoneAuthConfigured = 
@@ -116,11 +164,13 @@ export default function PhoneSignup() {
     try {
       setLoading(true);
 
+      const { e164 } = normalizeToE164({ raw: phoneNumber, defaultCountry: selectedCountry });
+
       const verifier =
         recaptchaVerifierRef.current || (await setupRecaptcha('recaptcha-container'));
       recaptchaVerifierRef.current = verifier;
 
-      const confirmation = await sendPhoneVerificationCode(phoneNumber, verifier);
+      const confirmation = await sendPhoneVerificationCode(e164, verifier);
       confirmationResultRef.current = confirmation;
 
       setVerificationStep('verifyCode');
@@ -208,6 +258,33 @@ export default function PhoneSignup() {
         <form className="space-y-6" onSubmit={handleSendCode}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
+              <label htmlFor="country" className="sr-only">
+                Country
+              </label>
+              <input
+                id="country-search"
+                type="text"
+                inputMode="search"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="Search country (e.g. Nigeria, NG, +234)"
+                value={countryQuery}
+                onChange={(e) => setCountryQuery(e.target.value)}
+              />
+              <select
+                id="country"
+                name="country"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+              >
+                {filteredCountryOptions.map((opt) => (
+                  <option key={opt.country} value={opt.country}>
+                    {opt.name} (+{opt.callingCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label htmlFor="phone-number" className="sr-only">
                 Phone Number
               </label>
@@ -216,10 +293,17 @@ export default function PhoneSignup() {
                 name="phone"
                 type="tel"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Phone Number (e.g. +1234567890)"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder={`Phone number (e.g. 8012345678 or +${selectedOption?.callingCode}...)`}
                 value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setPhoneNumber(next);
+                  if (next.trim().startsWith('+')) {
+                    const match = findBestCountryMatchFromE164(next.trim());
+                    if (match) setSelectedCountry(match.country);
+                  }
+                }}
               />
             </div>
             <div>
@@ -240,7 +324,7 @@ export default function PhoneSignup() {
 
           <div className="text-sm text-gray-500">
             <p>
-              Please enter your phone number in international format (e.g., +1 for US, +44 for UK).
+              Select your country and enter your number. You can also paste a full international number starting with +.
             </p>
           </div>
 

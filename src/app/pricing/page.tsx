@@ -5,6 +5,7 @@ import { subscriptionFeatures, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import PaymentProviderSelector, { PaymentProvider } from '@/components/PaymentProviderSelector';
+import { providerSupportsPaymentMethod, type CheckoutPaymentMethod } from '@/lib/checkout/paymentMethodSupport';
 
 interface CurrencyInfo {
   country: string;
@@ -13,6 +14,7 @@ interface CurrencyInfo {
     symbol: string;
     name: string;
   };
+  availableProviders?: PaymentProvider[];
   recommendedProvider: 'paystack' | 'flutterwave';
   pricing: {
     pro: {
@@ -34,10 +36,15 @@ export default function PricingPage() {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('paystack');
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mobile_money' | 'apple_pay' | 'google_pay'>('mobile_money');
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('mobile_money');
   const [email, setEmail] = useState('');
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
   const [loadingCurrency, setLoadingCurrency] = useState(true);
+
+  const availableProviders = currencyInfo?.availableProviders;
+  const filteredProviders = (availableProviders || []).filter((provider) =>
+    providerSupportsPaymentMethod(provider, paymentMethod)
+  );
 
   useEffect(() => {
     if (user?.email) {
@@ -59,6 +66,7 @@ export default function PricingPage() {
         setCurrencyInfo({
           country: 'US',
           currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
+          availableProviders: ['flutterwave', 'paystack'],
           recommendedProvider: 'flutterwave',
           pricing: {
             pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
@@ -70,6 +78,13 @@ export default function PricingPage() {
   }, []);
 
   const handleUpgrade = async (tier: SubscriptionTier) => {
+    if (tier === 'free') {
+      // Free plan should not open the payment modal.
+      setShowCheckoutModal(false);
+      window.location.href = user ? '/dashboard' : '/register';
+      return;
+    }
+
     // Set tier and show modal immediately - no login required!
     setSelectedTier(tier);
     setEmail(user?.email || '');
@@ -79,6 +94,17 @@ export default function PricingPage() {
   const handleCheckout = async () => {
     if (!selectedTier || !email) {
       alert('Please enter your email');
+      return;
+    }
+
+    if (selectedTier === 'free') {
+      alert('Free plan does not require payment.');
+      setShowCheckoutModal(false);
+      return;
+    }
+
+    if (availableProviders && filteredProviders.length === 0) {
+      alert('No payment gateways support the selected payment option. Please choose another option.');
       return;
     }
 
@@ -110,8 +136,15 @@ export default function PricingPage() {
         headers: headers,
         body: JSON.stringify(checkoutData),
       });
-      
-      const data = await response.json();
+
+      const raw = await response.text();
+      let data: any = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        // If server returned non-JSON (e.g., plain text stack), surface it.
+        throw new Error(raw || 'Failed to create checkout session');
+      }
       
       if (!response.ok) {
         const errorMessage = data.error || 'Failed to create checkout session';
@@ -132,6 +165,14 @@ export default function PricingPage() {
       alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error. Please try again.'}`);
     }
   };
+
+  useEffect(() => {
+    if (!availableProviders) return;
+    if (filteredProviders.length === 0) return;
+    if (!filteredProviders.includes(selectedProvider)) {
+      setSelectedProvider(filteredProviders[0]);
+    }
+  }, [availableProviders, filteredProviders, selectedProvider]);
 
   const renderFeatures = (tier: SubscriptionTier) => {
     const features = subscriptionFeatures[tier];
@@ -641,10 +682,15 @@ export default function PricingPage() {
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Payment Processor
                     </label>
+                    {availableProviders && filteredProviders.length === 0 && (
+                      <p className="mb-3 text-sm text-red-600">
+                        No gateways support the selected payment option.
+                      </p>
+                    )}
                     <PaymentProviderSelector
                       selectedProvider={selectedProvider}
                       onSelectProvider={setSelectedProvider}
-                      availableProviders={['paystack', 'flutterwave']}
+                      availableProviders={availableProviders ? filteredProviders : undefined}
                     />
                   </div>
 
@@ -673,7 +719,8 @@ export default function PricingPage() {
                   {/* CTA Button */}
                   <button
                     onClick={handleCheckout}
-                    className="w-full py-4 px-6 rounded-xl shadow-lg font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transform hover:scale-105 transition-all"
+                    disabled={Boolean(availableProviders) && filteredProviders.length === 0}
+                    className="w-full py-4 px-6 rounded-xl shadow-lg font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transform hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     🚀 Start 14-Day Free Trial
                   </button>
