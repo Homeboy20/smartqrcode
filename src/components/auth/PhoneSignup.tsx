@@ -57,6 +57,10 @@ export default function PhoneSignup() {
       return 'Too many attempts. Please wait a moment and try again.';
     }
 
+    if (combined.includes('error-code:-39') || combined.includes('recaptcha')) {
+      return 'reCAPTCHA verification failed. This usually means the reCAPTCHA site key is invalid or not properly configured for this domain. Ask the administrator to verify the reCAPTCHA configuration in Firebase Console (Authentication → Sign-in method → Phone → reCAPTCHA verifier).';
+    }
+
     return String(err?.message || 'Something went wrong. Please try again.');
   };
 
