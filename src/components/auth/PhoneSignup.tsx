@@ -44,6 +44,22 @@ export default function PhoneSignup() {
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
+  const toFriendlyFirebaseAuthError = (err: any): string => {
+    const code = String(err?.code || '').toLowerCase();
+    const message = String(err?.message || '').toLowerCase();
+    const combined = `${code} ${message}`;
+
+    if (combined.includes('auth/billing-not-enabled')) {
+      return 'Phone sign-in is not available because billing is not enabled for this Firebase project. Ask the administrator to upgrade the Firebase project to the Blaze plan (Billing enabled) and try again.';
+    }
+
+    if (combined.includes('auth/too-many-requests')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+
+    return String(err?.message || 'Something went wrong. Please try again.');
+  };
+
   const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
   const selectedOption = React.useMemo(
     () => countryOptions.find((o) => o.country === selectedCountry) || countryOptions[0],
@@ -176,7 +192,7 @@ export default function PhoneSignup() {
       setVerificationStep('verifyCode');
       setSuccessMessage('Verification code sent.');
     } catch (err: any) {
-      setLocalError(err?.message || 'Failed to send verification code');
+      setLocalError(toFriendlyFirebaseAuthError(err) || 'Failed to send verification code');
     } finally {
       setLoading(false);
     }
@@ -226,7 +242,7 @@ export default function PhoneSignup() {
 
       window.location.href = (data as any).actionLink;
     } catch (err: any) {
-      setLocalError(err?.message || 'Failed to verify code');
+      setLocalError(toFriendlyFirebaseAuthError(err) || 'Failed to verify code');
     } finally {
       setLoading(false);
     }
