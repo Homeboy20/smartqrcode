@@ -64,24 +64,67 @@ const initializeFirebase = () => {
   return false;
 };
 
+// Debounce timer for re-initialization
+let reinitTimer: NodeJS.Timeout | null = null;
+let isReinitializing = false;
+
 // Re-initialize Firebase when settings change
 export const reinitializeFirebase = async () => {
   if (!isBrowser) return false;
   
-  try {
-    // Delete existing app if it exists
-    if (firebaseApp) {
-      await deleteApp(firebaseApp);
-      firebaseApp = undefined;
-      firebaseAvailable = false;
-    }
-    
-    // Re-initialize
-    return initializeFirebase();
-  } catch (error) {
-    console.error('Error reinitializing Firebase:', error);
+  // Debounce: clear any pending re-initialization
+  if (reinitTimer) {
+    clearTimeout(reinitTimer);
+    reinitTimer = null;
+  }
+  
+  // Prevent concurrent re-initialization
+  if (isReinitializing) {
+    if (isDev) console.log('⏳ Firebase re-initialization already in progress, skipping...');
     return false;
   }
+  
+  return new Promise((resolve) => {
+    reinitTimer = setTimeout(async () => {
+      reinitTimer = null;
+      isReinitializing = true;
+      
+      try {
+        // Clear service references first to prevent usage after deletion
+        firebaseAvailable = false;
+        auth = undefined as unknown as Auth;
+        db = undefined as unknown as Firestore;
+        storage = undefined as unknown as FirebaseStorage;
+        
+        // Delete existing app if it exists
+        if (firebaseApp) {
+          try {
+            // Wait a brief moment for pending operations to complete
+            await new Promise(r => setTimeout(r, 100));
+            await deleteApp(firebaseApp);
+            firebaseApp = undefined;
+            if (isDev) console.log('🗑️ Firebase app deleted');
+          } catch (deleteError) {
+            // Silently handle "app already deleted" errors
+            if (isDev && !String(deleteError).includes('already deleted')) {
+              console.warn('Firebase deletion warning:', deleteError);
+            }
+            firebaseApp = undefined;
+          }
+        }
+        
+        // Re-initialize after a brief delay
+        await new Promise(r => setTimeout(r, 200));
+        const success = initializeFirebase();
+        resolve(success);
+      } catch (error) {
+        console.error('Error reinitializing Firebase:', error);
+        resolve(false);
+      } finally {
+        isReinitializing = false;
+      }
+    }, 300); // 300ms debounce
+  });
 };
 
 // Initialize Firebase only on the client side
@@ -94,14 +137,26 @@ if (isBrowser) {
     }
   }, 100);
   
-  // Listen for settings updates
+  // Track last event time to prevent duplicate triggers
+  let lastSettingsUpdate = 0;
+  let lastFirebaseUpdate = 0;
+  
+  // Listen for settings updates (debounced)
   window.addEventListener('app-settings-updated', () => {
+    const now = Date.now();
+    if (now - lastSettingsUpdate < 500) return; // Ignore rapid-fire events
+    lastSettingsUpdate = now;
+    
     if (isDev) console.log('📱 App settings updated, reinitializing Firebase...');
     reinitializeFirebase();
   });
   
-  // Listen for Firebase config updates specifically
+  // Listen for Firebase config updates specifically (debounced)
   window.addEventListener('firebase-config-updated', () => {
+    const now = Date.now();
+    if (now - lastFirebaseUpdate < 500) return; // Ignore rapid-fire events
+    lastFirebaseUpdate = now;
+    
     if (isDev) console.log('🔥 Firebase config updated from database, reinitializing...');
     reinitializeFirebase();
   });
