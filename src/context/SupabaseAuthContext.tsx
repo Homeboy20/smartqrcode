@@ -9,6 +9,7 @@ interface SupabaseAuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  adminLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<boolean>;
   signUp: (email: string, password: string, displayName?: string) => Promise<boolean>;
@@ -26,6 +27,7 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
   user: null,
   session: null,
   loading: true,
+  adminLoading: false,
   error: null,
   signIn: async () => false,
   signUp: async () => false,
@@ -45,30 +47,48 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminLoading, setAdminLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+
       if (session?.user) {
-        checkAdminStatus(session.user.id);
+        setAdminLoading(true);
+        try {
+          await checkAdminStatus(session.user.id);
+        } finally {
+          setAdminLoading(false);
+        }
+      } else {
+        setIsAdmin(false);
+        setAdminLoading(false);
       }
+
       setLoading(false);
     });
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        setLoading(true);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          checkAdminStatus(session.user.id);
+          setAdminLoading(true);
+          try {
+            await checkAdminStatus(session.user.id);
+          } finally {
+            setAdminLoading(false);
+          }
         } else {
           setIsAdmin(false);
+          setAdminLoading(false);
         }
         setLoading(false);
       }
@@ -105,10 +125,13 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
               
               if (!retryError && retryData) {
                 setIsAdmin(retryData.role === 'admin');
+              } else {
+                setIsAdmin(false);
               }
             }
           } catch (createErr) {
             console.error('Error creating user record:', createErr);
+            setIsAdmin(false);
           }
         }
         return;
@@ -116,9 +139,12 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (data) {
         setIsAdmin(data.role === 'admin');
+      } else {
+        setIsAdmin(false);
       }
     } catch (err) {
       console.error('Error checking admin status:', err);
+      setIsAdmin(false);
     }
   };
 
@@ -297,6 +323,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         session,
         loading,
+        adminLoading,
         error,
         signIn,
         signUp,

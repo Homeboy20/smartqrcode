@@ -12,7 +12,7 @@ interface AdminLayoutProps {
 }
 
 function AdminLayoutContent({ children }: AdminLayoutProps) {
-  const { user, loading, isAdmin } = useSupabaseAuth();
+  const { user, loading, adminLoading, isAdmin } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const isPublic = searchParams?.get('public') === 'true';
   const router = useRouter();
@@ -34,7 +34,17 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   }, [user, loading, isPublic, router, pathname]);
 
   // Show loading state while checking auth
-  if (loading) {
+  if (loading || adminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  // If not logged in (and not public), we will redirect to login.
+  // Avoid flashing "Access Denied" while the redirect happens.
+  if (!user && !isPublic) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
