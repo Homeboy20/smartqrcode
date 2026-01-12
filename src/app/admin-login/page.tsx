@@ -99,10 +99,7 @@ export default function AdminLogin() {
   // If user is already loading or being redirected, show loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-        <p className="ml-4 text-gray-700">Loading...</p>
-      </div>
+      <div className="min-h-screen bg-gray-50" />
     );
   }
 

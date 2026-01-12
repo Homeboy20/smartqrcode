@@ -36,9 +36,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   // Show loading state while checking auth
   if (loading || adminLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+      <div className="min-h-screen bg-gray-50" />
     );
   }
 
@@ -46,9 +44,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   // Avoid flashing "Access Denied" while the redirect happens.
   if (!user && !isPublic) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
+      <div className="min-h-screen bg-gray-50" />
     );
   }
 
