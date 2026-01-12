@@ -53,6 +53,18 @@ type CheckoutAdapter = {
   }) => Promise<CheckoutSessionResult>;
 };
 
+function appendQueryParam(url: string, key: string, value: string): string {
+  // Support both absolute and relative URLs.
+  // If relative, return relative (path + query + hash) without the dummy origin.
+  const dummyOrigin = 'http://localhost';
+  const isAbsolute = /^https?:\/\//i.test(url);
+
+  const u = new URL(url, isAbsolute ? undefined : dummyOrigin);
+  u.searchParams.set(key, value);
+  if (isAbsolute) return u.toString();
+  return `${u.pathname}${u.search}${u.hash}`;
+}
+
 const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
   paystack: {
     provider: 'paystack',
@@ -103,7 +115,7 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         currency: input.currency,
         plan: planCode,
         reference,
-        callbackUrl: `${input.successUrl}?reference=${reference}`,
+        callbackUrl: appendQueryParam(input.successUrl, 'reference', reference),
         metadata: {
           userId,
           planId: input.planId,
@@ -161,7 +173,7 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         customerName,
         planName,
         reference,
-        redirectUrl: `${input.successUrl}?reference=${reference}`,
+        redirectUrl: appendQueryParam(input.successUrl, 'reference', reference),
         paymentMethod: flutterwavePaymentMethod,
         metadata: {
           userId,
@@ -226,9 +238,9 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
     }
 
     if (provider === 'flutterwave') {
-      const clientSecret =
-        (runtime as any)?.credentials?.clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
-      return Boolean(clientSecret);
+      const clientId = (runtime as any)?.credentials?.clientId || process.env.FLUTTERWAVE_CLIENT_ID || '';
+      const clientSecret = (runtime as any)?.credentials?.clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+      return Boolean(clientId && clientSecret);
     }
 
     // For not-yet-integrated providers, keep disabled.
@@ -244,8 +256,9 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
   }
 
   if (provider === 'flutterwave') {
+    const hasClientId = await hasCredential('FLUTTERWAVE_CLIENT_ID');
     const hasSecret = await hasCredential('FLUTTERWAVE_CLIENT_SECRET');
-    return hasSecret;
+    return hasClientId && hasSecret;
   }
 
   return false;

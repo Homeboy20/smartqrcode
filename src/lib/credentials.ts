@@ -115,5 +115,9 @@ export interface PaymentCredentials {
   FLUTTERWAVE_CLIENT_ID: string;
   FLUTTERWAVE_CLIENT_SECRET: string;
   FLUTTERWAVE_ENCRYPTION_KEY?: string;
+  // Webhook secret hash (set in Flutterwave dashboard)
+  FLUTTERWAVE_WEBHOOK_SECRET_HASH?: string;
+  // Alternative env key used in Flutterwave docs/examples
+  FLW_SECRET_HASH?: string;
 }
 

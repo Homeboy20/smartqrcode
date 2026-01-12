@@ -90,24 +90,47 @@ export function verifyPaystackSignature(
 
 /**
  * Verify Flutterwave webhook signature
- * @param signature - The verif-hash header
- * @param webhookSecret - Your Flutterwave secret hash
+ * Supports current Flutterwave docs: `flutterwave-signature` header contains
+ * a base64-encoded HMAC-SHA256 of the raw request body signed with your secret hash.
+ *
+ * For backwards compatibility, also accepts legacy schemes where the signature
+ * may be a static hash value (e.g. `verif-hash`).
+ *
+ * @param signature - The flutterwave-signature (preferred) or verif-hash header
+ * @param rawBodyOrSecret - Either raw request body (preferred overload) or secret hash (legacy overload)
+ * @param webhookSecret - Your Flutterwave secret hash (preferred overload)
  * @returns true if valid, false otherwise
  */
+export function verifyFlutterwaveSignature(signature: string | null, webhookSecret: string): boolean;
 export function verifyFlutterwaveSignature(
   signature: string | null,
+  rawBody: string,
   webhookSecret: string
+): boolean;
+export function verifyFlutterwaveSignature(
+  signature: string | null,
+  rawBodyOrSecret: string,
+  maybeSecret?: string
 ): boolean {
-  if (!signature || !webhookSecret) {
-    return false;
-  }
+  const rawBody = maybeSecret ? rawBodyOrSecret : null;
+  const webhookSecret = maybeSecret ? maybeSecret : rawBodyOrSecret;
+
+  if (!signature || !webhookSecret) return false;
 
   try {
-    // Flutterwave sends a static secret hash
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(webhookSecret)
-    );
+    // Preferred: HMAC-SHA256(base64) of rawBody signed with secret hash.
+    if (rawBody !== null) {
+      const expected = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('base64');
+
+      // Constant-time comparison
+      return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+    }
+
+    // Legacy: static hash comparison
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(webhookSecret));
   } catch (error) {
     console.error('Flutterwave signature verification error:', error);
     return false;
@@ -202,7 +225,8 @@ export async function verifyWebhookSignature(
 
     case 'flutterwave':
       return verifyFlutterwaveSignature(
-        headers['verif-hash'],
+        headers['flutterwave-signature'] || headers['verif-hash'],
+        rawBody,
         secrets.webhookSecret
       );
 
