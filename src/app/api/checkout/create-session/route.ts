@@ -142,17 +142,9 @@ async function getUserFromToken(token: string) {
     const errorText = await response.text();
     console.error('Token verification failed:', errorText);
 
-    // Fallback: decode JWT payload to salvage user id/email even if session lookup fails
-    const decoded = decodeJwtWithoutVerify(token);
-    if (decoded?.sub) {
-      console.warn('Using decoded JWT payload as fallback');
-      return {
-        id: decoded.sub,
-        email: decoded.email || decoded.user_email || '',
-        user_metadata: decoded.user_metadata || {},
-      } as { id: string; email?: string; user_metadata?: Record<string, unknown> };
-    }
-
+    // ❌ SECURITY FIX: Removed insecure JWT fallback
+    // Previously this decoded JWT without verification, allowing attackers to forge tokens
+    // If token verification fails, authentication is required
     return null;
   } catch (error) {
     console.error('Error verifying token:', error);
@@ -161,6 +153,8 @@ async function getUserFromToken(token: string) {
 }
 
 function decodeJwtWithoutVerify(token: string) {
+  // ❌ DEPRECATED: This function is no longer used for security reasons
+  // JWT must always be verified before trusting its contents
   try {
     const [, payload] = token.split('.');
     if (!payload) return null;

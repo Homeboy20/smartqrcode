@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyPaystackWebhook } from '@/lib/paystack';
+import { verifyPaystackSignature } from '@/lib/webhook-verification';
+import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
+import { createErrorResponse, handleApiError, logError } from '@/lib/api-response';
 import { getCredential } from '@/lib/credentials';
 
 // Initialize Supabase admin client
@@ -14,32 +16,40 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const clientIP = getClientIP(request.headers);
+
   try {
+    // Rate limiting
+    const rateLimit = checkRateLimit(clientIP, RATE_LIMITS.WEBHOOK);
+    if (!rateLimit.allowed) {
+      return createErrorResponse('RATE_LIMIT_EXCEEDED', undefined, 429);
+    }
+
     // Get the webhook signature from headers
     const signature = request.headers.get('x-paystack-signature');
     
     if (!signature) {
-      console.error('Missing x-paystack-signature header');
-      return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
+      logError('paystack-webhook', new Error('Missing x-paystack-signature header'), { clientIP });
+      return createErrorResponse('VALIDATION_ERROR', 'Missing signature', 400);
     }
 
     // Get webhook secret from credentials
     const webhookSecret = await getCredential('PAYSTACK_SECRET_KEY');
     
     if (!webhookSecret) {
-      console.error('Missing PAYSTACK_SECRET_KEY');
-      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+      logError('paystack-webhook', new Error('Missing PAYSTACK_SECRET_KEY'), { clientIP });
+      return createErrorResponse('INTERNAL_ERROR', 'Webhook secret not configured', 500);
     }
 
     // Get raw body for verification
     const body = await request.text();
 
     // Verify webhook signature
-    const isValid = verifyPaystackWebhook(body, signature, webhookSecret);
+    const isValid = verifyPaystackSignature(signature, body, webhookSecret);
     
     if (!isValid) {
-      console.error('Invalid webhook signature');
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      logError('paystack-webhook', new Error('Invalid webhook signature'), { clientIP });
+      return createErrorResponse('AUTHORIZATION_ERROR', 'Invalid signature', 400);
     }
 
     // Parse the event
@@ -59,8 +69,8 @@ export async function POST(request: NextRequest) {
         const planId = data.metadata?.planId;
         
         if (!userId || !planId) {
-          console.error('Missing userId or planId in metadata');
-          return NextResponse.json({ error: 'Missing metadata' }, { status: 400 });
+          logError('paystack-webhook', new Error('Missing userId or planId in metadata'), { reference: data.reference });
+          return createErrorResponse('VALIDATION_ERROR', 'Missing metadata', 400);
         }
 
         // Check if this is a subscription payment
@@ -147,8 +157,8 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (findError || !existingSub) {
-          console.error('Subscription not found:', data.subscription_code);
-          return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+          logError('paystack-webhook', new Error('Subscription not found'), { subscriptionCode: data.subscription_code });
+          return createErrorResponse('NOT_FOUND', 'Subscription not found', 404);
         }
 
         // Update subscription status
@@ -217,8 +227,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true }, { status: 200 });
 
   } catch (error) {
-    console.error('Webhook error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return handleApiError('paystack-webhook', error, { clientIP });
   }
 }

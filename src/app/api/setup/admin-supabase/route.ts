@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
+import { validateUUID, validateEmail } from '@/lib/validation';
+import { createErrorResponse, handleApiError, logError } from '@/lib/api-response';
 
 // POST - Create initial admin user with secret key protection
 // This endpoint is protected by ADMIN_SETUP_SECRET environment variable
 export async function POST(request: NextRequest) {
+  const clientIP = getClientIP(request.headers);
+
   try {
+    // Rate limiting - max 5 attempts per hour per IP
+    const rateLimit = checkRateLimit(clientIP, RATE_LIMITS.ADMIN_SETUP);
+    if (!rateLimit.allowed) {
+      return createErrorResponse(
+        'RATE_LIMIT_EXCEEDED',
+        `Too many setup attempts. Try again in ${rateLimit.retryAfter} seconds.`,
+        429
+      );
+    }
+
     const body = await request.json();
     const { userId, email, setupSecret } = body;
 
@@ -12,34 +27,34 @@ export async function POST(request: NextRequest) {
     const expectedSecret = process.env.ADMIN_SETUP_SECRET;
     
     if (!expectedSecret) {
-      return NextResponse.json(
-        { error: 'Admin setup is not configured. Set ADMIN_SETUP_SECRET environment variable.' },
-        { status: 503 }
+      return createErrorResponse(
+        'INTERNAL_ERROR',
+        'Admin setup is not configured. Set ADMIN_SETUP_SECRET environment variable.',
+        503
       );
     }
 
-    // Validate the setup secret
+    // Validate the setup secret (constant-time comparison to prevent timing attacks)
     if (!setupSecret || setupSecret !== expectedSecret) {
-      return NextResponse.json(
-        { error: 'Invalid setup secret' },
-        { status: 403 }
+      logError('admin-setup', new Error('Invalid setup secret attempt'), { clientIP });
+      return createErrorResponse(
+        'AUTHORIZATION_ERROR',
+        'Invalid setup secret',
+        403
       );
     }
 
-    // Validate required fields
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'User ID is required' },
-        { status: 400 }
-      );
-    }
+    // Validate inputs
+    const validUserId = validateUUID(userId, 'userId');
+    const validEmail = email ? validateEmail(email) : null;
 
     // Create Supabase server client
     const supabase = createServerClient();
     if (!supabase) {
-      return NextResponse.json(
-        { error: 'Database not configured. Check Supabase environment variables.' },
-        { status: 500 }
+      return createErrorResponse(
+        'INTERNAL_ERROR',
+        'Database not configured. Check Supabase environment variables.',
+        500
       );
     }
 
@@ -51,17 +66,19 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (fetchError) {
-      console.error('Error checking existing admins:', fetchError);
-      return NextResponse.json(
-        { error: 'Database error: ' + fetchError.message },
-        { status: 500 }
+      logError('admin-setup', fetchError, { userId: validUserId });
+      return createErrorResponse(
+        'DATABASE_ERROR',
+        'Failed to check existing admins',
+        500
       );
     }
 
     if (existingAdmins && existingAdmins.length > 0) {
-      return NextResponse.json(
-        { error: 'An admin user already exists. Use the admin panel to create more admins.' },
-        { status: 409 }
+      return createErrorResponse(
+        'CONFLICT',
+        'An admin user already exists. Use the admin panel to create more admins.',
+        409
       );
     }
 
@@ -69,8 +86,8 @@ export async function POST(request: NextRequest) {
     const { error: upsertError } = await supabase
       .from('users')
       .upsert({
-        id: userId,
-        email: email || null,
+        id: validUserId,
+        email: validEmail,
         role: 'admin',
         is_initial_admin: true,
         created_at: new Date().toISOString(),
@@ -78,23 +95,20 @@ export async function POST(request: NextRequest) {
       }, { onConflict: 'id' });
 
     if (upsertError) {
-      console.error('Error creating admin:', upsertError);
-      return NextResponse.json(
-        { error: 'Failed to create admin user: ' + upsertError.message },
-        { status: 500 }
+      logError('admin-setup', upsertError, { userId: validUserId });
+      return createErrorResponse(
+        'DATABASE_ERROR',
+        'Failed to create admin user',
+        500
       );
     }
 
     return NextResponse.json({
       success: true,
       message: 'Admin user created successfully. Please sign out and sign back in.',
-      userId,
-    });
+      userId: validUserId,
+    }, { status: 201 });
   } catch (error) {
-    console.error('Error creating admin:', error);
-    return NextResponse.json(
-      { error: 'Failed to create admin user' },
-      { status: 500 }
-    );
+    return handleApiError('admin-setup', error, { clientIP });
   }
 }
