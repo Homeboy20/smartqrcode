@@ -114,9 +114,12 @@ export default function SupabaseAdminSetup() {
             </p>
 
             <div>
-              <label className="block text-gray-300 mb-2">Email</label>
+              <label htmlFor="supabaseAdminEmail" className="block text-gray-300 mb-2">Email</label>
               <input
+                id="supabaseAdminEmail"
+                name="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
@@ -126,9 +129,12 @@ export default function SupabaseAdminSetup() {
             </div>
 
             <div>
-              <label className="block text-gray-300 mb-2">Password</label>
+              <label htmlFor="supabaseAdminPassword" className="block text-gray-300 mb-2">Password</label>
               <input
+                id="supabaseAdminPassword"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
@@ -155,9 +161,12 @@ export default function SupabaseAdminSetup() {
             </p>
 
             <div>
-              <label className="block text-gray-300 mb-2">Setup Secret</label>
+              <label htmlFor="supabaseAdminSetupSecret" className="block text-gray-300 mb-2">Setup Secret</label>
               <input
+                id="supabaseAdminSetupSecret"
+                name="setupSecret"
                 type="password"
+                autoComplete="off"
                 value={setupSecret}
                 onChange={(e) => setSetupSecret(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"

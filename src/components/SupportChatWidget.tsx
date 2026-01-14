@@ -203,7 +203,12 @@ export default function SupportChatWidget() {
             <p className="mb-2 text-sm text-red-600">{error}</p>
           )}
           <div className="flex items-center gap-2">
+            <label htmlFor="support-chat-message" className="sr-only">
+              Message
+            </label>
             <input
+              id="support-chat-message"
+              name="message"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {

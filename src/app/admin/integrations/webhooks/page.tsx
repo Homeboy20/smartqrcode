@@ -241,10 +241,12 @@ export default function WebhooksPage() {
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="newWebhookName" className="block text-sm font-medium text-gray-700 mb-1">
                         Webhook Name
                       </label>
                       <input
+                        id="newWebhookName"
+                        name="webhookName"
                         type="text"
                         value={newWebhook.name}
                         onChange={(e) => setNewWebhook({...newWebhook, name: e.target.value})}
@@ -254,10 +256,12 @@ export default function WebhooksPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="newWebhookUrl" className="block text-sm font-medium text-gray-700 mb-1">
                         Webhook URL
                       </label>
                       <input
+                        id="newWebhookUrl"
+                        name="webhookUrl"
                         type="url"
                         value={newWebhook.url}
                         onChange={(e) => setNewWebhook({...newWebhook, url: e.target.value})}
@@ -267,10 +271,12 @@ export default function WebhooksPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="newWebhookProvider" className="block text-sm font-medium text-gray-700 mb-1">
                         Provider
                       </label>
                       <select
+                        id="newWebhookProvider"
+                        name="webhookProvider"
                         value={newWebhook.provider}
                         onChange={(e) => setNewWebhook({...newWebhook, provider: e.target.value})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"

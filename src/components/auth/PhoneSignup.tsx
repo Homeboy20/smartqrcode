@@ -278,11 +278,12 @@ export default function PhoneSignup() {
         <form className="space-y-6" onSubmit={handleSendCode}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="country" className="sr-only">
-                Country
+              <label htmlFor="country-search" className="sr-only">
+                Search country
               </label>
               <input
                 id="country-search"
+                name="countrySearch"
                 type="text"
                 inputMode="search"
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
@@ -290,6 +291,9 @@ export default function PhoneSignup() {
                 value={countryQuery}
                 onChange={(e) => setCountryQuery(e.target.value)}
               />
+              <label htmlFor="country" className="sr-only">
+                Country
+              </label>
               <select
                 id="country"
                 name="country"

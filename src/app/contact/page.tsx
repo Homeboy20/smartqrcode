@@ -88,6 +88,7 @@ export default function ContactPage() {
               </label>
               <input
                 id="website"
+                name="website"
                 type="text"
                 tabIndex={-1}
                 autoComplete="off"
@@ -102,6 +103,7 @@ export default function ContactPage() {
               </label>
               <input
                 id="name"
+                name="name"
                 type="text"
                 required
                 value={name}
@@ -116,6 +118,7 @@ export default function ContactPage() {
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 required
                 value={email}
@@ -130,6 +133,7 @@ export default function ContactPage() {
               </label>
               <input
                 id="subject"
+                name="subject"
                 type="text"
                 required
                 value={subject}
@@ -144,6 +148,7 @@ export default function ContactPage() {
               </label>
               <textarea
                 id="message"
+                name="message"
                 required
                 rows={6}
                 value={message}

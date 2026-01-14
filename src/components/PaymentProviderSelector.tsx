@@ -64,6 +64,9 @@ export default function PaymentProviderSelector({
           >
             <div className="flex items-center h-5">
               <input
+                id={`payment-${provider}`}
+                name="paymentProvider"
+                value={provider}
                 type="radio"
                 checked={selectedProvider === provider}
                 onChange={() => onSelectProvider(provider)}
