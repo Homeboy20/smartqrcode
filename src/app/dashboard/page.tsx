@@ -48,7 +48,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
             <div className="space-y-2">
               <Link 
-                href="/qr-generator" 
+                href="/qrcode" 
                 className="flex items-center p-3 bg-blue-50 hover:bg-blue-100 rounded-md transition"
               >
                 <span className="p-2 bg-blue-500 rounded-md mr-3">
@@ -60,7 +60,7 @@ export default function DashboardPage() {
               </Link>
               
               <Link 
-                href="/barcode-generator" 
+                href="/barcode" 
                 className="flex items-center p-3 bg-purple-50 hover:bg-purple-100 rounded-md transition"
               >
                 <span className="p-2 bg-purple-500 rounded-md mr-3">
@@ -73,7 +73,7 @@ export default function DashboardPage() {
               
               {subscriptionTier !== 'free' && (
                 <Link 
-                  href="/bulk-generator" 
+                  href="/bulk" 
                   className="flex items-center p-3 bg-green-50 hover:bg-green-100 rounded-md transition"
                 >
                   <span className="p-2 bg-green-500 rounded-md mr-3">
@@ -92,7 +92,7 @@ export default function DashboardPage() {
           <div className="bg-white shadow-md rounded-lg p-6 mb-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-800">Recent Activity</h2>
-              <Link href="/history" className="text-blue-600 hover:text-blue-800 text-sm">
+              <Link href="/qrcode" className="text-blue-600 hover:text-blue-800 text-sm">
                 View All
               </Link>
             </div>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-gray-600">No recent activity to display</p>
-              <Link href="/qr-generator" className="mt-4 text-blue-600 hover:underline">
+              <Link href="/qrcode" className="mt-4 text-blue-600 hover:underline">
                 Generate your first QR code
               </Link>
             </div>

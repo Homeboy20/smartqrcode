@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,28 +8,65 @@ export const dynamic = 'force-dynamic';
  * Creates a user record in the public.users table if it doesn't exist.
  * This is called by the client when an authenticated user doesn't have a users table entry.
  */
-export async function POST() {
+export async function POST(request: Request) {
   try {
-    const supabase = createServerClient();
-    
-    // Get current session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError || !session?.user) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
-        { error: 'Not authenticated' },
+        { error: 'Supabase configuration missing (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY)' },
+        { status: 500 }
+      );
+    }
+
+    const authHeader = request.headers.get('authorization') || '';
+    const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice('bearer '.length).trim() : '';
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Not authenticated (missing Bearer token)' },
         { status: 401 }
       );
     }
 
-    const user = session.user;
+    // Validate the JWT and get the user.
+    const authClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: userData, error: userError } = await authClient.auth.getUser(token);
+
+    if (userError || !userData?.user) {
+      return NextResponse.json(
+        { error: 'Not authenticated (invalid or expired token)' },
+        { status: 401 }
+      );
+    }
+
+    const user = userData.user;
+
+    // Prefer service role for DB operations; fall back to user-scoped anon client (requires RLS rules).
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const dbClient = serviceRoleKey
+      ? createClient(supabaseUrl, serviceRoleKey, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+        });
 
     // Try to fetch existing user record
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingError } = await dbClient
       .from('users')
       .select('id')
       .eq('id', user.id)
       .maybeSingle();
+
+    if (existingError) {
+      console.error('Error checking existing user record:', existingError);
+      return NextResponse.json(
+        { error: 'Failed to check existing user record: ' + existingError.message },
+        { status: 500 }
+      );
+    }
 
     if (existingUser) {
       return NextResponse.json({
@@ -40,7 +77,7 @@ export async function POST() {
     }
 
     // Create user record
-    const { error: insertError } = await supabase
+    const { error: insertError } = await dbClient
       .from('users')
       .insert({
         id: user.id,
@@ -55,7 +92,14 @@ export async function POST() {
     if (insertError) {
       console.error('Error creating user record:', insertError);
       return NextResponse.json(
-        { error: 'Failed to create user record: ' + insertError.message },
+        {
+          error:
+            'Failed to create user record: ' +
+            insertError.message +
+            (serviceRoleKey
+              ? ''
+              : ' (Server is missing SUPABASE_SERVICE_ROLE_KEY and RLS may be blocking inserts)')
+        },
         { status: 500 }
       );
     }
