@@ -75,10 +75,27 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('features_usage')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (rowError) {
       return NextResponse.json({ error: 'Failed to load usage' }, { status: 500 });
+    }
+
+    // If the row doesn't exist yet, create it (idempotent).
+    if (!existingRow) {
+      await authed
+        .from('users')
+        .upsert(
+          {
+            id: user.id,
+            email: user.email,
+            subscription_tier: 'free',
+            role: 'user',
+            features_usage: {},
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id', ignoreDuplicates: true }
+        );
     }
 
     const existingUsage = (existingRow?.features_usage as any) || {};

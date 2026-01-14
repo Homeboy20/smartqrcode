@@ -53,60 +53,45 @@ export async function POST(request: Request) {
           global: { headers: { Authorization: `Bearer ${token}` } },
         });
 
-    // Try to fetch existing user record
-    const { data: existingUser, error: existingError } = await dbClient
+    // Idempotent create: insert row if missing, otherwise do nothing.
+    // This avoids race-condition 23505 duplicate key failures.
+    const { error: upsertError } = await dbClient
       .from('users')
-      .select('id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (existingError) {
-      console.error('Error checking existing user record:', existingError);
-      return NextResponse.json(
-        { error: 'Failed to check existing user record: ' + existingError.message },
-        { status: 500 }
-      );
-    }
-
-    if (existingUser) {
-      return NextResponse.json({
-        success: true,
-        message: 'User record already exists',
-        userId: user.id,
-      });
-    }
-
-    // Create user record
-    const { error: insertError } = await dbClient
-      .from('users')
-      .insert({
-        id: user.id,
-        email: user.email,
-        display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-        role: 'user',
-        subscription_tier: 'free',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-    if (insertError) {
-      console.error('Error creating user record:', insertError);
-      return NextResponse.json(
+      .upsert(
         {
-          error:
-            'Failed to create user record: ' +
-            insertError.message +
-            (serviceRoleKey
-              ? ''
-              : ' (Server is missing SUPABASE_SERVICE_ROLE_KEY and RLS may be blocking inserts)')
+          id: user.id,
+          email: user.email,
+          display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+          role: 'user',
+          subscription_tier: 'free',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
-        { status: 500 }
+        { onConflict: 'id', ignoreDuplicates: true }
       );
+
+    if (upsertError) {
+      // If a duplicate slipped through, treat it as success.
+      const pgCode = (upsertError as any)?.code;
+      if (pgCode !== '23505') {
+        console.error('Error creating user record:', upsertError);
+        return NextResponse.json(
+          {
+            error:
+              'Failed to create user record: ' +
+              upsertError.message +
+              (serviceRoleKey
+                ? ''
+                : ' (Server is missing SUPABASE_SERVICE_ROLE_KEY and RLS may be blocking inserts)')
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'User record created successfully',
+      message: 'User record ensured successfully',
       userId: user.id,
     });
   } catch (error) {

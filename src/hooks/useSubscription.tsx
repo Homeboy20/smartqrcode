@@ -41,8 +41,17 @@ export function useSubscription(): UseSubscriptionReturn {
         // If no user record exists yet, create it via ensure-user endpoint
         if (!data) {
           console.log('User record not found, creating...');
-          const { data: sessionData } = await supabase.auth.getSession();
-          const accessToken = sessionData.session?.access_token;
+          async function getAccessTokenWithRetry(): Promise<string | null> {
+            for (let attempt = 0; attempt < 3; attempt++) {
+              const { data: sessionData } = await supabase.auth.getSession();
+              const token = sessionData.session?.access_token || null;
+              if (token) return token;
+              await new Promise((r) => setTimeout(r, 150));
+            }
+            return null;
+          }
+
+          const accessToken = await getAccessTokenWithRetry();
 
           const ensureRes = await fetch('/api/auth/ensure-user', {
             method: 'POST',

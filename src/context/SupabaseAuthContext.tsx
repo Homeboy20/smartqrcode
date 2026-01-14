@@ -100,48 +100,36 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // Check if user is admin
   const checkAdminStatus = async (userId: string) => {
     try {
+      // Best-effort: ensure the public.users row exists.
+      // This avoids noisy 406s from PostgREST when a row is missing.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      if (accessToken) {
+        try {
+          await fetch('/api/auth/ensure-user', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       const { data, error } = await supabase
         .from('users')
         .select('role')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        // If user record doesn't exist (PGRST116), try to create it
-        if (error.code === 'PGRST116') {
-          console.log('User record not found, creating...');
-          try {
-            const response = await fetch('/api/auth/ensure-user', {
-              method: 'POST',
-            });
-            if (response.ok) {
-              console.log('User record created, retrying admin check...');
-              // Retry after creating the user record
-              const { data: retryData, error: retryError } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', userId)
-                .single();
-              
-              if (!retryError && retryData) {
-                setIsAdmin(retryData.role === 'admin');
-              } else {
-                setIsAdmin(false);
-              }
-            }
-          } catch (createErr) {
-            console.error('Error creating user record:', createErr);
-            setIsAdmin(false);
-          }
-        }
+        setIsAdmin(false);
         return;
       }
 
-      if (data) {
-        setIsAdmin(data.role === 'admin');
-      } else {
-        setIsAdmin(false);
-      }
+      setIsAdmin(data?.role === 'admin');
     } catch (err) {
       console.error('Error checking admin status:', err);
       setIsAdmin(false);
