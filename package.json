@@ -34,6 +34,7 @@
     "firebase": "^11.6.0",
     "firebase-admin": "^13.2.0",
     "html2canvas": "^1.4.1",
+    "jose": "^5.10.0",
     "jsbarcode": "^3.11.6",
     "jspdf": "^3.0.1",
     "jszip": "^3.10.1",

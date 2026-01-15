@@ -70,6 +70,10 @@ function createMissingProxy(name: string) {
 
 tryInitializeAdmin();
 
+export function isFirebaseAdminInitialized() {
+  return admin.apps.length > 0;
+}
+
 // Export admin services (safe at build-time)
 const adminDb = admin.apps.length ? admin.firestore() : (createMissingProxy('firestore') as any);
 const adminAuth = admin.apps.length ? admin.auth() : (createMissingProxy('auth') as any);

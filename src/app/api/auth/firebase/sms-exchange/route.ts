@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase-admin';
+import { adminAuth, isFirebaseAdminInitialized } from '@/lib/firebase-admin';
 import { createServerClient } from '@/lib/supabase/server';
+import { verifyFirebaseIdToken } from '@/lib/firebaseIdToken';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +15,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing Firebase token' }, { status: 401 });
     }
 
-    const decoded = await adminAuth.verifyIdToken(firebaseToken);
+    const decoded = await (async () => {
+      // Prefer Admin SDK when configured (supports revoked-token checks, etc.)
+      if (isFirebaseAdminInitialized()) {
+        return await adminAuth.verifyIdToken(firebaseToken);
+      }
+
+      // Fallback: verify using Firebase public keys (no service-account needed).
+      // This keeps phone auth working even when Admin credentials are not present.
+      return await verifyFirebaseIdToken(firebaseToken);
+    })().catch((err: any) => {
+      const message = String(err?.message || err || 'Invalid token');
+      console.error('Firebase token verification failed:', message);
+      throw new Error(`Invalid Firebase token: ${message}`);
+    });
 
     const body = await request.json().catch(() => ({} as any));
     const redirect = typeof body?.redirect === 'string' ? body.redirect : '/';
@@ -73,6 +87,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ actionLink: data.properties.action_link });
   } catch (err: any) {
     console.error('Firebase SMS exchange error:', err);
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+    const message = String(err?.message || 'Internal error');
+    const status = message.toLowerCase().includes('invalid firebase token') ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
