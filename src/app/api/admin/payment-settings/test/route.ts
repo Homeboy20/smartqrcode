@@ -1,6 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
+import { isMaskedValue } from '@/lib/secure/credentialCrypto';
+
+function mergeWithEnvFallback(provider: PaymentProvider, credentials: Record<string, string>) {
+  const merged: Record<string, string> = { ...credentials };
+
+  const setIfMissing = (field: string, envKey: string) => {
+    const current = merged[field];
+    const isMissing =
+      !current ||
+      (typeof current === 'string' && current.trim().length === 0) ||
+      isMaskedValue(current);
+    if (!isMissing) return;
+
+    const envValue = process.env[envKey];
+    if (typeof envValue === 'string' && envValue.trim().length > 0) {
+      merged[field] = envValue;
+    }
+  };
+
+  switch (provider) {
+    case 'stripe':
+      setIfMissing('secretKey', 'STRIPE_SECRET_KEY');
+      setIfMissing('webhookSecret', 'STRIPE_WEBHOOK_SECRET');
+      break;
+    case 'paypal':
+      setIfMissing('clientId', 'PAYPAL_CLIENT_ID');
+      setIfMissing('clientSecret', 'PAYPAL_CLIENT_SECRET');
+      break;
+    case 'flutterwave':
+      setIfMissing('clientId', 'FLUTTERWAVE_CLIENT_ID');
+      setIfMissing('clientSecret', 'FLUTTERWAVE_CLIENT_SECRET');
+      setIfMissing('encryptionKey', 'FLUTTERWAVE_ENCRYPTION_KEY');
+      break;
+    case 'paystack':
+      setIfMissing('publicKey', 'PAYSTACK_PUBLIC_KEY');
+      setIfMissing('secretKey', 'PAYSTACK_SECRET_KEY');
+      break;
+  }
+
+  return merged;
+}
 
 // POST - Test payment provider connection
 export async function POST(request: NextRequest) {
@@ -25,7 +66,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Provider is disabled' }, { status: 400 });
     }
 
-    const credentials = runtime.credentials;
+    if ('decryptError' in runtime && (runtime as any).decryptError) {
+      // Most commonly this means CREDENTIALS_ENCRYPTION_KEY is missing or changed.
+      // Surface the underlying error so admins can fix server config.
+      return NextResponse.json(
+        {
+          error:
+            `Stored payment credentials could not be decrypted. ${(runtime as any).decryptError} ` +
+            'Ensure CREDENTIALS_ENCRYPTION_KEY is set (and unchanged) on the server.'
+        },
+        { status: 500 }
+      );
+    }
+
+    const credentials = mergeWithEnvFallback(provider, runtime.credentials || {});
     if (isDev) {
       console.log(`Testing ${provider} with credential keys:`, Object.keys(credentials || {}));
     }
