@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { subscriptionFeatures, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
-import PaymentProviderSelector, { PaymentProvider } from '@/components/PaymentProviderSelector';
-import { providerSupportsPaymentMethod, type CheckoutPaymentMethod } from '@/lib/checkout/paymentMethodSupport';
+import { type CheckoutPaymentMethod } from '@/lib/checkout/paymentMethodSupport';
 
 interface CurrencyInfo {
   country: string;
@@ -14,8 +13,6 @@ interface CurrencyInfo {
     symbol: string;
     name: string;
   };
-  availableProviders?: PaymentProvider[];
-  recommendedProvider: 'paystack' | 'flutterwave';
   pricing: {
     pro: {
       amount: number;
@@ -34,17 +31,11 @@ export default function PricingPage() {
   const { user, getAccessToken } = useSupabaseAuth();
   const { subscriptionTier, loading } = useSubscription();
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('paystack');
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('mobile_money');
   const [email, setEmail] = useState('');
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
   const [loadingCurrency, setLoadingCurrency] = useState(true);
-
-  const availableProviders = currencyInfo?.availableProviders;
-  const filteredProviders = (availableProviders || []).filter((provider) =>
-    providerSupportsPaymentMethod(provider, paymentMethod)
-  );
 
   useEffect(() => {
     if (user?.email) {
@@ -58,7 +49,6 @@ export default function PricingPage() {
       .then((res) => res.json())
       .then((data) => {
         setCurrencyInfo(data);
-        setSelectedProvider(data.recommendedProvider);
       })
       .catch((err) => {
         console.error('Failed to fetch currency info:', err);
@@ -66,8 +56,6 @@ export default function PricingPage() {
         setCurrencyInfo({
           country: 'US',
           currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
-          availableProviders: ['flutterwave', 'paystack'],
-          recommendedProvider: 'flutterwave',
           pricing: {
             pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
             business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
@@ -103,17 +91,11 @@ export default function PricingPage() {
       return;
     }
 
-    if (availableProviders && filteredProviders.length === 0) {
-      alert('No payment gateways support the selected payment option. Please choose another option.');
-      return;
-    }
-
     try {
       // For new users (no account), we'll auto-create on payment success
       // For existing users, link payment to their account
       const checkoutData = {
         planId: selectedTier,
-        provider: selectedProvider,
         paymentMethod: paymentMethod,
         email: email,
         successUrl: `${window.location.origin}/dashboard?welcome=true`,
@@ -165,14 +147,6 @@ export default function PricingPage() {
       alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error. Please try again.'}`);
     }
   };
-
-  useEffect(() => {
-    if (!availableProviders) return;
-    if (filteredProviders.length === 0) return;
-    if (!filteredProviders.includes(selectedProvider)) {
-      setSelectedProvider(filteredProviders[0]);
-    }
-  }, [availableProviders, filteredProviders, selectedProvider]);
 
   const renderFeatures = (tier: SubscriptionTier) => {
     const features = subscriptionFeatures[tier];
@@ -570,6 +544,7 @@ export default function PricingPage() {
                     <input
                       type="email"
                       id="email"
+                      name="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
@@ -630,68 +605,7 @@ export default function PricingPage() {
                         <span className="text-sm font-medium text-gray-900">Card</span>
                         <span className="text-xs text-gray-500 mt-1">Visa, Mastercard</span>
                       </button>
-
-                      {/* Apple Pay */}
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('apple_pay')}
-                        className={`relative flex flex-col items-center p-4 border-2 rounded-lg transition-all ${
-                          paymentMethod === 'apple_pay'
-                            ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                            : 'border-gray-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        {paymentMethod === 'apple_pay' && (
-                          <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="text-3xl mb-2"></div>
-                        <span className="text-sm font-medium text-gray-900">Apple Pay</span>
-                        <span className="text-xs text-gray-500 mt-1">1-tap</span>
-                      </button>
-
-                      {/* Google Pay */}
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('google_pay')}
-                        className={`relative flex flex-col items-center p-4 border-2 rounded-lg transition-all ${
-                          paymentMethod === 'google_pay'
-                            ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                            : 'border-gray-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        {paymentMethod === 'google_pay' && (
-                          <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="text-3xl mb-2">G</div>
-                        <span className="text-sm font-medium text-gray-900">Google Pay</span>
-                        <span className="text-xs text-gray-500 mt-1">1-tap</span>
-                      </button>
                     </div>
-                  </div>
-
-                  {/* Payment Provider */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Payment Processor
-                    </label>
-                    {availableProviders && filteredProviders.length === 0 && (
-                      <p className="mb-3 text-sm text-red-600">
-                        No gateways support the selected payment option.
-                      </p>
-                    )}
-                    <PaymentProviderSelector
-                      selectedProvider={selectedProvider}
-                      onSelectProvider={setSelectedProvider}
-                      availableProviders={availableProviders ? filteredProviders : undefined}
-                    />
                   </div>
 
                   {/* Trust signals */}
@@ -719,7 +633,7 @@ export default function PricingPage() {
                   {/* CTA Button */}
                   <button
                     onClick={handleCheckout}
-                    disabled={Boolean(availableProviders) && filteredProviders.length === 0}
+                    disabled={false}
                     className="w-full py-4 px-6 rounded-xl shadow-lg font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transform hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     🚀 Start 14-Day Free Trial
