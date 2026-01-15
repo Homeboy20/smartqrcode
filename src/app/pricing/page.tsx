@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { subscriptionFeatures, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
-import { type CheckoutPaymentMethod } from '@/lib/checkout/paymentMethodSupport';
+import { getSupportedPaymentMethods, type CheckoutPaymentMethod, type UniversalPaymentProvider } from '@/lib/checkout/paymentMethodSupport';
 
 interface CurrencyInfo {
   country: string;
@@ -13,6 +13,8 @@ interface CurrencyInfo {
     symbol: string;
     name: string;
   };
+  availableProviders?: UniversalPaymentProvider[];
+  recommendedProvider?: UniversalPaymentProvider;
   pricing: {
     pro: {
       amount: number;
@@ -32,7 +34,7 @@ export default function PricingPage() {
   const { subscriptionTier, loading } = useSubscription();
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('mobile_money');
+  const [selectedProvider, setSelectedProvider] = useState<UniversalPaymentProvider>('flutterwave');
   const [email, setEmail] = useState('');
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
   const [loadingCurrency, setLoadingCurrency] = useState(true);
@@ -49,6 +51,15 @@ export default function PricingPage() {
       .then((res) => res.json())
       .then((data) => {
         setCurrencyInfo(data);
+
+        const providers = (data?.availableProviders || []) as UniversalPaymentProvider[];
+        const recommended = data?.recommendedProvider as UniversalPaymentProvider | undefined;
+
+        if (recommended && providers.includes(recommended)) {
+          setSelectedProvider(recommended);
+        } else if (providers.length > 0) {
+          setSelectedProvider(providers[0]);
+        }
       })
       .catch((err) => {
         console.error('Failed to fetch currency info:', err);
@@ -56,14 +67,59 @@ export default function PricingPage() {
         setCurrencyInfo({
           country: 'US',
           currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
+          availableProviders: ['flutterwave', 'paystack'],
+          recommendedProvider: 'flutterwave',
           pricing: {
             pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
             business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
           },
         });
+
+        setSelectedProvider('flutterwave');
       })
       .finally(() => setLoadingCurrency(false));
   }, []);
+
+  const availableProviders = (currencyInfo?.availableProviders && currencyInfo.availableProviders.length > 0)
+    ? currencyInfo.availableProviders
+    : (['flutterwave', 'paystack'] as UniversalPaymentProvider[]);
+
+  useEffect(() => {
+    if (availableProviders.length === 0) return;
+    if (!availableProviders.includes(selectedProvider)) {
+      setSelectedProvider(availableProviders[0]);
+    }
+  }, [availableProviders, selectedProvider]);
+
+  const providerLabel = (provider: UniversalPaymentProvider) => {
+    switch (provider) {
+      case 'paystack':
+        return 'Paystack';
+      case 'flutterwave':
+        return 'Flutterwave';
+      case 'stripe':
+        return 'Stripe';
+      case 'paypal':
+        return 'PayPal';
+      default:
+        return provider;
+    }
+  };
+
+  const methodLabel = (method: CheckoutPaymentMethod) => {
+    switch (method) {
+      case 'card':
+        return 'Card';
+      case 'mobile_money':
+        return 'Mobile Money';
+      case 'apple_pay':
+        return 'Apple Pay';
+      case 'google_pay':
+        return 'Google Pay';
+      default:
+        return method;
+    }
+  };
 
   const handleUpgrade = async (tier: SubscriptionTier) => {
     if (tier === 'free') {
@@ -96,7 +152,7 @@ export default function PricingPage() {
       // For existing users, link payment to their account
       const checkoutData = {
         planId: selectedTier,
-        paymentMethod: paymentMethod,
+        provider: selectedProvider,
         email: email,
         successUrl: `${window.location.origin}/dashboard?welcome=true`,
         cancelUrl: `${window.location.origin}/pricing?canceled=true`,
@@ -556,55 +612,71 @@ export default function PricingPage() {
                     </p>
                   </div>
 
-                  {/* Payment Method Selection */}
+                  {/* Payment Gateway Selection */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Payment Method
+                      Payment Gateway
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Mobile Money - HIGHLIGHTED */}
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('mobile_money')}
-                        className={`relative flex flex-col items-center p-4 border-2 rounded-lg transition-all ${
-                          paymentMethod === 'mobile_money'
-                            ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                            : 'border-gray-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        {paymentMethod === 'mobile_money' && (
-                          <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="text-3xl mb-2">📱</div>
-                        <span className="text-sm font-medium text-gray-900">Mobile Money</span>
-                        <span className="text-xs text-gray-500 mt-1">M-Pesa, Airtel</span>
-                      </button>
 
-                      {/* Card */}
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('card')}
-                        className={`relative flex flex-col items-center p-4 border-2 rounded-lg transition-all ${
-                          paymentMethod === 'card'
-                            ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                            : 'border-gray-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        {paymentMethod === 'card' && (
-                          <div className="absolute -top-2 -right-2 bg-green-500 text-white rounded-full p-1">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="text-3xl mb-2">💳</div>
-                        <span className="text-sm font-medium text-gray-900">Card</span>
-                        <span className="text-xs text-gray-500 mt-1">Visa, Mastercard</span>
-                      </button>
+                    <div className="space-y-3">
+                      {availableProviders.map((provider) => {
+                        const supportedMethods = getSupportedPaymentMethods(provider);
+                        const isSelected = selectedProvider === provider;
+                        const isRecommended = currencyInfo?.recommendedProvider === provider;
+
+                        return (
+                          <button
+                            key={provider}
+                            type="button"
+                            onClick={() => setSelectedProvider(provider)}
+                            className={`w-full text-left border-2 rounded-xl p-4 transition-all ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                                : 'border-gray-200 hover:border-indigo-300'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <input
+                                id={`provider-${provider}`}
+                                name="paymentProvider"
+                                type="radio"
+                                value={provider}
+                                checked={isSelected}
+                                onChange={() => setSelectedProvider(provider)}
+                                className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                              />
+
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <label htmlFor={`provider-${provider}`} className="text-sm font-semibold text-gray-900">
+                                    {providerLabel(provider)}
+                                  </label>
+                                  {isRecommended && (
+                                    <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                      Recommended
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {supportedMethods.map((method) => (
+                                    <span
+                                      key={`${provider}-${method}`}
+                                      className="text-[11px] font-medium px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700"
+                                    >
+                                      {methodLabel(method)}
+                                    </span>
+                                  ))}
+                                </div>
+
+                                <p className="mt-2 text-xs text-gray-500">
+                                  You can choose the exact method on the checkout page.
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

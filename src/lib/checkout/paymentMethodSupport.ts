@@ -33,3 +33,9 @@ const PROVIDER_METHOD_SUPPORT: Record<UniversalPaymentProvider, Record<CheckoutP
 export function providerSupportsPaymentMethod(provider: UniversalPaymentProvider, method: CheckoutPaymentMethod) {
   return Boolean(PROVIDER_METHOD_SUPPORT[provider]?.[method]);
 }
+
+export function getSupportedPaymentMethods(provider: UniversalPaymentProvider): CheckoutPaymentMethod[] {
+  const support = PROVIDER_METHOD_SUPPORT[provider];
+  if (!support) return [];
+  return (Object.keys(support) as CheckoutPaymentMethod[]).filter((method) => Boolean(support[method]));
+}

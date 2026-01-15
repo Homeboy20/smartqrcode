@@ -298,7 +298,7 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     throw new Error('Invalid plan ID or free plan selected');
   }
 
-  const paymentMethod: CheckoutPaymentMethod = input.paymentMethod || 'card';
+  const paymentMethod: CheckoutPaymentMethod | undefined = input.paymentMethod;
 
   const availableProviders = await getAvailableCheckoutProviders();
 
@@ -307,7 +307,7 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     return chooseDefaultProvider({ currency: input.currency, availableProviders });
   })();
 
-  if (!providerSupportsPaymentMethod(selectedProvider, paymentMethod)) {
+  if (paymentMethod && !providerSupportsPaymentMethod(selectedProvider, paymentMethod)) {
     throw new Error(`Selected provider does not support payment method: ${paymentMethod}`);
   }
 
