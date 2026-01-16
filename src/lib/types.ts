@@ -168,6 +168,7 @@ export interface FlutterwaveCredentials {
   clientId: string;
   clientSecret: string;
   encryptionKey: string;
+  webhookSecretHash?: string;
 }
 
 export interface PaystackCredentials {

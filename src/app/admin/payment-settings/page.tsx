@@ -36,7 +36,8 @@ export default function PaymentSettingsPage() {
   const [flutterwaveCredentials, setFlutterwaveCredentials] = useState<FlutterwaveCredentials>({
     clientId: '',
     clientSecret: '',
-    encryptionKey: ''
+    encryptionKey: '',
+    webhookSecretHash: ''
   });
   
   const [paystackCredentials, setPaystackCredentials] = useState<PaystackCredentials>({
@@ -948,6 +949,27 @@ export default function PaymentSettingsPage() {
                           className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         />
                       </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="webhookSecretHash" className="block text-sm font-medium text-gray-700">
+                        Webhook Secret Hash
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="password"
+                          name="webhookSecretHash"
+                          id="webhookSecretHash"
+                          autoComplete="off"
+                          value={flutterwaveCredentials.webhookSecretHash || ''}
+                          onChange={handleFlutterwaveChange}
+                          placeholder="Set in Flutterwave dashboard (Secret Hash)"
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Used to verify incoming webhook signatures.
+                      </p>
                     </div>
                   </div>
                   
