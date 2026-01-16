@@ -135,9 +135,9 @@ async function testFlutterwaveConnection(credentials: { clientSecret?: string; c
   }
 
   try {
-    // Use a stable v3 endpoint to validate the secret key.
-    // (The previous v4/customers check can return 404 depending on API availability.)
-    const response = await fetch('https://api.flutterwave.com/v3/balances', {
+    // Use v4/transactions endpoint to align with the application's V4 usage.
+    // (Note: v4/customers previously returned 404, implying strict endpoint availability on v4)
+    const response = await fetch('https://api.flutterwave.com/v4/transactions?limit=1', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${credentials.clientSecret}`,
@@ -162,10 +162,10 @@ async function testFlutterwaveConnection(credentials: { clientSecret?: string; c
       };
     }
 
-    return {
-      success: true,
+    return { 
+      success: true, 
       message: 'Flutterwave connection successful',
-      apiVersion: 'v3',
+      apiVersion: 'v4'
     };
   } catch (error) {
     console.error('Flutterwave test error:', error);
