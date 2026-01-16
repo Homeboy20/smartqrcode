@@ -244,6 +244,9 @@ export function mapEnvStylePaymentKeysToProviders(credentials: Record<string, st
   if (credentials.FLUTTERWAVE_CLIENT_ID) flutterwave.clientId = credentials.FLUTTERWAVE_CLIENT_ID;
   if (credentials.FLUTTERWAVE_CLIENT_SECRET) flutterwave.clientSecret = credentials.FLUTTERWAVE_CLIENT_SECRET;
   if (credentials.FLUTTERWAVE_ENCRYPTION_KEY) flutterwave.encryptionKey = credentials.FLUTTERWAVE_ENCRYPTION_KEY;
+  if (credentials.FLUTTERWAVE_WEBHOOK_SECRET_HASH) flutterwave.webhookSecretHash = credentials.FLUTTERWAVE_WEBHOOK_SECRET_HASH;
+  // Also support alternative naming
+  if (credentials.FLW_SECRET_HASH && !flutterwave.webhookSecretHash) flutterwave.webhookSecretHash = credentials.FLW_SECRET_HASH;
   if (Object.keys(flutterwave).length > 0) updates.push({ provider: 'flutterwave', credentials: flutterwave });
 
   const paystack: Record<string, unknown> = {};

@@ -8,6 +8,7 @@ interface FlutterwaveSettings {
   clientId: string;
   clientSecret: string;
   encryptionKey: string;
+  webhookSecretHash: string;
 }
 
 interface PayPalSettings {
@@ -46,7 +47,7 @@ type ActiveTab = 'flutterwave' | 'paypal' | 'stripe' | 'paystack' | 'googlePay';
 type ProviderStatus = Record<Exclude<ActiveTab, 'googlePay'>, boolean>;
 
 const emptySettings: IntegrationSettings = {
-  flutterwave: { clientId: '', clientSecret: '', encryptionKey: '' },
+  flutterwave: { clientId: '', clientSecret: '', encryptionKey: '', webhookSecretHash: '' },
   paypal: { clientId: '', clientSecret: '' },
   stripe: { publicKey: '', secretKey: '', webhookSecret: '' },
   paystack: { publicKey: '', secretKey: '', planCodePro: '', planCodeBusiness: '' },
@@ -211,6 +212,13 @@ export default function IntegrationsForm() {
             <div>
               <label htmlFor="fwEncryptionKey" className={labelStyle}>Encryption Key</label>
               <input type="password" id="fwEncryptionKey" name="encryptionKey" value={settings.flutterwave.encryptionKey} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="Encryption Key" />
+            </div>
+            <div>
+              <label htmlFor="fwWebhookSecretHash" className={labelStyle}>Webhook Secret Hash</label>
+              <input type="password" id="fwWebhookSecretHash" name="webhookSecretHash" value={settings.flutterwave.webhookSecretHash} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="Your webhook secret hash" />
+              <p className="mt-2 text-sm text-gray-500">
+                Required for webhook signature verification. Find this in your Flutterwave dashboard under Settings → Webhooks.
+              </p>
             </div>
           </div>
         );
