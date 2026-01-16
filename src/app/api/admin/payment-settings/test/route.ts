@@ -66,18 +66,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Provider is disabled' }, { status: 400 });
     }
 
-    if ('decryptError' in runtime && (runtime as any).decryptError) {
-      // Most commonly this means CREDENTIALS_ENCRYPTION_KEY is missing or changed.
-      // Surface the underlying error so admins can fix server config.
-      return NextResponse.json(
-        {
-          error:
-            `Stored payment credentials could not be decrypted. ${(runtime as any).decryptError} ` +
-            'Ensure CREDENTIALS_ENCRYPTION_KEY is set (and unchanged) on the server.'
-        },
-        { status: 500 }
-      );
-    }
+    const decryptError =
+      'decryptError' in runtime && (runtime as any).decryptError
+        ? String((runtime as any).decryptError)
+        : null;
 
     const credentials = mergeWithEnvFallback(provider, runtime.credentials || {});
     if (isDev) {
@@ -107,10 +99,33 @@ export async function POST(request: NextRequest) {
     }
 
     if (!testResult.success) {
+      // If stored credentials can't be decrypted and env fallback isn't present,
+      // surface a clearer remediation message.
+      if (decryptError && /required/i.test(testResult.message || '')) {
+        return NextResponse.json(
+          {
+            error:
+              `Stored payment credentials could not be decrypted. ${decryptError} ` +
+              'Ensure CREDENTIALS_ENCRYPTION_KEY is set (and unchanged) on the server, or set provider credentials via environment variables.',
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
         { error: testResult.message },
         { status: 400 }
       );
+    }
+
+    if (decryptError) {
+      return NextResponse.json({
+        success: true,
+        message: testResult.message,
+        warning:
+          `Stored payment credentials could not be decrypted. ${decryptError} ` +
+          'Using environment-variable fallback credentials for this test.',
+      });
     }
 
     return NextResponse.json({ success: true, message: testResult.message });
