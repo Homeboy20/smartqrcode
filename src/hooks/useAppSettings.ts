@@ -118,7 +118,9 @@ async function fetchSettingsShared() {
       const isDev = process.env.NODE_ENV === 'development';
       if (isDev) console.log('useAppSettings: Fetching from API...');
 
-      const response = await fetch('/api/app-settings', {
+      // trailingSlash is enabled in next.config.js, so use the canonical URL
+      // to avoid extra redirect requests.
+      const response = await fetch('/api/app-settings/', {
         cache: 'no-store',
       });
 

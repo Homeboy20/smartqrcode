@@ -135,8 +135,9 @@ async function testFlutterwaveConnection(credentials: { clientSecret?: string; c
   }
 
   try {
-    // Use v4/customers endpoint for testing connectivity
-    const response = await fetch('https://api.flutterwave.com/v4/customers?page=1&limit=1', {
+    // Use a stable v3 endpoint to validate the secret key.
+    // (The previous v4/customers check can return 404 depending on API availability.)
+    const response = await fetch('https://api.flutterwave.com/v3/balances', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${credentials.clientSecret}`,
@@ -157,25 +158,20 @@ async function testFlutterwaveConnection(credentials: { clientSecret?: string; c
     if (!response.ok) {
       return { 
         success: false, 
-        message: `Flutterwave API returned error: ${data.message || `Status ${response.status}`}` 
+        message: `Flutterwave API returned error: ${data.message || data?.data?.message || `Status ${response.status}`}` 
       };
     }
 
-    // For V4 API, a successful connection is indicated by 200 status
-    if (response.ok) {
-      return { 
-        success: true, 
-        message: 'Flutterwave V4 API connection successful',
-        apiVersion: 'v4'
-      };
-    }
-
-    return { success: false, message: 'Unexpected response from Flutterwave API' };
+    return {
+      success: true,
+      message: 'Flutterwave connection successful',
+      apiVersion: 'v3',
+    };
   } catch (error) {
     console.error('Flutterwave test error:', error);
     return { 
-      success: false, 
-      message: `Failed to connect to Flutterwave V4 API: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      success: false,
+      message: `Failed to connect to Flutterwave API: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
 }

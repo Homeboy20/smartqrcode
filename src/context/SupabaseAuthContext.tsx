@@ -77,7 +77,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     if (nextSession?.user) {
       setAdminLoading(true);
       try {
-        await checkAdminStatus(nextSession.user.id);
+        await checkAdminStatus(nextSession.user.id, nextSession.access_token);
       } finally {
         setAdminLoading(false);
       }
@@ -170,17 +170,10 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Check if user is admin
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = async (userId: string, accessToken?: string) => {
     try {
       // Best-effort: ensure the public.users row exists.
       // This avoids noisy 406s from PostgREST when a row is missing.
-      const { data: sessionData } = await withTimeout(
-        supabase.auth.getSession(),
-        10_000,
-        'supabase.auth.getSession() (admin check)'
-      );
-      const accessToken = sessionData.session?.access_token;
-
       if (accessToken) {
         try {
           const controller = new AbortController();
