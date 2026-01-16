@@ -142,29 +142,10 @@ export interface PayPalSubscriptionParams {
 
 // Update the function implementation to handle test mode
 export async function createPayPalSubscription(params: PayPalSubscriptionParams) {
-  const { planId, returnUrl, cancelUrl, customerId, testMode = false } = params;
-  
-  // Use sandbox or production credentials based on test mode
-  const clientId = testMode 
-    ? process.env.PAYPAL_SANDBOX_CLIENT_ID || process.env.PAYPAL_CLIENT_ID
-    : process.env.PAYPAL_CLIENT_ID;
-    
-  const clientSecret = testMode
-    ? process.env.PAYPAL_SANDBOX_CLIENT_SECRET || process.env.PAYPAL_CLIENT_SECRET
-    : process.env.PAYPAL_CLIENT_SECRET;
-  
-  // Use sandbox or production API URL based on test mode
-  const baseUrl = testMode
-    ? 'https://api-m.sandbox.paypal.com'
-    : 'https://api-m.paypal.com';
-  
-  // Implement rest of the function...
-  
-  // Mock return for now
-  return {
-    subscriptionId: 'test_sub_123',
-    approvalUrl: 'https://paypal.com/checkout'
-  };
+  // PayPal subscriptions are not currently integrated in this project.
+  // Keep this DB-only: credentials (when needed) must be read from `payment_settings`.
+  void params;
+  throw new Error('PayPal subscriptions are not integrated yet');
 }
 
 // Cancel a PayPal subscription
