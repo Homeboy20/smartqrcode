@@ -53,12 +53,13 @@ async function getFlutterwaveCredentials() {
   const clientId = runtime.credentials.clientId || '';
   const clientSecret = runtime.credentials.clientSecret || '';
   const encryptionKey = runtime.credentials.encryptionKey || '';
+  const webhookSecretHash = runtime.credentials.webhookSecretHash || '';
   
   if (!clientId || !clientSecret) {
     throw new Error('Flutterwave credentials not configured');
   }
   
-  return { clientId, clientSecret, encryptionKey };
+  return { clientId, clientSecret, encryptionKey, webhookSecretHash };
 }
 
 // Make authenticated request to Flutterwave V4 API
@@ -300,6 +301,12 @@ export async function getFlutterwaveClientId() {
 export async function getFlutterwaveEncryptionKey() {
   const { encryptionKey } = await getFlutterwaveCredentials();
   return encryptionKey;
+}
+
+// Get Flutterwave webhook secret hash for webhook verification
+export async function getFlutterwaveWebhookSecret() {
+  const runtime = await getProviderRuntimeConfig('flutterwave');
+  return runtime.credentials.webhookSecretHash || '';
 }
 
 // List all transactions (V4 API)

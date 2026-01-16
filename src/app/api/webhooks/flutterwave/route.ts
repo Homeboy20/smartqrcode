@@ -4,6 +4,7 @@ import { verifyFlutterwaveSignature } from '@/lib/webhook-verification';
 import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
 import { createErrorResponse, handleApiError, logError } from '@/lib/api-response';
 import { getCredential } from '@/lib/credentials';
+import { getFlutterwaveWebhookSecret } from '@/lib/flutterwave';
 
 // Initialize Supabase admin client
 const supabaseAdmin = createClient(
@@ -46,11 +47,17 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('VALIDATION_ERROR', 'Missing signature', 400);
     }
 
-    const secretHash =
-      (await getCredential('FLW_SECRET_HASH')) ||
-      (await getCredential('FLUTTERWAVE_WEBHOOK_SECRET_HASH')) ||
-      (await getCredential('FLUTTERWAVE_SECRET_HASH')) ||
-      '';
+    // Try to get webhook secret from payment_settings first
+    let secretHash = await getFlutterwaveWebhookSecret();
+
+    // Fallback to old credential store if not found in payment_settings
+    if (!secretHash) {
+      secretHash =
+        (await getCredential('FLW_SECRET_HASH')) ||
+        (await getCredential('FLUTTERWAVE_WEBHOOK_SECRET_HASH')) ||
+        (await getCredential('FLUTTERWAVE_SECRET_HASH')) ||
+        '';
+    }
 
     if (!secretHash) {
       logError('flutterwave-webhook', new Error('Missing Flutterwave webhook secret hash'), {
