@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import AdminHeader from './AdminHeader';
 import AdminSidebar from './AdminSidebar';
@@ -12,11 +12,21 @@ interface AdminLayoutProps {
 }
 
 function AdminLayoutContent({ children }: AdminLayoutProps) {
-  const { user, loading, adminLoading, isAdmin } = useSupabaseAuth();
+  const { user, loading, adminLoading, isAdmin, logout } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const isPublic = searchParams?.get('public') === 'true';
   const router = useRouter();
   const pathname = usePathname();
+  const [showStuckHint, setShowStuckHint] = useState(false);
+
+  useEffect(() => {
+    if (!(loading || adminLoading)) {
+      setShowStuckHint(false);
+      return;
+    }
+    const t = setTimeout(() => setShowStuckHint(true), 10_000);
+    return () => clearTimeout(t);
+  }, [loading, adminLoading]);
 
   useEffect(() => {
     // If public mode is enabled, bypass admin check
@@ -36,7 +46,60 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   // Show loading state while checking auth
   if (loading || adminLoading) {
     return (
-      <div className="min-h-screen bg-gray-50" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <svg
+              className="h-5 w-5 animate-spin text-indigo-600"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+            <div>
+              <div className="text-sm font-medium text-gray-900">Loading admin…</div>
+              <div className="text-xs text-gray-600">Checking your session and permissions.</div>
+            </div>
+          </div>
+
+          {showStuckHint && (
+            <div className="mt-4 text-sm text-gray-700">
+              <div className="mb-3">
+                This is taking longer than expected. If you just switched tabs, your browser may have paused network activity.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+                >
+                  Reload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.refresh()}
+                  className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -44,7 +107,20 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   // Avoid flashing "Access Denied" while the redirect happens.
   if (!user && !isPublic) {
     return (
-      <div className="min-h-screen bg-gray-50" />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm text-center">
+          <div className="text-sm font-medium text-gray-900">Redirecting to login…</div>
+          <div className="mt-1 text-xs text-gray-600">If this doesn’t happen automatically, use the button below.</div>
+          <div className="mt-4">
+            <Link
+              href={`/admin-login?returnTo=${encodeURIComponent(pathname || '/admin')}`}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+            >
+              Go to Admin Login
+            </Link>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -86,6 +162,43 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
           <p className="mt-2 text-center text-sm text-gray-600">
             You do not have permission to access the admin panel.
           </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 text-left">
+          <div className="text-sm text-gray-700">
+            If you believe this is a mistake (or you just switched tabs), try retrying the permission check.
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Reload
+            </button>
+            <Link
+              href={`/admin-login?returnTo=${encodeURIComponent(pathname || '/admin')}`}
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Go to Admin Login
+            </Link>
+            {user && (
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="inline-flex items-center justify-center rounded-md bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700"
+              >
+                Sign out
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

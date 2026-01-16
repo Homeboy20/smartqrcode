@@ -4,6 +4,25 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timed out after ${ms}ms: ${label}`));
+    }, ms);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 // Define the shape of the context
 interface SupabaseAuthContextType {
   user: User | null;
@@ -51,50 +70,103 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Listen for auth state changes
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+  const applySessionState = async (nextSession: Session | null) => {
+    setSession(nextSession);
+    setUser(nextSession?.user ?? null);
 
-      if (session?.user) {
-        setAdminLoading(true);
-        try {
-          await checkAdminStatus(session.user.id);
-        } finally {
-          setAdminLoading(false);
-        }
-      } else {
-        setIsAdmin(false);
+    if (nextSession?.user) {
+      setAdminLoading(true);
+      try {
+        await checkAdminStatus(nextSession.user.id);
+      } finally {
         setAdminLoading(false);
       }
+    } else {
+      setIsAdmin(false);
+      setAdminLoading(false);
+    }
+  };
 
-      setLoading(false);
-    });
+  // Listen for auth state changes
+  useEffect(() => {
+    let disposed = false;
+
+    const init = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.getSession(),
+          10_000,
+          'supabase.auth.getSession()'
+        );
+        if (disposed) return;
+        if (error) throw error;
+        await applySessionState(data.session);
+      } catch (err) {
+        console.error('Failed to initialize auth session:', err);
+        if (disposed) return;
+        setSession(null);
+        setUser(null);
+        setIsAdmin(false);
+        setAdminLoading(false);
+      } finally {
+        if (!disposed) setLoading(false);
+      }
+    };
+
+    init();
 
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setLoading(true);
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setAdminLoading(true);
-          try {
-            await checkAdminStatus(session.user.id);
-          } finally {
-            setAdminLoading(false);
-          }
-        } else {
+        try {
+          // Note: ignore the event for state; session is source of truth here.
+          await applySessionState(session);
+        } catch (err) {
+          console.error('Auth state change handler failed:', { event, err });
+          setSession(null);
+          setUser(null);
           setIsAdmin(false);
           setAdminLoading(false);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    const refreshOnResume = async () => {
+      if (disposed) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      setLoading(true);
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.getSession(),
+          10_000,
+          'supabase.auth.getSession() (resume)'
+        );
+        if (disposed) return;
+        if (error) throw error;
+        await applySessionState(data.session);
+      } catch (err) {
+        console.warn('Auth resume refresh failed:', err);
+        if (disposed) return;
+        // Keep current state if refresh fails; avoid forcing logout on transient issues.
+      } finally {
+        if (!disposed) setLoading(false);
+      }
+    };
+
+    window.addEventListener('focus', refreshOnResume);
+    document.addEventListener('visibilitychange', refreshOnResume);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('focus', refreshOnResume);
+      document.removeEventListener('visibilitychange', refreshOnResume);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Check if user is admin
@@ -102,27 +174,43 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // Best-effort: ensure the public.users row exists.
       // This avoids noisy 406s from PostgREST when a row is missing.
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await withTimeout(
+        supabase.auth.getSession(),
+        10_000,
+        'supabase.auth.getSession() (admin check)'
+      );
       const accessToken = sessionData.session?.access_token;
 
       if (accessToken) {
         try {
-          await fetch('/api/auth/ensure-user', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          });
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6_000);
+          try {
+            await fetch('/api/auth/ensure-user', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
         } catch {
           // ignore
         }
       }
 
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .maybeSingle();
+      const result = await withTimeout<any>(
+        supabase
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle(),
+        10_000,
+        'supabase.from(users).select(role)'
+      );
+      const { data, error } = result as { data: { role?: string } | null; error: any };
 
       if (error) {
         setIsAdmin(false);
