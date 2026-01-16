@@ -6,7 +6,19 @@ import { decryptString, isEncryptedPayload } from '@/lib/secure/credentialCrypto
 // GET - Debug payment settings encryption/decryption
 export async function GET(request: NextRequest) {
   try {
-    await verifyAdminAccess(request);
+    // Verify admin access (works with cookie-based session)
+    try {
+      await verifyAdminAccess(request);
+    } catch (authError: any) {
+      return NextResponse.json(
+        { 
+          error: 'Admin authentication required', 
+          message: 'Please visit this URL while logged in to the admin panel',
+          hint: 'Open /admin/payment-settings in another tab, then try this URL again'
+        }, 
+        { status: 401 }
+      );
+    }
 
     const supabase = createServerClient();
     if (!supabase) {
