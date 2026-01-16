@@ -17,7 +17,7 @@ type StoredCredentials = Record<string, unknown> | null;
 const SECRET_FIELDS: Record<PaymentProvider, string[]> = {
   stripe: ['secretKey', 'webhookSecret'],
   paypal: ['clientSecret'],
-  flutterwave: ['clientSecret', 'encryptionKey'],
+  flutterwave: ['clientSecret', 'encryptionKey', 'webhookSecretHash'],
   paystack: ['secretKey'],
 };
 

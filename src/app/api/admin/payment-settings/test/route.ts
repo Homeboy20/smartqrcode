@@ -1,47 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
-import { isMaskedValue } from '@/lib/secure/credentialCrypto';
-
-function mergeWithEnvFallback(provider: PaymentProvider, credentials: Record<string, string>) {
-  const merged: Record<string, string> = { ...credentials };
-
-  const setIfMissing = (field: string, envKey: string) => {
-    const current = merged[field];
-    const isMissing =
-      !current ||
-      (typeof current === 'string' && current.trim().length === 0) ||
-      isMaskedValue(current);
-    if (!isMissing) return;
-
-    const envValue = process.env[envKey];
-    if (typeof envValue === 'string' && envValue.trim().length > 0) {
-      merged[field] = envValue;
-    }
-  };
-
-  switch (provider) {
-    case 'stripe':
-      setIfMissing('secretKey', 'STRIPE_SECRET_KEY');
-      setIfMissing('webhookSecret', 'STRIPE_WEBHOOK_SECRET');
-      break;
-    case 'paypal':
-      setIfMissing('clientId', 'PAYPAL_CLIENT_ID');
-      setIfMissing('clientSecret', 'PAYPAL_CLIENT_SECRET');
-      break;
-    case 'flutterwave':
-      setIfMissing('clientId', 'FLUTTERWAVE_CLIENT_ID');
-      setIfMissing('clientSecret', 'FLUTTERWAVE_CLIENT_SECRET');
-      setIfMissing('encryptionKey', 'FLUTTERWAVE_ENCRYPTION_KEY');
-      break;
-    case 'paystack':
-      setIfMissing('publicKey', 'PAYSTACK_PUBLIC_KEY');
-      setIfMissing('secretKey', 'PAYSTACK_SECRET_KEY');
-      break;
-  }
-
-  return merged;
-}
 
 // POST - Test payment provider connection
 export async function POST(request: NextRequest) {
@@ -71,7 +30,7 @@ export async function POST(request: NextRequest) {
         ? String((runtime as any).decryptError)
         : null;
 
-    const credentials = mergeWithEnvFallback(provider, runtime.credentials || {});
+    const credentials = runtime.credentials || {};
     if (isDev) {
       console.log(`Testing ${provider} with credential keys:`, Object.keys(credentials || {}));
     }
@@ -99,33 +58,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!testResult.success) {
-      // If stored credentials can't be decrypted and env fallback isn't present,
-      // surface a clearer remediation message.
-      if (decryptError && /required/i.test(testResult.message || '')) {
+      if (decryptError) {
         return NextResponse.json(
           {
             error:
               `Stored payment credentials could not be decrypted. ${decryptError} ` +
-              'Ensure CREDENTIALS_ENCRYPTION_KEY is set (and unchanged) on the server, or set provider credentials via environment variables.',
+              'Ensure CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server and matches the key used to encrypt the stored credentials.',
           },
           { status: 500 }
         );
       }
-
       return NextResponse.json(
         { error: testResult.message },
         { status: 400 }
       );
-    }
-
-    if (decryptError) {
-      return NextResponse.json({
-        success: true,
-        message: testResult.message,
-        warning:
-          `Stored payment credentials could not be decrypted. ${decryptError} ` +
-          'Using environment-variable fallback credentials for this test.',
-      });
     }
 
     return NextResponse.json({ success: true, message: testResult.message });

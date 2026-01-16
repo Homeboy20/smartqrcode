@@ -23,6 +23,10 @@ const CREDENTIAL_MAP: Record<string, { provider: PaymentProvider; field: string 
   FLUTTERWAVE_CLIENT_ID: { provider: 'flutterwave', field: 'clientId' },
   FLUTTERWAVE_CLIENT_SECRET: { provider: 'flutterwave', field: 'clientSecret' },
   FLUTTERWAVE_ENCRYPTION_KEY: { provider: 'flutterwave', field: 'encryptionKey' },
+  // Webhook signature secret hash (Flutterwave dashboard)
+  FLW_SECRET_HASH: { provider: 'flutterwave', field: 'webhookSecretHash' },
+  FLUTTERWAVE_WEBHOOK_SECRET_HASH: { provider: 'flutterwave', field: 'webhookSecretHash' },
+  FLUTTERWAVE_SECRET_HASH: { provider: 'flutterwave', field: 'webhookSecretHash' },
   
   // Paystack
   PAYSTACK_PUBLIC_KEY: { provider: 'paystack', field: 'publicKey' },
@@ -33,23 +37,28 @@ const CREDENTIAL_MAP: Record<string, { provider: PaymentProvider; field: string 
 };
 
 /**
- * Get a credential from either environment variables or payment settings storage
+ * Get a credential.
+ *
+ * Payment credentials (Stripe/PayPal/Flutterwave/Paystack) are sourced ONLY from
+ * the `payment_settings` table managed via `/admin/payment-settings`.
+ *
+ * Non-payment credentials may still come from environment variables.
  * @param key The credential key to retrieve (e.g., 'STRIPE_SECRET_KEY')
  * @returns The credential value or null if not found
  */
 export async function getCredential(key: string): Promise<string | null> {
   try {
-    // First check environment variables
-    if (process.env[key]) {
-      return process.env[key] as string;
-    }
-    
-    // Check if this is a payment provider credential
+    // Payment provider credentials: DB-only (no env fallback)
     const mapping = CREDENTIAL_MAP[key];
     if (mapping) {
       const config = await getProviderRuntimeConfig(mapping.provider);
       const value = config.credentials[mapping.field];
       return typeof value === 'string' ? value : null;
+    }
+
+    // Non-payment credentials: env-only
+    if (process.env[key]) {
+      return process.env[key] as string;
     }
     
     return null;

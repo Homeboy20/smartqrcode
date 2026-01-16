@@ -2,7 +2,6 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { hasCredential } from '@/lib/credentials';
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
 import { createPaystackCustomer, initializeSubscriptionPayment } from '@/lib/paystack';
 import {
@@ -71,8 +70,8 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
     async createSession({ input, amount, reference, userId }) {
       const paystackRuntime = await getProviderRuntimeConfig('paystack');
       const paystackPlanCodes: Record<CheckoutPlanId, string> = {
-        pro: paystackRuntime.credentials.planCodePro || process.env.PAYSTACK_PLAN_CODE_PRO || '',
-        business: paystackRuntime.credentials.planCodeBusiness || process.env.PAYSTACK_PLAN_CODE_BUSINESS || '',
+        pro: paystackRuntime.credentials.planCodePro || '',
+        business: paystackRuntime.credentials.planCodeBusiness || '',
       };
 
       const planCode = paystackPlanCodes[input.planId];
@@ -223,23 +222,16 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
     if (!Boolean((runtime as any).isActive)) return false;
 
     // Also require that the provider has the minimum required credentials.
-    // If stored secrets are encrypted but CREDENTIALS_ENCRYPTION_KEY is missing,
-    // runtime.credentials may be empty; env vars can still satisfy these.
     if (provider === 'paystack') {
-      const secretKey =
-        (runtime as any)?.credentials?.secretKey || process.env.PAYSTACK_SECRET_KEY || '';
-      const pro =
-        (runtime as any)?.credentials?.planCodePro || process.env.PAYSTACK_PLAN_CODE_PRO || '';
-      const business =
-        (runtime as any)?.credentials?.planCodeBusiness ||
-        process.env.PAYSTACK_PLAN_CODE_BUSINESS ||
-        '';
+      const secretKey = (runtime as any)?.credentials?.secretKey || '';
+      const pro = (runtime as any)?.credentials?.planCodePro || '';
+      const business = (runtime as any)?.credentials?.planCodeBusiness || '';
       return Boolean(secretKey && pro && business);
     }
 
     if (provider === 'flutterwave') {
-      const clientId = (runtime as any)?.credentials?.clientId || process.env.FLUTTERWAVE_CLIENT_ID || '';
-      const clientSecret = (runtime as any)?.credentials?.clientSecret || process.env.FLUTTERWAVE_CLIENT_SECRET || '';
+      const clientId = (runtime as any)?.credentials?.clientId || '';
+      const clientSecret = (runtime as any)?.credentials?.clientSecret || '';
       return Boolean(clientId && clientSecret);
     }
 
@@ -247,20 +239,7 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
     return false;
   }
 
-  // Env-only fallback for legacy deployments (no row exists):
-  if (provider === 'paystack') {
-    const hasSecret = await hasCredential('PAYSTACK_SECRET_KEY');
-    const hasPro = await hasCredential('PAYSTACK_PLAN_CODE_PRO');
-    const hasBusiness = await hasCredential('PAYSTACK_PLAN_CODE_BUSINESS');
-    return hasSecret && hasPro && hasBusiness;
-  }
-
-  if (provider === 'flutterwave') {
-    const hasClientId = await hasCredential('FLUTTERWAVE_CLIENT_ID');
-    const hasSecret = await hasCredential('FLUTTERWAVE_CLIENT_SECRET');
-    return hasClientId && hasSecret;
-  }
-
+  // DB-only requirement: if no row exists, provider is not enabled.
   return false;
 }
 

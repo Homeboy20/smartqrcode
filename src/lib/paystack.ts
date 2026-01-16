@@ -1,4 +1,3 @@
-import { getCredential } from '@/lib/credentials';
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 
 // Paystack API base URLs
@@ -117,21 +116,19 @@ class PaystackClient {
 
 // Initialize Paystack client
 let paystackClient: PaystackClient | null = null;
+let paystackClientSecretKey: string | null = null;
 
 export async function getPaystackClient() {
   const runtime = await getProviderRuntimeConfig('paystack');
-  const secretKey =
-    runtime.credentials.secretKey ||
-    (await getCredential('PAYSTACK_SECRET_KEY')) ||
-    (await getCredential('PAYSTACK_SECRET_KEY'.toUpperCase()));
+  const secretKey = runtime.credentials.secretKey || '';
   
   if (!secretKey) {
-    console.warn('Missing PAYSTACK_SECRET_KEY');
     throw new Error('Paystack API key not configured');
   }
   
-  if (!paystackClient) {
+  if (!paystackClient || paystackClientSecretKey !== secretKey) {
     paystackClient = new PaystackClient(secretKey);
+    paystackClientSecretKey = secretKey;
   }
   
   return paystackClient;
@@ -140,11 +137,7 @@ export async function getPaystackClient() {
 // Get public key for client-side use
 export async function getPaystackPublicKey() {
   const runtime = await getProviderRuntimeConfig('paystack');
-  return (
-    runtime.credentials.publicKey ||
-    (await getCredential('NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY')) ||
-    (await getCredential('PAYSTACK_PUBLIC_KEY'))
-  );
+  return runtime.credentials.publicKey || null;
 }
 
 // Initialize transaction for subscription

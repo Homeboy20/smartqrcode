@@ -1,7 +1,6 @@
 // Flutterwave V4 API Integration
 // Documentation: https://developer.flutterwave.com/reference
 
-import { getCredential } from '@/lib/credentials';
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 
 const FLUTTERWAVE_V4_BASE_URL = 'https://api.flutterwave.com/v4';
@@ -51,9 +50,9 @@ export interface FlutterwavePayment {
 // Get Flutterwave credentials
 async function getFlutterwaveCredentials() {
   const runtime = await getProviderRuntimeConfig('flutterwave');
-  const clientId = runtime.credentials.clientId || (await getCredential('FLUTTERWAVE_CLIENT_ID'));
-  const clientSecret = runtime.credentials.clientSecret || (await getCredential('FLUTTERWAVE_CLIENT_SECRET'));
-  const encryptionKey = runtime.credentials.encryptionKey || (await getCredential('FLUTTERWAVE_ENCRYPTION_KEY'));
+  const clientId = runtime.credentials.clientId || '';
+  const clientSecret = runtime.credentials.clientSecret || '';
+  const encryptionKey = runtime.credentials.encryptionKey || '';
   
   if (!clientId || !clientSecret) {
     throw new Error('Flutterwave credentials not configured');

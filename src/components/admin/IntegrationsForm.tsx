@@ -5,8 +5,8 @@ import { useAuth } from '@/context/FirebaseAuthContext';
 
 // Define types for integration settings
 interface FlutterwaveSettings {
-  publicKey: string;
-  secretKey: string;
+  clientId: string;
+  clientSecret: string;
   encryptionKey: string;
 }
 
@@ -46,7 +46,7 @@ type ActiveTab = 'flutterwave' | 'paypal' | 'stripe' | 'paystack' | 'googlePay';
 type ProviderStatus = Record<Exclude<ActiveTab, 'googlePay'>, boolean>;
 
 const emptySettings: IntegrationSettings = {
-  flutterwave: { publicKey: '', secretKey: '', encryptionKey: '' },
+  flutterwave: { clientId: '', clientSecret: '', encryptionKey: '' },
   paypal: { clientId: '', clientSecret: '' },
   stripe: { publicKey: '', secretKey: '', webhookSecret: '' },
   paystack: { publicKey: '', secretKey: '', planCodePro: '', planCodeBusiness: '' },
@@ -201,12 +201,12 @@ export default function IntegrationsForm() {
               Enabled
             </label>
             <div>
-              <label htmlFor="fwPublicKey" className={labelStyle}>Public Key</label>
-              <input type="text" id="fwPublicKey" name="publicKey" value={settings.flutterwave.publicKey} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="FLWPUBK..." />
+              <label htmlFor="fwClientId" className={labelStyle}>Public Key</label>
+              <input type="text" id="fwClientId" name="clientId" value={settings.flutterwave.clientId} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="FLWPUBK..." />
             </div>
             <div>
-              <label htmlFor="fwSecretKey" className={labelStyle}>Secret Key</label>
-              <input type="password" id="fwSecretKey" name="secretKey" value={settings.flutterwave.secretKey} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="FLWSECK..." />
+              <label htmlFor="fwClientSecret" className={labelStyle}>Secret Key</label>
+              <input type="password" id="fwClientSecret" name="clientSecret" value={settings.flutterwave.clientSecret} onChange={(e) => handleInputChange('flutterwave', e)} className={inputStyle} placeholder="FLWSECK..." />
             </div>
             <div>
               <label htmlFor="fwEncryptionKey" className={labelStyle}>Encryption Key</label>
