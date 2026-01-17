@@ -69,10 +69,12 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [adminLoading, setAdminLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number>(0);
 
   const applySessionState = async (nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
+    setLastRefresh(Date.now());
 
     if (nextSession?.user) {
       setAdminLoading(true);
@@ -139,11 +141,18 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (disposed) return;
       if (typeof document !== 'undefined' && document.hidden) return;
 
-      setLoading(true);
+      // Skip refresh if session was validated recently (< 5 minutes ago)
+      const now = Date.now();
+      const timeSinceLastRefresh = now - lastRefresh;
+      if (timeSinceLastRefresh < 5 * 60 * 1000) {
+        return;
+      }
+
+      // Refresh in background without blocking UI
       try {
         const { data, error } = await withTimeout(
           supabase.auth.getSession(),
-          10_000,
+          5_000,
           'supabase.auth.getSession() (resume)'
         );
         if (disposed) return;
@@ -153,8 +162,6 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.warn('Auth resume refresh failed:', err);
         if (disposed) return;
         // Keep current state if refresh fails; avoid forcing logout on transient issues.
-      } finally {
-        if (!disposed) setLoading(false);
       }
     };
 
