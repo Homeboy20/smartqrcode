@@ -73,50 +73,60 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const lastRefreshRef = React.useRef<number>(0);
 
   // Check if user is admin
-  const checkAdminStatus = React.useCallback(async (userId: string, accessToken?: string) => {
+  const checkAdminStatus = React.useCallback(async (_userId: string, accessToken?: string) => {
+    if (!accessToken) {
+      setIsAdmin(false);
+      return;
+    }
+
+    // Best-effort: ensure the public.users row exists.
+    // This avoids noisy 406s from PostgREST when a row is missing.
     try {
-      // Best-effort: ensure the public.users row exists.
-      // This avoids noisy 406s from PostgREST when a row is missing.
-      if (accessToken) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 6_000);
-          try {
-            await fetch('/api/auth/ensure-user', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-              signal: controller.signal,
-            });
-          } finally {
-            clearTimeout(timer);
-          }
-        } catch {
-          // ignore
-        }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6_000);
+      try {
+        await fetch('/api/auth/ensure-user', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
       }
+    } catch {
+      // ignore
+    }
 
-      const result = await withTimeout<any>(
-        supabase
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle(),
-        10_000,
-        'supabase.from(users).select(role)'
+    // Use a server-side check (service role) so client RLS cannot cause false negatives.
+    try {
+      const response = await withTimeout(
+        fetch('/api/admin/auth-status', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }),
+        7_000,
+        'GET /api/admin/auth-status'
       );
-      const { data, error } = result as { data: { role?: string } | null; error: any };
 
-      if (error) {
-        setIsAdmin(false);
+      const body = await response.json().catch(() => ({} as any));
+
+      if (response.ok) {
+        setIsAdmin(Boolean(body?.isAdmin));
         return;
       }
 
-      setIsAdmin(data?.role === 'admin');
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
+      // Only treat explicit auth failures as non-admin.
+      if (response.status === 401 || response.status === 403) {
+        setIsAdmin(false);
+      }
+      // For other failures (5xx, network), keep existing `isAdmin` to avoid lockouts.
+    } catch (err) {
+      console.warn('Admin status check failed:', err);
+      // Keep existing `isAdmin` on transient errors.
     }
   }, []);
 

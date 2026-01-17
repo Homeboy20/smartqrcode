@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export default function AdminLogin() {
   const router = useRouter();
-  const { user, loading } = useSupabaseAuth();
+  const { user, session, loading } = useSupabaseAuth();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo') || '/admin';
   
@@ -27,19 +27,27 @@ export default function AdminLogin() {
     
     if (user) {
       // Check if user is admin
-      checkAdminStatus(user.id);
+      checkAdminStatus(session?.access_token);
     }
-  }, [loading, user, router, returnTo]);
+  }, [loading, user, session, router, returnTo]);
 
-  const checkAdminStatus = async (userId: string) => {
+  const checkAdminStatus = async (accessToken?: string | null) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', userId)
-        .single();
+      if (!accessToken) {
+        setError('Authentication required. Please sign in again.');
+        return;
+      }
 
-      if (!error && data?.role === 'admin') {
+      const response = await fetch('/api/admin/auth-status', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      const data = await response.json().catch(() => ({} as any));
+
+      if (response.ok && data?.isAdmin) {
         router.push(returnTo);
       } else {
         setError('Your account does not have administrator privileges.');
@@ -66,14 +74,22 @@ export default function AdminLogin() {
       }
 
       if (data.user) {
-        // Check admin status
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single();
+        // Check admin status via server-side verification
+        const accessToken = data.session?.access_token;
+        if (!accessToken) {
+          setError('Authentication required. Please sign in again.');
+          await supabase.auth.signOut();
+          return;
+        }
+        const response = await fetch('/api/admin/auth-status', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const authData = await response.json().catch(() => ({} as any));
 
-        if (userError || userData?.role !== 'admin') {
+        if (!response.ok || !authData?.isAdmin) {
           setError('Your account does not have administrator privileges.');
           await supabase.auth.signOut();
         } else {
