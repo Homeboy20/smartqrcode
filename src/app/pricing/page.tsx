@@ -175,13 +175,26 @@ export default function PricingPage() {
         body: JSON.stringify(checkoutData),
       });
 
+      const contentType = response.headers.get('content-type') || '';
       const raw = await response.text();
+      const isJson = contentType.includes('application/json');
       let data: any = null;
-      try {
-        data = raw ? JSON.parse(raw) : null;
-      } catch {
-        // If server returned non-JSON (e.g., plain text stack), surface it.
-        throw new Error(raw || 'Failed to create checkout session');
+
+      if (raw && isJson) {
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          // JSON header but invalid body
+          throw new Error(`Invalid JSON from checkout API (status ${response.status}).`);
+        }
+      }
+
+      if (!isJson) {
+        const snippet = (raw || '').slice(0, 200);
+        throw new Error(
+          `Checkout API returned non-JSON (status ${response.status}). ` +
+            (snippet ? `Response: ${snippet}` : 'Empty response')
+        );
       }
       
       if (!response.ok) {

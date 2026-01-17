@@ -23,7 +23,9 @@ const nextConfig = {
       },
     ],
   },
-  trailingSlash: true,
+  // Trailing-slash redirects can break POST /api/* on some hosts (e.g., Netlify)
+  // by redirecting to a path that isn't routed for functions.
+  trailingSlash: false,
   assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
   experimental: {
     appDocumentPreloading: false,

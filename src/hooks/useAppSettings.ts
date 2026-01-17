@@ -118,9 +118,8 @@ async function fetchSettingsShared() {
       const isDev = process.env.NODE_ENV === 'development';
       if (isDev) console.log('useAppSettings: Fetching from API...');
 
-      // trailingSlash is enabled in next.config.js, so use the canonical URL
-      // to avoid extra redirect requests.
-      const response = await fetch('/api/app-settings/', {
+      // Use the non-slashed API path. Trailing-slash redirects can break POST/GET routing on some hosts.
+      const response = await fetch('/api/app-settings', {
         cache: 'no-store',
       });
 
