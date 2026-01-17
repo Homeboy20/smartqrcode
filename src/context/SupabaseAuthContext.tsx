@@ -70,11 +70,62 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
+  const lastRefreshRef = React.useRef<number>(0);
 
-  const applySessionState = async (nextSession: Session | null) => {
+  // Check if user is admin
+  const checkAdminStatus = React.useCallback(async (userId: string, accessToken?: string) => {
+    try {
+      // Best-effort: ensure the public.users row exists.
+      // This avoids noisy 406s from PostgREST when a row is missing.
+      if (accessToken) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6_000);
+          try {
+            await fetch('/api/auth/ensure-user', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const result = await withTimeout<any>(
+        supabase
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle(),
+        10_000,
+        'supabase.from(users).select(role)'
+      );
+      const { data, error } = result as { data: { role?: string } | null; error: any };
+
+      if (error) {
+        setIsAdmin(false);
+        return;
+      }
+
+      setIsAdmin(data?.role === 'admin');
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    }
+  }, []);
+
+  const applySessionState = React.useCallback(async (nextSession: Session | null) => {
     setSession(nextSession);
     setUser(nextSession?.user ?? null);
-    setLastRefresh(Date.now());
+    const now = Date.now();
+    setLastRefresh(now);
+    lastRefreshRef.current = now;
 
     if (nextSession?.user) {
       setAdminLoading(true);
@@ -87,7 +138,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsAdmin(false);
       setAdminLoading(false);
     }
-  };
+  }, [checkAdminStatus]);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -142,8 +193,9 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (typeof document !== 'undefined' && document.hidden) return;
 
       // Skip refresh if session was validated recently (< 5 minutes ago)
+      // Use ref to avoid stale closure
       const now = Date.now();
-      const timeSinceLastRefresh = now - lastRefresh;
+      const timeSinceLastRefresh = now - lastRefreshRef.current;
       if (timeSinceLastRefresh < 5 * 60 * 1000) {
         return;
       }
@@ -174,55 +226,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       document.removeEventListener('visibilitychange', refreshOnResume);
       subscription.unsubscribe();
     };
-  }, []);
-
-  // Check if user is admin
-  const checkAdminStatus = async (userId: string, accessToken?: string) => {
-    try {
-      // Best-effort: ensure the public.users row exists.
-      // This avoids noisy 406s from PostgREST when a row is missing.
-      if (accessToken) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 6_000);
-          try {
-            await fetch('/api/auth/ensure-user', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-              },
-              signal: controller.signal,
-            });
-          } finally {
-            clearTimeout(timer);
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      const result = await withTimeout<any>(
-        supabase
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle(),
-        10_000,
-        'supabase.from(users).select(role)'
-      );
-      const { data, error } = result as { data: { role?: string } | null; error: any };
-
-      if (error) {
-        setIsAdmin(false);
-        return;
-      }
-
-      setIsAdmin(data?.role === 'admin');
-    } catch (err) {
-      console.error('Error checking admin status:', err);
-      setIsAdmin(false);
-    }
-  };
+  }, [applySessionState]);
 
   // Clear any error
   const clearError = () => setError(null);
