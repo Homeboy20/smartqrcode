@@ -3,6 +3,28 @@ import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 // Paystack API base URLs
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
+// Get Paystack credentials with error handling
+async function getPaystackCredentials() {
+  const runtime = await getProviderRuntimeConfig('paystack');
+  
+  // Check for decryption errors first
+  if ('decryptError' in runtime && (runtime as any).decryptError) {
+    throw new Error(
+      `Paystack credentials could not be decrypted: ${(runtime as any).decryptError}. ` +
+      'Please check that CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server.'
+    );
+  }
+  
+  const secretKey = runtime.credentials.secretKey || '';
+  const publicKey = runtime.credentials.publicKey || '';
+  
+  if (!secretKey) {
+    throw new Error('Paystack credentials not configured');
+  }
+  
+  return { secretKey, publicKey };
+}
+
 // Paystack API client
 class PaystackClient {
   private secretKey: string;
@@ -120,6 +142,15 @@ let paystackClientSecretKey: string | null = null;
 
 export async function getPaystackClient() {
   const runtime = await getProviderRuntimeConfig('paystack');
+  
+  // Check for decryption errors first
+  if ('decryptError' in runtime && (runtime as any).decryptError) {
+    throw new Error(
+      `Paystack credentials could not be decrypted: ${(runtime as any).decryptError}. ` +
+      'Please check that CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server.'
+    );
+  }
+  
   const secretKey = runtime.credentials.secretKey || '';
   
   if (!secretKey) {

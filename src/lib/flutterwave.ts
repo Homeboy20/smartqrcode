@@ -50,6 +50,15 @@ export interface FlutterwavePayment {
 // Get Flutterwave credentials
 async function getFlutterwaveCredentials() {
   const runtime = await getProviderRuntimeConfig('flutterwave');
+  
+  // Check for decryption errors first
+  if ('decryptError' in runtime && (runtime as any).decryptError) {
+    throw new Error(
+      `Flutterwave credentials could not be decrypted: ${(runtime as any).decryptError}. ` +
+      'Please check that CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server.'
+    );
+  }
+  
   const clientId = runtime.credentials.clientId || '';
   const clientSecret = runtime.credentials.clientSecret || '';
   const encryptionKey = runtime.credentials.encryptionKey || '';
