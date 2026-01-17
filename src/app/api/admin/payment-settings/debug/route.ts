@@ -89,6 +89,56 @@ export async function GET(request: NextRequest) {
       debug.fieldDetails[field] = fieldDebug;
     }
 
+    // If clientSecret was decrypted successfully, test it
+    if (debug.fieldDetails.clientSecret?.decryptionSuccess) {
+      try {
+        const clientSecret = decryptString((credentials as any).clientSecret);
+        debug.clientSecretValidation = {
+          format: clientSecret.startsWith('FLWSECK-') || clientSecret.startsWith('FLWSECK_TEST-') 
+            ? 'Valid format' 
+            : 'Invalid format (should start with FLWSECK- or FLWSECK_TEST-)',
+          length: clientSecret.length,
+          isTestKey: clientSecret.startsWith('FLWSECK_TEST-'),
+          isLiveKey: clientSecret.startsWith('FLWSECK-') && !clientSecret.startsWith('FLWSECK_TEST-'),
+        };
+
+        // Test the actual API call
+        debug.apiTest = {
+          testing: true,
+          endpoint: 'https://api.flutterwave.com/v3/balances'
+        };
+
+        const testResponse = await fetch('https://api.flutterwave.com/v3/balances', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${clientSecret}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        debug.apiTest.statusCode = testResponse.status;
+        debug.apiTest.statusText = testResponse.statusText;
+        debug.apiTest.success = testResponse.ok;
+
+        if (!testResponse.ok) {
+          const responseData = await testResponse.json().catch(() => ({}));
+          debug.apiTest.errorResponse = responseData;
+          debug.apiTest.diagnosis = testResponse.status === 401 
+            ? 'Secret key is invalid or expired - please verify from Flutterwave dashboard'
+            : testResponse.status === 403
+            ? 'Secret key lacks required permissions'
+            : `Unexpected error: ${testResponse.status}`;
+        } else {
+          debug.apiTest.diagnosis = 'Secret key is valid and working!';
+        }
+      } catch (e: any) {
+        debug.apiTest = {
+          error: e.message,
+          diagnosis: 'Failed to test API connection'
+        };
+      }
+    }
+
     return NextResponse.json(debug);
   } catch (error: any) {
     console.error('Error in debug endpoint:', error);
