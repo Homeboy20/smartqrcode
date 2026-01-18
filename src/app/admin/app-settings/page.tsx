@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { SUBSCRIPTION_PRICING, type PricingTier, type CurrencyCode } from '@/lib/currency';
 
 interface AppSettings {
   freeMode: boolean;
@@ -27,6 +28,8 @@ interface AppSettings {
     phoneAuthEnabled?: boolean;
     recaptchaSiteKey?: string;
   };
+
+  pricing?: Record<'pro' | 'business', PricingTier>;
 }
 
 export default function AppSettingsPage() {
@@ -64,6 +67,7 @@ export default function AppSettingsPage() {
       phoneAuthEnabled: false,
       recaptchaSiteKey: '',
     },
+    pricing: SUBSCRIPTION_PRICING,
   });
 
   // Fetch existing app settings
@@ -88,7 +92,40 @@ export default function AppSettingsPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.settings) {
-            setSettings(data.settings);
+            setSettings((prev) => {
+              const incoming = data.settings as Partial<AppSettings>;
+              return {
+                ...prev,
+                ...incoming,
+                freeModeFeatures: {
+                  ...prev.freeModeFeatures,
+                  ...(incoming.freeModeFeatures ?? {}),
+                },
+                branding: {
+                  ...prev.branding,
+                  ...(incoming.branding ?? {}),
+                },
+                firebase: {
+                  ...(prev.firebase ?? {
+                    enabled: false,
+                    apiKey: '',
+                    authDomain: '',
+                    projectId: '',
+                    storageBucket: '',
+                    messagingSenderId: '',
+                    appId: '',
+                    measurementId: '',
+                    phoneAuthEnabled: false,
+                    recaptchaSiteKey: '',
+                  }),
+                  ...(incoming.firebase ?? {}),
+                },
+                pricing: {
+                  ...(prev.pricing ?? SUBSCRIPTION_PRICING),
+                  ...(incoming.pricing ?? {}),
+                },
+              };
+            });
           }
         }
       } catch (err) {
@@ -813,6 +850,103 @@ export default function AppSettingsPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Subscription Pricing */}
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Subscription Pricing</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Configure monthly pricing per currency. Leaving a local price blank will fall back to the USD base price.
+              </p>
+            </div>
+            <div className="px-4 py-5 sm:p-6">
+              <div className="space-y-6">
+                {(['pro', 'business'] as const).map((tier) => {
+                  const tierPricing = (settings.pricing ?? SUBSCRIPTION_PRICING)[tier];
+                  const localPrices = tierPricing?.localPrices ?? {};
+
+                  const setUsdPrice = (raw: string) => {
+                    const n = raw.trim() === '' ? undefined : Number(raw);
+                    if (n === undefined || !Number.isFinite(n)) return;
+                    setSettings((prev) => ({
+                      ...prev,
+                      pricing: {
+                        ...(prev.pricing ?? SUBSCRIPTION_PRICING),
+                        [tier]: {
+                          ...(prev.pricing ?? SUBSCRIPTION_PRICING)[tier],
+                          usdPrice: n,
+                        },
+                      },
+                    }));
+                  };
+
+                  const setLocalPrice = (currency: CurrencyCode, raw: string) => {
+                    setSettings((prev) => {
+                      const current = (prev.pricing ?? SUBSCRIPTION_PRICING)[tier];
+                      const nextLocalPrices: Record<string, number> = { ...(current.localPrices as any) };
+
+                      if (raw.trim() === '') {
+                        delete nextLocalPrices[currency];
+                      } else {
+                        const n = Number(raw);
+                        if (!Number.isFinite(n)) return prev;
+                        nextLocalPrices[currency] = n;
+                      }
+
+                      return {
+                        ...prev,
+                        pricing: {
+                          ...(prev.pricing ?? SUBSCRIPTION_PRICING),
+                          [tier]: {
+                            ...current,
+                            localPrices: nextLocalPrices as any,
+                          },
+                        },
+                      };
+                    });
+                  };
+
+                  return (
+                    <div key={tier} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-base font-semibold text-gray-900">
+                          {tier === 'pro' ? 'Pro' : 'Business'} (monthly)
+                        </h4>
+                        <div className="text-sm text-gray-500">Defaults: {SUBSCRIPTION_PRICING[tier].usdPrice}</div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">USD base price</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={String(tierPricing?.usdPrice ?? '')}
+                            onChange={(e) => setUsdPrice(e.target.value)}
+                            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          />
+                        </div>
+
+                        {(['NGN', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'] as const).map((ccy) => (
+                          <div key={ccy}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">{ccy} local price (optional)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={localPrices[ccy] === undefined ? '' : String(localPrices[ccy])}
+                              onChange={(e) => setLocalPrice(ccy, e.target.value)}
+                              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                              placeholder="Leave blank to fallback"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Save Button */}

@@ -4,7 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { subscriptionFeatures, type SubscriptionTier } from '@/lib/subscriptions';
+import { AFRICAN_COUNTRIES } from '@/lib/countries/africa';
 
 import {
   getSupportedPaymentMethodsForContext,
@@ -67,6 +69,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, getAccessToken } = useSupabaseAuth();
+  const { settings: appSettings } = useAppSettings();
 
   const selectedPlan = useMemo(
     () => normalizePlan(searchParams.get('plan')),
@@ -219,8 +222,34 @@ export default function CheckoutPage() {
   const planName = selectedPlan === 'pro' ? 'Pro' : 'Business';
   const planFeatures = subscriptionFeatures[selectedPlan];
 
+  const commonBillingCountries = useMemo(
+    () =>
+      [
+        { code: 'GB', name: 'United Kingdom' },
+        { code: 'US', name: 'United States' },
+        { code: 'CA', name: 'Canada' },
+        { code: 'DE', name: 'Germany' },
+        { code: 'FR', name: 'France' },
+        { code: 'ES', name: 'Spain' },
+        { code: 'IT', name: 'Italy' },
+        { code: 'NL', name: 'Netherlands' },
+        { code: 'BR', name: 'Brazil' },
+      ] as const,
+    []
+  );
+
+  const requiresPhoneVerification = Boolean(appSettings?.firebase?.phoneAuthEnabled);
+  const isPhoneVerified = Boolean(
+    (user as any)?.user_metadata?.phone_verified_at || (user as any)?.user_metadata?.phone_number
+  );
+
   async function submitCheckout() {
     setError(null);
+
+    if (requiresPhoneVerification && user && !isPhoneVerified) {
+      setError('Please verify your phone number before checkout.');
+      return;
+    }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -298,6 +327,26 @@ export default function CheckoutPage() {
           {/* Left: form */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+              {requiresPhoneVerification && user && !isPhoneVerified && (
+                <div className="mb-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-yellow-900">Phone verification required</p>
+                      <p className="mt-1 text-sm text-yellow-800">
+                        To protect accounts and reduce fraud, please verify your phone number before starting checkout.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/verify-account?redirect=${encodeURIComponent(`/checkout?plan=${selectedPlan}`)}`)}
+                      className="shrink-0 inline-flex items-center px-3 py-2 rounded-md bg-yellow-700 text-white text-sm font-medium hover:bg-yellow-800"
+                    >
+                      Verify now
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900">
@@ -326,19 +375,22 @@ export default function CheckoutPage() {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white"
                   >
                     <option value="AUTO">Auto-detect</option>
-                    <option value="NG">Nigeria</option>
-                    <option value="GH">Ghana</option>
-                    <option value="KE">Kenya</option>
-                    <option value="ZA">South Africa</option>
-                    <option value="DE">Germany</option>
-                    <option value="FR">France</option>
-                    <option value="ES">Spain</option>
-                    <option value="IT">Italy</option>
-                    <option value="NL">Netherlands</option>
-                    <option value="GB">United Kingdom</option>
-                    <option value="US">United States</option>
-                    <option value="CA">Canada</option>
-                    <option value="BR">Brazil</option>
+
+                    <optgroup label="Africa">
+                      {AFRICAN_COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
+
+                    <optgroup label="Other">
+                      {commonBillingCountries.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                   <p className="mt-2 text-xs text-gray-500">
                     Choose the country you want to pay from. This can change currency and available payment methods.

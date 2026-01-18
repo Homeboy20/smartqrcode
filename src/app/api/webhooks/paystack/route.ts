@@ -15,6 +15,39 @@ const supabaseAdmin = createClient(
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+async function verifyTransactionWithPaystack(secretKey: string, reference: string) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+    const parsed = (() => {
+      try {
+        return text ? JSON.parse(text) : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!res.ok || parsed?.status === false) {
+      const message = parsed?.message || (text ? text.slice(0, 500) : `HTTP ${res.status}`);
+      throw new Error(message || 'Paystack verification failed');
+    }
+
+    return parsed?.data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request.headers);
 
@@ -63,69 +96,100 @@ export async function POST(request: NextRequest) {
         const data = event.data;
         
         console.log('Charge successful:', data.reference);
+
+        const reference = String(data?.reference || '').trim();
+        if (!reference) {
+          logError('paystack-webhook', new Error('Missing reference in charge.success payload'), { clientIP });
+          return createErrorResponse('VALIDATION_ERROR', 'Missing reference', 400);
+        }
+
+        // Verify transaction server-side (defense-in-depth).
+        const verified = await verifyTransactionWithPaystack(webhookSecret, reference);
+        if (!verified || String(verified?.reference || '') !== reference || verified?.status !== 'success') {
+          logError('paystack-webhook', new Error('Paystack verification mismatch'), {
+            reference,
+            verifiedStatus: verified?.status,
+          });
+          return createErrorResponse('AUTHORIZATION_ERROR', 'Transaction verification failed', 400);
+        }
         
         // Extract metadata
-        const userId = data.metadata?.userId;
-        const planId = data.metadata?.planId;
+        const meta = (verified?.metadata ?? data.metadata ?? {}) as any;
+        const userId = meta?.userId;
+        const planId = meta?.planId;
         
         if (!userId || !planId) {
-          logError('paystack-webhook', new Error('Missing userId or planId in metadata'), { reference: data.reference });
+          logError('paystack-webhook', new Error('Missing userId or planId in metadata'), { reference });
           return createErrorResponse('VALIDATION_ERROR', 'Missing metadata', 400);
         }
 
         // Check if this is a subscription payment
-        if (data.plan) {
+        if (data.plan || verified?.plan) {
           const now = new Date().toISOString();
           
           // Calculate subscription end date (30 days for monthly)
           const endDate = new Date();
           endDate.setMonth(endDate.getMonth() + 1);
-          
-          // Create or update subscription record in Supabase
-          const { data: existingSub } = await supabaseAdmin
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('paystack_subscription_code', data.plan.subscription_code)
-            .single();
 
-          if (existingSub) {
-            // Update existing subscription
+          // Derive a stable subscription code for idempotency.
+          const subscriptionCode =
+            String((data as any)?.subscription?.subscription_code || '') ||
+            String((data as any)?.subscription_code || '') ||
+            String((data as any)?.plan?.subscription_code || '') ||
+            String((verified as any)?.plan?.subscription_code || '') ||
+            reference;
+
+          const customerCode = String((data as any)?.customer?.customer_code || (verified as any)?.customer?.customer_code || '');
+          const authorizationCode = String((data as any)?.authorization?.authorization_code || (verified as any)?.authorization?.authorization_code || '');
+
+          // Best-effort payment record (idempotent via unique paystack_reference).
+          try {
             await supabaseAdmin
-              .from('subscriptions')
-              .update({
-                status: 'active',
-                current_period_end: endDate.toISOString(),
-                updated_at: now
-              })
-              .eq('paystack_subscription_code', data.plan.subscription_code);
-          } else {
-            // Create new subscription
-            await supabaseAdmin
-              .from('subscriptions')
-              .insert({
+              .from('payments')
+              .upsert(
+                {
+                  user_id: userId,
+                  amount: Number((verified as any)?.amount) ? Number((verified as any)?.amount) / 100 : undefined,
+                  currency: String((verified as any)?.currency || (data as any)?.currency || 'NGN'),
+                  status: 'succeeded',
+                  paystack_reference: reference,
+                  paystack_transaction_id: String((verified as any)?.id || ''),
+                  description: `Subscription payment (${planId})`,
+                  created_at: now,
+                } as any,
+                { onConflict: 'paystack_reference' }
+              );
+          } catch {
+            // Ignore if the payments table isn't provisioned.
+          }
+          
+          // Upsert subscription record in Supabase (idempotent via unique paystack_subscription_code).
+          await supabaseAdmin
+            .from('subscriptions')
+            .upsert(
+              {
                 user_id: userId,
                 plan: planId,
                 status: 'active',
-                paystack_subscription_code: data.plan.subscription_code || data.reference,
-                paystack_customer_code: data.customer.customer_code,
-                paystack_authorization_code: data.authorization.authorization_code,
+                paystack_subscription_code: subscriptionCode,
+                paystack_customer_code: customerCode || null,
+                paystack_authorization_code: authorizationCode || null,
                 current_period_start: now,
                 current_period_end: endDate.toISOString(),
                 cancel_at_period_end: false,
-                created_at: now,
-                updated_at: now
-              });
+                updated_at: now,
+              } as any,
+              { onConflict: 'paystack_subscription_code' }
+            );
 
-            // Update user's subscription tier
-            await supabaseAdmin
-              .from('users')
-              .update({ 
-                subscription_tier: planId,
-                updated_at: now
-              })
-              .eq('id', userId);
-          }
+          // Update user's subscription tier
+          await supabaseAdmin
+            .from('users')
+            .update({
+              subscription_tier: planId,
+              updated_at: now,
+            })
+            .eq('id', userId);
 
           console.log('Subscription processed successfully for user:', userId);
         }

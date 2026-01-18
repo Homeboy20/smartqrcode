@@ -1,3 +1,5 @@
+import { AFRICAN_COUNTRIES } from '@/lib/countries/africa';
+
 // Multi-currency support for payment system
 export type CurrencyCode = 'USD' | 'NGN' | 'GHS' | 'KES' | 'ZAR' | 'GBP' | 'EUR';
 
@@ -102,9 +104,7 @@ export const SUBSCRIPTION_PRICING: Record<'pro' | 'business', PricingTier> = {
 
 // Used to decide when to show local payment options (e.g., mobile money) vs card-only.
 // ISO 3166-1 alpha-2 country codes.
-const AFRICAN_COUNTRY_CODES = new Set([
-  'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','ZM','ZW'
-]);
+const AFRICAN_COUNTRY_CODES = new Set(AFRICAN_COUNTRIES.map((c) => c.code.toUpperCase()));
 
 // Countries where we prefer EUR by default when outside Africa.
 // (EU/EEA + a few common EUR users; keep conservative)

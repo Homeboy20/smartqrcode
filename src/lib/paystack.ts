@@ -1,29 +1,8 @@
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
+import { toMinorUnits, type CurrencyCode } from '@/lib/currency';
 
 // Paystack API base URLs
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
-
-// Get Paystack credentials with error handling
-async function getPaystackCredentials() {
-  const runtime = await getProviderRuntimeConfig('paystack');
-  
-  // Check for decryption errors first
-  if ('decryptError' in runtime && (runtime as any).decryptError) {
-    throw new Error(
-      `Paystack credentials could not be decrypted: ${(runtime as any).decryptError}. ` +
-      'Please check that CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server.'
-    );
-  }
-  
-  const secretKey = runtime.credentials.secretKey || '';
-  const publicKey = runtime.credentials.publicKey || '';
-  
-  if (!secretKey) {
-    throw new Error('Paystack credentials not configured');
-  }
-  
-  return { secretKey, publicKey };
-}
 
 // Paystack API client
 class PaystackClient {
@@ -33,31 +12,57 @@ class PaystackClient {
     this.secretKey = secretKey;
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  private async request(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}) {
     const url = `${PAYSTACK_BASE_URL}${endpoint}`;
-    
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.secretKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
 
-    const data = await response.json();
+    const controller = new AbortController();
+    const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 15_000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Paystack API request failed');
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: options.signal ?? controller.signal,
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      });
+
+      const text = await response.text();
+      const data = (() => {
+        try {
+          return text ? JSON.parse(text) : null;
+        } catch {
+          return null;
+        }
+      })();
+
+      // Paystack returns { status: boolean, message: string, data: any }
+      const paystackMessage = (data as any)?.message;
+      const paystackStatus = (data as any)?.status;
+
+      if (!response.ok || paystackStatus === false) {
+        const status = response.status;
+        const details = paystackMessage || (text ? text.slice(0, 500) : '');
+        throw new Error(details || `Paystack API request failed (HTTP ${status})`);
+      }
+
+      if (!data) {
+        throw new Error('Paystack API returned an empty response');
+      }
+
+      return data;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return data;
   }
 
   async initializeTransaction(params: {
     email: string;
     amount: number; // In kobo (smallest currency unit)
-    currency?: string;
+    currency?: CurrencyCode;
     reference?: string;
     callback_url?: string;
     metadata?: Record<string, any>;
@@ -78,7 +83,7 @@ class PaystackClient {
     amount: number; // In kobo
     interval: 'daily' | 'weekly' | 'monthly' | 'annually';
     description?: string;
-    currency?: string;
+    currency?: CurrencyCode;
   }) {
     return this.request('/plan', {
       method: 'POST',
@@ -183,7 +188,7 @@ export async function initializeSubscriptionPayment({
 }: {
   email: string;
   amount: number;
-  currency?: string;
+  currency?: CurrencyCode;
   plan: string;
   reference: string;
   callbackUrl: string;
@@ -191,11 +196,9 @@ export async function initializeSubscriptionPayment({
 }) {
   try {
     const client = await getPaystackClient();
-    
-    // Convert amount to kobo (smallest unit)
-    // For NGN: 1 NGN = 100 kobo
-    // For USD: 1 USD = 100 cents
-    const amountInKobo = Math.round(amount * 100);
+
+    // Paystack expects the smallest currency unit.
+    const amountInKobo = toMinorUnits(amount, currency);
     
     const response = await client.initializeTransaction({
       email,
@@ -223,7 +226,8 @@ export async function initializeSubscriptionPayment({
     };
   } catch (error) {
     console.error('Error initializing Paystack payment:', error);
-    throw new Error('Failed to initialize payment');
+    const message = String((error as any)?.message || 'Failed to initialize payment');
+    throw new Error(message);
   }
 }
 
@@ -235,7 +239,8 @@ export async function verifyPaystackTransaction(reference: string) {
     return response.data;
   } catch (error) {
     console.error('Error verifying Paystack transaction:', error);
-    throw new Error('Failed to verify transaction');
+    const message = String((error as any)?.message || 'Failed to verify transaction');
+    throw new Error(message);
   }
 }
 
@@ -264,7 +269,8 @@ export async function createPaystackCustomer({
     return response.data;
   } catch (error) {
     console.error('Error creating Paystack customer:', error);
-    throw new Error('Failed to create customer');
+    const message = String((error as any)?.message || 'Failed to create customer');
+    throw new Error(message);
   }
 }
 
@@ -290,7 +296,8 @@ export async function createPaystackSubscription({
     return response.data;
   } catch (error) {
     console.error('Error creating Paystack subscription:', error);
-    throw new Error('Failed to create subscription');
+    const message = String((error as any)?.message || 'Failed to create subscription');
+    throw new Error(message);
   }
 }
 
@@ -313,7 +320,8 @@ export async function cancelPaystackSubscription({
     return response.data;
   } catch (error) {
     console.error('Error canceling Paystack subscription:', error);
-    throw new Error('Failed to cancel subscription');
+    const message = String((error as any)?.message || 'Failed to cancel subscription');
+    throw new Error(message);
   }
 }
 

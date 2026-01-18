@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAnonClient } from '@/lib/supabase/server';
+import { SUBSCRIPTION_PRICING, type PricingTier, type CurrencyCode } from '@/lib/currency';
 
 type FirebaseSettings = {
   enabled?: boolean;
@@ -13,6 +14,45 @@ type FirebaseSettings = {
   phoneAuthEnabled?: boolean;
   recaptchaSiteKey?: string;
 };
+
+type SubscriptionPricing = Record<'pro' | 'business', PricingTier>;
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function mergePricingSettings(input: any): SubscriptionPricing {
+  const defaults: SubscriptionPricing = SUBSCRIPTION_PRICING;
+  const raw = (input?.pricing ?? input?.subscriptionPricing ?? input?.subscription_pricing ?? {}) as any;
+
+  const tiers: Array<'pro' | 'business'> = ['pro', 'business'];
+  const merged: SubscriptionPricing = {
+    pro: { ...defaults.pro, localPrices: { ...(defaults.pro.localPrices ?? {}) } },
+    business: { ...defaults.business, localPrices: { ...(defaults.business.localPrices ?? {}) } },
+  };
+
+  for (const tier of tiers) {
+    const candidate = (raw?.[tier] ?? {}) as any;
+    const usdPrice = toNumberOrUndefined(candidate?.usdPrice ?? candidate?.usd_price);
+    if (usdPrice !== undefined) merged[tier].usdPrice = usdPrice;
+
+    const localPrices = (candidate?.localPrices ?? candidate?.local_prices ?? {}) as Record<string, unknown>;
+    for (const [code, value] of Object.entries(localPrices)) {
+      const upper = String(code || '').toUpperCase() as CurrencyCode;
+      const n = toNumberOrUndefined(value);
+      if (!n) continue;
+      if (!['USD', 'NGN', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'].includes(upper)) continue;
+      (merged[tier].localPrices as any)[upper] = n;
+    }
+  }
+
+  return merged;
+}
 
 function mergeFirebaseSettings(input: any): FirebaseSettings {
   const defaults: FirebaseSettings = {
@@ -73,6 +113,7 @@ export async function GET(request: NextRequest) {
           appId: '',
           measurementId: '',
         },
+        pricing: SUBSCRIPTION_PRICING,
       });
     }
 
@@ -120,9 +161,11 @@ export async function GET(request: NextRequest) {
         phoneAuthEnabled: false,
         recaptchaSiteKey: '',
       },
+      pricing: SUBSCRIPTION_PRICING,
     };
 
     const mergedFirebase = mergeFirebaseSettings(settings);
+    const mergedPricing = mergePricingSettings(settings);
 
     const response = { 
       freeMode: settings.freeMode,
@@ -135,6 +178,8 @@ export async function GET(request: NextRequest) {
       },
       // Firebase Web App config is safe to expose client-side.
       firebase: mergedFirebase,
+      // Pricing is also safe to expose client-side.
+      pricing: mergedPricing,
     };
     
     if (isDev) console.log('[app-settings API] Returning response');
@@ -168,6 +213,7 @@ export async function GET(request: NextRequest) {
         phoneAuthEnabled: false,
         recaptchaSiteKey: '',
       },
+      pricing: SUBSCRIPTION_PRICING,
     });
   }
 }

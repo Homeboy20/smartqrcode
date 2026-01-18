@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SUBSCRIPTION_PRICING, type PricingTier } from '@/lib/currency';
 
 export interface AppSettings {
   freeMode: boolean;
@@ -26,6 +27,8 @@ export interface AppSettings {
     phoneAuthEnabled?: boolean;
     recaptchaSiteKey?: string;
   };
+
+  pricing?: Record<'pro' | 'business', PricingTier>;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -54,6 +57,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     phoneAuthEnabled: false,
     recaptchaSiteKey: '',
   },
+  pricing: SUBSCRIPTION_PRICING,
 };
 
 type SettingsSnapshot = {
@@ -207,6 +211,7 @@ function normalizeSettings(candidate: unknown): AppSettings {
   const incoming = (candidate ?? {}) as Partial<AppSettings>;
   const incomingBranding = (incoming.branding ?? {}) as Partial<AppSettings['branding']>;
   const incomingFirebase = (incoming.firebase ?? {}) as Partial<NonNullable<AppSettings['firebase']>>;
+  const incomingPricing = (incoming.pricing ?? {}) as Partial<Record<'pro' | 'business', PricingTier>>;
 
   return {
     ...DEFAULT_SETTINGS,
@@ -231,6 +236,10 @@ function normalizeSettings(candidate: unknown): AppSettings {
         measurementId: '',
       }),
       ...incomingFirebase,
+    },
+    pricing: {
+      ...(DEFAULT_SETTINGS.pricing ?? SUBSCRIPTION_PRICING),
+      ...(incomingPricing as any),
     },
   };
 }

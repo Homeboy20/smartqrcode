@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { 
   detectCountryFromHeaders, 
   getCurrencyForCountry,
-  getLocalPrice,
   formatCurrency,
   getRecommendedProvider,
   SUBSCRIPTION_PRICING
 } from '@/lib/currency';
+import { createAnonClient } from '@/lib/supabase/server';
 import {
   chooseDefaultProvider,
   getAvailableCheckoutProviders,
@@ -15,6 +15,33 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+async function getPricingOverridesFromAppSettings() {
+  try {
+    const supabase = createAnonClient();
+    if (!supabase) return null;
+
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'general')
+      .maybeSingle();
+
+    if (error || !data?.value) return null;
+    return (data.value as any)?.pricing ?? null;
+  } catch {
+    return null;
+  }
+}
 
 function normalizeCountryCode(value: string | null | undefined): string | null {
   const normalized = String(value || '').trim().toUpperCase();
@@ -36,18 +63,57 @@ export async function GET(request: NextRequest) {
       currency: currencyConfig.code,
       availableProviders,
     });
+
+    const basePricing = SUBSCRIPTION_PRICING;
+    const overrides = await getPricingOverridesFromAppSettings();
+
+    const mergedPricing = {
+      pro: {
+        ...basePricing.pro,
+        ...(overrides?.pro ?? {}),
+        localPrices: {
+          ...(basePricing.pro.localPrices ?? {}),
+          ...((overrides?.pro?.localPrices ?? overrides?.pro?.local_prices ?? {}) as any),
+        },
+      },
+      business: {
+        ...basePricing.business,
+        ...(overrides?.business ?? {}),
+        localPrices: {
+          ...(basePricing.business.localPrices ?? {}),
+          ...((overrides?.business?.localPrices ?? overrides?.business?.local_prices ?? {}) as any),
+        },
+      },
+    };
+
+    // Safety: ensure numeric overrides.
+    for (const tier of ['pro', 'business'] as const) {
+      const usd = toNumberOrUndefined((mergedPricing as any)[tier]?.usdPrice);
+      if (usd !== undefined) (mergedPricing as any)[tier].usdPrice = usd;
+      for (const [ccy, v] of Object.entries((mergedPricing as any)[tier]?.localPrices ?? {})) {
+        const n = toNumberOrUndefined(v);
+        if (n === undefined) {
+          delete (mergedPricing as any)[tier].localPrices[ccy];
+        } else {
+          (mergedPricing as any)[tier].localPrices[ccy] = n;
+        }
+      }
+    }
+
+    const proAmount = (mergedPricing.pro.localPrices as any)[currencyConfig.code] ?? mergedPricing.pro.usdPrice;
+    const businessAmount = (mergedPricing.business.localPrices as any)[currencyConfig.code] ?? mergedPricing.business.usdPrice;
     
     // Get pricing for all tiers
     const pricing = {
       pro: {
-        amount: getLocalPrice('pro', currencyConfig.code),
-        formatted: formatCurrency(getLocalPrice('pro', currencyConfig.code), currencyConfig.code),
-        usd: SUBSCRIPTION_PRICING.pro.usdPrice,
+        amount: proAmount,
+        formatted: formatCurrency(proAmount, currencyConfig.code),
+        usd: mergedPricing.pro.usdPrice,
       },
       business: {
-        amount: getLocalPrice('business', currencyConfig.code),
-        formatted: formatCurrency(getLocalPrice('business', currencyConfig.code), currencyConfig.code),
-        usd: SUBSCRIPTION_PRICING.business.usdPrice,
+        amount: businessAmount,
+        formatted: formatCurrency(businessAmount, currencyConfig.code),
+        usd: mergedPricing.business.usdPrice,
       },
     };
     

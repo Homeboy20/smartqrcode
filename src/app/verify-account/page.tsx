@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/FirebaseAuthContext';
-import { useRouter } from 'next/navigation';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   getCountryCallingCodeOptions,
@@ -12,9 +13,19 @@ import {
 import { normalizeToE164 } from '@/lib/phone/e164';
 
 export default function VerifyAccountPage() {
-  const { user, loading, error, sendVerificationEmail, setupRecaptcha, sendPhoneVerificationCode, verifyPhoneCode } = useAuth();
+  const {
+    user: firebaseUser,
+    loading: firebaseLoading,
+    error,
+    sendVerificationEmail,
+    setupRecaptcha,
+    sendPhoneVerificationCode,
+    verifyPhoneCode,
+    getIdToken,
+  } = useAuth();
+  const { user: supabaseUser, loading: supabaseLoading, getAccessToken } = useSupabaseAuth();
   const [verificationSent, setVerificationSent] = useState(false);
-  const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('email');
+  const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('phone');
   const [selectedCountry, setSelectedCountry] = useState('US');
   const [countryQuery, setCountryQuery] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -25,6 +36,8 @@ export default function VerifyAccountPage() {
   const [verifying, setVerifying] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams?.get('redirect') || '/dashboard';
 
   const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
   const selectedOption = React.useMemo(
@@ -68,21 +81,22 @@ export default function VerifyAccountPage() {
   
   // Check if user is already verified
   useEffect(() => {
-    if (!loading && user) {
-      const isVerified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
+    if (!supabaseLoading && supabaseUser) {
+      const meta = (supabaseUser.user_metadata || {}) as any;
+      const isVerified = Boolean(meta.phone_verified_at) || Boolean(meta.phone_number);
       
       if (isVerified) {
-        router.push('/dashboard');
+        router.push(redirectTo);
       }
     }
-  }, [user, loading, router]);
+  }, [supabaseUser, supabaseLoading, router, redirectTo]);
   
   // Redirect to login if no user
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
+    if (!supabaseLoading && !supabaseUser) {
+      router.push('/login?redirect=/verify-account');
     }
-  }, [user, loading, router]);
+  }, [supabaseUser, supabaseLoading, router]);
   
   const handleSendVerification = async () => {
     setSending(true);
@@ -108,9 +122,6 @@ export default function VerifyAccountPage() {
         
         try {
           const { e164 } = normalizeToE164({ raw: phoneNumber, defaultCountry: selectedCountry });
-          
-          // Store the phone number in the window object for later use
-          (window as any).phoneNumber = e164;
 
           const recaptchaVerifier = await setupRecaptcha('recaptcha-container');
           const confirmation = await sendPhoneVerificationCode(e164, recaptchaVerifier);
@@ -142,9 +153,34 @@ export default function VerifyAccountPage() {
     try {
       const success = await verifyPhoneCode(confirmationResult, verificationCode);
       if (success) {
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
+          setStatusMessage('Please sign in again to finish verification.');
+          return;
+        }
+
+        const firebaseToken = await getIdToken();
+        if (!firebaseToken) {
+          setStatusMessage('Missing Firebase token after verification. Please try again.');
+          return;
+        }
+
+        const res = await fetch('/api/account/verify-phone', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ firebaseIdToken: firebaseToken }),
+        });
+
+        const data = await res.json().catch(() => ({} as any));
+        if (!res.ok) {
+          throw new Error(String((data as any)?.error || 'Failed to sync phone verification'));
+        }
+
         setStatusMessage('Phone verified successfully!');
-        // Redirect to dashboard after successful verification
-        setTimeout(() => router.push('/dashboard'), 1500);
+        setTimeout(() => router.push(redirectTo), 1200);
       } else {
         setStatusMessage('Failed to verify phone. Please check the code and try again.');
       }
@@ -156,7 +192,7 @@ export default function VerifyAccountPage() {
     }
   };
   
-  if (loading) {
+  if (firebaseLoading || supabaseLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -164,7 +200,7 @@ export default function VerifyAccountPage() {
     );
   }
   
-  if (!user) {
+  if (!supabaseUser) {
     return null; // Will redirect in useEffect
   }
   

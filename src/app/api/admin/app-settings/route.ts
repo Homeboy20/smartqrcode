@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
+import { SUBSCRIPTION_PRICING, type PricingTier, type CurrencyCode } from '@/lib/currency';
 
 type FirebaseSettings = {
   enabled?: boolean;
@@ -14,6 +15,44 @@ type FirebaseSettings = {
   phoneAuthEnabled?: boolean;
   recaptchaSiteKey?: string;
 };
+
+type SubscriptionPricing = Record<'pro' | 'business', PricingTier>;
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function mergePricingSettings(raw: any, defaults: SubscriptionPricing): SubscriptionPricing {
+  const input = (raw?.pricing ?? raw?.subscriptionPricing ?? raw?.subscription_pricing ?? {}) as any;
+  const tiers: Array<'pro' | 'business'> = ['pro', 'business'];
+
+  const merged: SubscriptionPricing = {
+    pro: { ...defaults.pro, localPrices: { ...(defaults.pro.localPrices ?? {}) } },
+    business: { ...defaults.business, localPrices: { ...(defaults.business.localPrices ?? {}) } },
+  };
+
+  for (const tier of tiers) {
+    const candidate = (input?.[tier] ?? {}) as any;
+    const usdPrice = toNumberOrUndefined(candidate?.usdPrice ?? candidate?.usd_price);
+    if (usdPrice !== undefined) merged[tier].usdPrice = usdPrice;
+
+    const localPrices = (candidate?.localPrices ?? candidate?.local_prices ?? {}) as Record<string, unknown>;
+    for (const [code, value] of Object.entries(localPrices)) {
+      const upper = String(code || '').toUpperCase() as CurrencyCode;
+      const n = toNumberOrUndefined(value);
+      if (!n) continue;
+      if (!['USD', 'NGN', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'].includes(upper)) continue;
+      (merged[tier].localPrices as any)[upper] = n;
+    }
+  }
+
+  return merged;
+}
 
 function mergeFirebaseSettings(raw: any, defaults: FirebaseSettings): FirebaseSettings {
   const firebaseConfig = (raw?.firebaseConfig ?? raw?.firebase_config ?? {}) as FirebaseSettings;
@@ -85,6 +124,7 @@ export async function GET(request: NextRequest) {
         phoneAuthEnabled: false,
         recaptchaSiteKey: '',
       },
+      pricing: SUBSCRIPTION_PRICING,
     };
 
     const raw = ((data as any)?.value ?? {}) as any;
@@ -101,11 +141,14 @@ export async function GET(request: NextRequest) {
         ...(raw?.branding ?? {}),
       },
       firebase: mergeFirebaseSettings(raw, defaults.firebase),
+      pricing: mergePricingSettings(raw, defaults.pricing),
     };
 
     // Avoid returning legacy keys to the admin UI.
     delete (settings as any).firebaseConfig;
     delete (settings as any).firebase_config;
+    delete (settings as any).subscriptionPricing;
+    delete (settings as any).subscription_pricing;
 
     return NextResponse.json({ settings });
   } catch (error: any) {
@@ -171,6 +214,11 @@ export async function POST(request: NextRequest) {
     normalizedSettings.firebase = mergeFirebaseSettings(normalizedSettings, firebaseDefaults);
     delete normalizedSettings.firebaseConfig;
     delete normalizedSettings.firebase_config;
+
+    const pricingDefaults: SubscriptionPricing = SUBSCRIPTION_PRICING;
+    normalizedSettings.pricing = mergePricingSettings(normalizedSettings, pricingDefaults);
+    delete normalizedSettings.subscriptionPricing;
+    delete normalizedSettings.subscription_pricing;
 
     if (isDev) console.log('[admin/app-settings POST] Upserting settings...');
     const nowIso = new Date().toISOString();
