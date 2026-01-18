@@ -1,9 +1,11 @@
-// Flutterwave V4 API Integration
+// Flutterwave API Integration
 // Documentation: https://developer.flutterwave.com/reference
 
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 
-const FLUTTERWAVE_V4_BASE_URL = 'https://api.flutterwave.com/v4';
+// Flutterwave's public API is versioned under /v3.
+// Using /v4 causes production failures like: "Cannot POST /v4/customers".
+const FLUTTERWAVE_V4_BASE_URL = 'https://api.flutterwave.com/v3';
 
 const DEFAULT_FLW_TIMEOUT_MS = 15000;
 
