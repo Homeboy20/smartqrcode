@@ -47,24 +47,38 @@ function maskCredentials(provider: PaymentProvider, credentials: StoredCredentia
   return masked;
 }
 
-function decryptCredentials(provider: PaymentProvider, credentials: StoredCredentials): Record<string, string> {
+function decryptCredentials(provider: PaymentProvider, credentials: StoredCredentials): {
+  credentials: Record<string, string>;
+  decryptError?: string;
+} {
   const out: Record<string, string> = {};
-  if (!credentials) return out;
+  if (!credentials) return { credentials: out };
+
+  const decryptErrors: string[] = [];
 
   for (const [key, value] of Object.entries(credentials)) {
     if (isSecretField(provider, key)) {
       if (isEncryptedPayload(value)) {
-        out[key] = decryptString(value);
+        try {
+          out[key] = decryptString(value);
+        } catch (e: any) {
+          const message = e?.message || 'Failed to decrypt stored secret';
+          decryptErrors.push(`${key}: ${message}`);
+        }
       } else if (typeof value === 'string') {
         // Back-compat if secrets were stored plaintext previously.
         out[key] = value;
       }
     } else {
+      // Non-secret fields should always be accessible.
       if (typeof value === 'string') out[key] = value;
     }
   }
 
-  return out;
+  return {
+    credentials: out,
+    decryptError: decryptErrors.length ? decryptErrors.join('; ') : undefined,
+  };
 }
 
 function mergeForStorage(
@@ -161,23 +175,14 @@ export async function getProviderRuntimeConfig(provider: PaymentProvider) {
     return { exists: false, isActive: false, credentials: {} as Record<string, string> };
   }
 
-  try {
-    return {
-      exists: true,
-      isActive: Boolean(data.is_active),
-      credentials: decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials),
-    };
-  } catch (e: any) {
-    const message = e?.message || 'Failed to decrypt stored payment credentials';
-    // If encryption key is missing, do not hard-crash checkout flows.
-    // Treat stored secrets as unavailable; callers may still fall back to env credentials.
-    return {
-      exists: true,
-      isActive: Boolean(data.is_active),
-      credentials: {} as Record<string, string>,
-      decryptError: message,
-    } as any;
-  }
+  const decrypted = decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials);
+
+  return {
+    exists: true,
+    isActive: Boolean(data.is_active),
+    credentials: decrypted.credentials,
+    ...(decrypted.decryptError ? { decryptError: decrypted.decryptError } : {}),
+  } as any;
 }
 
 export async function saveProviderSettings(options: {

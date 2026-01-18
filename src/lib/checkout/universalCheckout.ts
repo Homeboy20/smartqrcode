@@ -8,10 +8,11 @@ import { createPaystackCustomer, initializeSubscriptionPayment } from '@/lib/pay
 import {
   createFlutterwaveSubscriptionPayment,
 } from '@/lib/flutterwave';
-import { getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
+import { CURRENCY_CONFIGS, getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
 
 import {
   providerSupportsPaymentMethod,
+  getSupportedPaymentMethodsForContext,
   type CheckoutPaymentMethod,
 } from '@/lib/checkout/paymentMethodSupport';
 
@@ -28,6 +29,30 @@ const PROVIDER_CURRENCY_SUPPORT: Record<PaymentProvider, CurrencyCode[]> = {
 export function providerSupportsCurrency(provider: PaymentProvider, currency: CurrencyCode): boolean {
   const allowed = PROVIDER_CURRENCY_SUPPORT[provider] || [];
   return allowed.includes(currency);
+}
+
+const PROVIDER_COUNTRY_SUPPORT: Record<PaymentProvider, Set<string> | 'ALL'> = {
+  // Derive Paystack countries from our currency config so it stays consistent.
+  paystack: new Set(
+    Object.values(CURRENCY_CONFIGS)
+      .filter((c) => c.preferredProvider === 'paystack')
+      .flatMap((c) => c.countries)
+      .filter((cc) => cc && cc !== 'DEFAULT')
+      .map((cc) => cc.toUpperCase())
+  ),
+  // Flutterwave is our global provider in this app.
+  flutterwave: 'ALL',
+  // Not integrated (kept disabled)
+  stripe: new Set<string>(),
+  paypal: new Set<string>(),
+};
+
+export function providerSupportsCountry(provider: PaymentProvider, countryCode: string): boolean {
+  const normalized = String(countryCode || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return false;
+  const allowed = PROVIDER_COUNTRY_SUPPORT[provider];
+  if (allowed === 'ALL') return true;
+  return Boolean(allowed?.has(normalized));
 }
 
 export type CheckoutPlanId = 'pro' | 'business';
@@ -212,33 +237,117 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
 
 const INTEGRATED_PROVIDERS: PaymentProvider[] = ['paystack', 'flutterwave'];
 
-async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
-  const runtime = await getProviderRuntimeConfig(provider);
+function parseAllowedCountriesCsv(value: unknown): Set<string> | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const parts = raw
+    .split(/[^A-Za-z]+/g)
+    .map((p) => p.trim().toUpperCase())
+    .filter(Boolean);
+  const codes = parts.filter((p) => /^[A-Z]{2}$/.test(p));
+  return codes.length ? new Set(codes) : null;
+}
 
-  // If there is a DB row, respect the admin toggle.
-  if ((runtime as any).exists) {
-    if (!Boolean((runtime as any).isActive)) return false;
+async function providerSupportsCountryWithAdmin(provider: PaymentProvider, countryCode: string): Promise<boolean> {
+  const normalized = String(countryCode || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) return false;
 
-    // Also require that the provider has the minimum required credentials.
+  try {
+    const runtime = await getProviderRuntimeConfig(provider);
+    const allowed = parseAllowedCountriesCsv((runtime as any)?.credentials?.allowedCountries);
+
+    // If admin configured an allow-list, enforce it.
+    if (allowed) return providerSupportsCountry(provider, normalized) && allowed.has(normalized);
+  } catch {
+    // ignore and fall back to built-in rules
+  }
+
+  return providerSupportsCountry(provider, normalized);
+}
+
+export type ProviderEnablement = {
+  enabled: boolean;
+  reason?: string;
+};
+
+export async function getProviderEnablement(provider: PaymentProvider): Promise<ProviderEnablement> {
+  try {
+    const runtime = await getProviderRuntimeConfig(provider);
+
+    if (!Boolean((runtime as any).exists)) {
+      return { enabled: false, reason: 'Not configured.' };
+    }
+
+    if (!Boolean((runtime as any).isActive)) {
+      return { enabled: false, reason: 'Disabled by admin toggle.' };
+    }
+
+    if ((runtime as any).decryptError) {
+      return {
+        enabled: false,
+        reason:
+          'Credentials cannot be decrypted on the server. ' +
+          'Check CREDENTIALS_ENCRYPTION_KEY/CREDENTIALS_ENCRYPTION_KEYS. ' +
+          `(${String((runtime as any).decryptError)})`,
+      };
+    }
+
     if (provider === 'paystack') {
       const secretKey = (runtime as any)?.credentials?.secretKey || '';
       const pro = (runtime as any)?.credentials?.planCodePro || '';
       const business = (runtime as any)?.credentials?.planCodeBusiness || '';
-      return Boolean(secretKey && pro && business);
+      if (!secretKey) return { enabled: false, reason: 'Missing Paystack Secret Key.' };
+      if (!pro || !business) return { enabled: false, reason: 'Missing Paystack plan codes (Pro and Business).' };
+      return { enabled: true };
     }
 
     if (provider === 'flutterwave') {
       const clientId = (runtime as any)?.credentials?.clientId || '';
       const clientSecret = (runtime as any)?.credentials?.clientSecret || '';
-      return Boolean(clientId && clientSecret);
+      if (!clientId || !clientSecret) return { enabled: false, reason: 'Missing Flutterwave Client ID/Secret.' };
+      return { enabled: true };
     }
 
-    // For not-yet-integrated providers, keep disabled.
-    return false;
+    return { enabled: false, reason: 'Not integrated.' };
+  } catch (e: any) {
+    return { enabled: false, reason: String(e?.message || 'Unable to read payment settings') };
   }
+}
 
-  // DB-only requirement: if no row exists, provider is not enabled.
-  return false;
+export async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
+  const { enabled } = await getProviderEnablement(provider);
+  return enabled;
+}
+
+export type ProviderEligibility = {
+  enabled: boolean;
+  supportsCountry: boolean;
+  supportsCurrency: boolean;
+  allowed: boolean;
+  reason?: string;
+};
+
+export async function getProviderEligibility(options: {
+  provider: PaymentProvider;
+  countryCode: string;
+  currency: CurrencyCode;
+}): Promise<ProviderEligibility> {
+  const supportsCountry = await providerSupportsCountryWithAdmin(options.provider, options.countryCode);
+  const supportsCurrency = providerSupportsCurrency(options.provider, options.currency);
+
+  const enablement = await getProviderEnablement(options.provider);
+  const enabled = enablement.enabled;
+
+  const allowed = Boolean(enabled && supportsCountry && supportsCurrency);
+
+  const reason = (() => {
+    if (!enabled) return enablement.reason || 'Not configured.';
+    if (!supportsCountry) return `Not available for billing country ${String(options.countryCode).toUpperCase()}.`;
+    if (!supportsCurrency) return `Not available for currency ${String(options.currency).toUpperCase()}.`;
+    return undefined;
+  })();
+
+  return { enabled, supportsCountry, supportsCurrency, allowed, reason };
 }
 
 export async function getAvailableCheckoutProviders(): Promise<PaymentProvider[]> {
@@ -259,6 +368,19 @@ export async function getAvailableCheckoutProviders(): Promise<PaymentProvider[]
     // fall back to integrated providers so pricing can still suggest a provider.
     return INTEGRATED_PROVIDERS.filter((p) => p in ADAPTERS);
   }
+}
+
+export async function getAvailableCheckoutProvidersStrict(): Promise<PaymentProvider[]> {
+  const available: PaymentProvider[] = [];
+
+  for (const provider of INTEGRATED_PROVIDERS) {
+    if (!(provider in ADAPTERS)) continue;
+    if (await isProviderEnabled(provider)) {
+      available.push(provider);
+    }
+  }
+
+  return available;
 }
 
 export function chooseDefaultProvider(options: {
@@ -283,12 +405,19 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
 
   const paymentMethod: CheckoutPaymentMethod | undefined = input.paymentMethod;
 
-  const availableProviders = await getAvailableCheckoutProviders();
+  const availableProviders = await getAvailableCheckoutProvidersStrict();
 
   const selectedProvider = (() => {
     if (input.provider) return input.provider;
     return chooseDefaultProvider({ currency: input.currency, availableProviders });
   })();
+
+  if (!(await providerSupportsCountryWithAdmin(selectedProvider, input.countryCode))) {
+    throw new Error(
+      `Selected provider does not support your billing country: ${input.countryCode}. ` +
+        `Try a different provider or change billing country.`
+    );
+  }
 
   if (!providerSupportsCurrency(selectedProvider, input.currency)) {
     throw new Error(
@@ -297,8 +426,25 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     );
   }
 
-  if (paymentMethod && !providerSupportsPaymentMethod(selectedProvider, paymentMethod)) {
-    throw new Error(`Selected provider does not support payment method: ${paymentMethod}`);
+  if (paymentMethod) {
+    // Guard against manual API calls that bypass the UI.
+    // UI limits methods by provider + country + currency.
+    const supportedForContext = getSupportedPaymentMethodsForContext({
+      provider: selectedProvider,
+      countryCode: input.countryCode,
+      currency: input.currency,
+    });
+
+    if (!supportedForContext.includes(paymentMethod)) {
+      throw new Error(
+        `Selected provider does not support payment method for your country/currency: ${paymentMethod}`
+      );
+    }
+
+    // Keep the coarse provider-level guard too (helps catch unsupported methods for non-contextual providers).
+    if (!providerSupportsPaymentMethod(selectedProvider, paymentMethod)) {
+      throw new Error(`Selected provider does not support payment method: ${paymentMethod}`);
+    }
   }
 
   if (!availableProviders.includes(selectedProvider)) {

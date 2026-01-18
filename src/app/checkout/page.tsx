@@ -7,9 +7,12 @@ import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { subscriptionFeatures, type SubscriptionTier } from '@/lib/subscriptions';
 import { AFRICAN_COUNTRIES } from '@/lib/countries/africa';
+import { isAfricanCountryCode } from '@/lib/currency';
 
 import {
+  getSupportedPaymentMethods,
   getSupportedPaymentMethodsForContext,
+  LOCAL_AFRICAN_CURRENCIES,
   type CheckoutPaymentMethod,
   type UniversalPaymentProvider,
 } from '@/lib/checkout/paymentMethodSupport';
@@ -23,6 +26,12 @@ type CurrencyInfo = {
   };
   availableProviders?: UniversalPaymentProvider[];
   recommendedProvider?: UniversalPaymentProvider;
+  providerEligibility?: Partial<
+    Record<
+      UniversalPaymentProvider,
+      { enabled: boolean; supportsCountry: boolean; supportsCurrency: boolean; allowed: boolean; reason?: string }
+    >
+  >;
   pricing: {
     pro: { amount: number; formatted: string; usd: number };
     business: { amount: number; formatted: string; usd: number };
@@ -86,6 +95,17 @@ export default function CheckoutPage() {
   const [provider, setProvider] = useState<UniversalPaymentProvider>('flutterwave');
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('card');
 
+  const [providerNotice, setProviderNotice] = useState<string | null>(null);
+  const providerNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showProviderNotice = React.useCallback((message: string) => {
+    setProviderNotice(message);
+    if (providerNoticeTimerRef.current) {
+      clearTimeout(providerNoticeTimerRef.current);
+    }
+    providerNoticeTimerRef.current = setTimeout(() => setProviderNotice(null), 8_000);
+  }, []);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,11 +164,22 @@ export default function CheckoutPage() {
       const providers = (data?.availableProviders || []) as UniversalPaymentProvider[];
       const recommended = data?.recommendedProvider as UniversalPaymentProvider | undefined;
 
-      const nextProvider =
-        (recommended && providers.includes(recommended) ? recommended : undefined) ||
-        providers[0] ||
-        'flutterwave';
-      setProvider(nextProvider);
+      setProvider((prev) => {
+        if (providers.length === 0) return prev;
+        if (providers.includes(prev)) return prev;
+
+        const nextProvider =
+          (recommended && providers.includes(recommended) ? recommended : undefined) ||
+          providers[0] ||
+          'flutterwave';
+
+        const detectedCountry = String((data as any)?.country || '').toUpperCase() || 'UNKNOWN';
+        const detectedCurrency = String((data as any)?.currency?.code || '').toUpperCase() || 'UNKNOWN';
+        showProviderNotice(
+          `Payment provider changed to ${providerLabel(nextProvider)} because the previous provider isn't available for ${detectedCountry} (${detectedCurrency}).`
+        );
+        return nextProvider;
+      });
     } catch (err) {
       console.error('Failed to fetch currency info:', err);
       setCurrencyInfo({
@@ -165,7 +196,7 @@ export default function CheckoutPage() {
     } finally {
       setLoadingCurrency(false);
     }
-  }, []);
+  }, [showProviderNotice]);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,12 +223,28 @@ export default function CheckoutPage() {
       ? currencyInfo.availableProviders
       : (['flutterwave', 'paystack'] as UniversalPaymentProvider[]);
 
+  const providerCards = useMemo(() => {
+    const eligibility = currencyInfo?.providerEligibility || {};
+    const base: UniversalPaymentProvider[] = ['flutterwave', 'paystack'];
+    const uniq = Array.from(new Set([...base, ...availableProviders]));
+    return uniq.map((p) => {
+      const info = eligibility[p];
+      const allowed = info ? Boolean(info.allowed) : availableProviders.includes(p);
+      const reason = info?.reason;
+      return { provider: p, allowed, reason };
+    });
+  }, [currencyInfo?.providerEligibility, availableProviders]);
+
   useEffect(() => {
     if (availableProviders.length === 0) return;
     if (!availableProviders.includes(provider)) {
-      setProvider(availableProviders[0]);
+      const next = availableProviders[0];
+      showProviderNotice(
+        `Payment provider changed to ${providerLabel(next)} because the previous selection isn't available for the selected billing country.`
+      );
+      setProvider(next);
     }
-  }, [availableProviders, provider]);
+  }, [availableProviders, provider, showProviderNotice]);
 
   const supportedMethods = useMemo(() => {
     return getSupportedPaymentMethodsForContext({
@@ -206,6 +253,24 @@ export default function CheckoutPage() {
       currency: effectiveCurrencyCode,
     });
   }, [provider, effectiveCountryCode, effectiveCurrencyCode]);
+
+  const methodAvailabilityNote = useMemo(() => {
+    const base = getSupportedPaymentMethods(provider);
+    const hidden = base.filter((m) => !supportedMethods.includes(m));
+    if (hidden.length === 0) return null;
+
+    if (hidden.includes('mobile_money')) {
+      const isAfrican = isAfricanCountryCode(effectiveCountryCode);
+      if (!isAfrican) {
+        return 'Mobile money is available only for African billing countries. Use Card or change billing country.';
+      }
+      if (!LOCAL_AFRICAN_CURRENCIES.includes(effectiveCurrencyCode as any)) {
+        return `Mobile money requires a local currency (${LOCAL_AFRICAN_CURRENCIES.join(', ')}). Use Card or change billing country.`;
+      }
+    }
+
+    return 'Some payment methods are unavailable for your billing country/currency.';
+  }, [provider, supportedMethods, effectiveCountryCode, effectiveCurrencyCode]);
 
   useEffect(() => {
     if (supportedMethods.length === 0) return;
@@ -429,18 +494,29 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {availableProviders.map((p) => {
+                    {providerCards.map(({ provider: p, allowed, reason }) => {
                       const isSelected = provider === p;
                       const isRecommended = currencyInfo?.recommendedProvider === p;
+                      const disabled = !allowed;
                       return (
                         <button
                           key={p}
                           type="button"
-                          onClick={() => setProvider(p)}
+                          onClick={() => {
+                            if (disabled) {
+                              showProviderNotice(reason || 'This provider is not available for your billing country/currency.');
+                              return;
+                            }
+                            setProviderNotice(null);
+                            setProvider(p);
+                          }}
+                          disabled={disabled}
                           className={`text-left border-2 rounded-xl p-4 transition-all ${
-                            isSelected
-                              ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                              : 'border-gray-200 hover:border-indigo-300'
+                            disabled
+                              ? 'border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed'
+                              : isSelected
+                                ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                                : 'border-gray-200 hover:border-indigo-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -458,10 +534,19 @@ export default function CheckoutPage() {
                                 ? 'Best for NGN and cards'
                                 : 'Secure checkout'}
                           </div>
+                          {disabled && reason && (
+                            <div className="mt-2 text-xs text-amber-700">{reason}</div>
+                          )}
                         </button>
                       );
                     })}
                   </div>
+
+                  {providerNotice && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      {providerNotice}
+                    </p>
+                  )}
                 </div>
 
                 {/* Method */}
@@ -489,6 +574,11 @@ export default function CheckoutPage() {
                   <p className="mt-2 text-xs text-gray-500">
                     You’ll choose exact details on the provider’s secure page.
                   </p>
+                  {methodAvailabilityNote && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      {methodAvailabilityNote}
+                    </p>
+                  )}
                 </div>
 
                 {error && (

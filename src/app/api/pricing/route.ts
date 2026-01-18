@@ -9,8 +9,9 @@ import {
 import { createAnonClient } from '@/lib/supabase/server';
 import {
   chooseDefaultProvider,
-  getAvailableCheckoutProviders,
-  providerSupportsCurrency,
+  getAvailableCheckoutProvidersStrict,
+  getProviderEligibility,
+  type ProviderEligibility,
 } from '@/lib/checkout/universalCheckout';
 
 export const runtime = 'nodejs';
@@ -57,8 +58,21 @@ export async function GET(request: NextRequest) {
     const countryCode = urlCountry || headerCountry || detectCountryFromHeaders(request.headers);
     const currencyConfig = getCurrencyForCountry(countryCode);
 
-    const allProviders = await getAvailableCheckoutProviders();
-    const availableProviders = allProviders.filter((p) => providerSupportsCurrency(p, currencyConfig.code));
+    // Build a detailed eligibility map so the UI can explain why a gateway isn't selectable.
+    const providersToDescribe = ['flutterwave', 'paystack'] as const;
+    const providerEligibility: Record<string, ProviderEligibility> = {};
+
+    await Promise.all(
+      providersToDescribe.map(async (provider) => {
+        providerEligibility[provider] = await getProviderEligibility({
+          provider,
+          countryCode,
+          currency: currencyConfig.code,
+        });
+      })
+    );
+
+    const availableProviders = (await getAvailableCheckoutProvidersStrict()).filter((p) => providerEligibility[p]?.allowed);
     const recommendedProvider = chooseDefaultProvider({
       currency: currencyConfig.code,
       availableProviders,
@@ -126,6 +140,7 @@ export async function GET(request: NextRequest) {
       },
       availableProviders,
       recommendedProvider,
+      providerEligibility,
       pricing,
     });
   } catch (error) {
@@ -141,6 +156,16 @@ export async function GET(request: NextRequest) {
       },
       availableProviders: ['flutterwave', 'paystack'],
       recommendedProvider: getRecommendedProvider('USD'),
+      providerEligibility: {
+        flutterwave: { enabled: true, supportsCountry: true, supportsCurrency: true, allowed: true },
+        paystack: {
+          enabled: false,
+          supportsCountry: false,
+          supportsCurrency: false,
+          allowed: false,
+          reason: 'Eligibility unavailable (fallback response).',
+        },
+      },
       pricing: {
         pro: {
           amount: 9.99,

@@ -149,6 +149,26 @@ async function flutterwaveRequest(
   return data;
 }
 
+export async function listFlutterwaveBanks(countryCode: string) {
+  const cc = String(countryCode || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) {
+    throw new Error('Invalid country code. Use ISO alpha-2, e.g. NG');
+  }
+
+  const response = await flutterwaveRequest(`/banks/${encodeURIComponent(cc)}`, 'GET', undefined, {
+    timeoutMs: DEFAULT_FLW_TIMEOUT_MS,
+  });
+
+  const banks = Array.isArray((response as any)?.data) ? (response as any).data : [];
+
+  return banks
+    .map((b: any) => ({
+      name: String(b?.name || ''),
+      code: b?.code ? String(b.code) : undefined,
+    }))
+    .filter((b: any) => b.name);
+}
+
 // Create a payment link with Flutterwave V4
 export async function createFlutterwavePaymentLink({
   amount,
@@ -252,6 +272,18 @@ function getFlutterwavePaymentOptions(paymentMethod?: 'card' | 'mobile_money') {
   if (paymentMethod === 'card') return 'card';
   if (paymentMethod === 'mobile_money') return 'mobilemoney,ussd,account,banktransfer';
   return 'card,mobilemoney,ussd,account,banktransfer';
+}
+
+export function getFlutterwavePaymentOptionsForCheckoutMethod(method?: 'card' | 'mobile_money') {
+  return getFlutterwavePaymentOptions(method);
+}
+
+export function getFlutterwavePaymentOptionsMatrix() {
+  return {
+    card: getFlutterwavePaymentOptions('card'),
+    mobile_money: getFlutterwavePaymentOptions('mobile_money'),
+    any: getFlutterwavePaymentOptions(undefined),
+  };
 }
 
 // Create subscription payment using V4 API

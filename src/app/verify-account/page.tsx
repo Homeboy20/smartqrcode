@@ -23,7 +23,12 @@ export default function VerifyAccountPage() {
     verifyPhoneCode,
     getIdToken,
   } = useAuth();
-  const { user: supabaseUser, loading: supabaseLoading, getAccessToken } = useSupabaseAuth();
+  const {
+    user: supabaseUser,
+    loading: supabaseLoading,
+    getAccessToken,
+    refreshSession,
+  } = useSupabaseAuth();
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<'email' | 'phone'>('phone');
   const [selectedCountry, setSelectedCountry] = useState('US');
@@ -94,9 +99,9 @@ export default function VerifyAccountPage() {
   // Redirect to login if no user
   useEffect(() => {
     if (!supabaseLoading && !supabaseUser) {
-      router.push('/login?redirect=/verify-account');
+      router.push(`/login?redirect=${encodeURIComponent(`/verify-account?redirect=${redirectTo}`)}`);
     }
-  }, [supabaseUser, supabaseLoading, router]);
+  }, [supabaseUser, supabaseLoading, router, redirectTo]);
   
   const handleSendVerification = async () => {
     setSending(true);
@@ -178,6 +183,9 @@ export default function VerifyAccountPage() {
         if (!res.ok) {
           throw new Error(String((data as any)?.error || 'Failed to sync phone verification'));
         }
+
+        // Ensure the client immediately sees updated `user_metadata` (phone_verified_at).
+        await refreshSession();
 
         setStatusMessage('Phone verified successfully!');
         setTimeout(() => router.push(redirectTo), 1200);

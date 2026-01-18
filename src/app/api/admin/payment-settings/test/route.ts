@@ -2,6 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
 
+const MASK = '••••••••••••••••';
+
+function normalizeProvidedCredentials(input: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!input || typeof input !== 'object') return out;
+
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v !== 'string') continue;
+    // If the UI sent masked secrets, treat as "not provided".
+    if (v === MASK) continue;
+    out[k] = v;
+  }
+
+  return out;
+}
+
 // POST - Test payment provider connection
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +26,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const provider = body?.provider as PaymentProvider | undefined;
+    const providedCredentials = normalizeProvidedCredentials(body?.credentials);
 
     if (!provider) {
       return NextResponse.json({ error: 'Provider is required' }, { status: 400 });
@@ -30,9 +47,15 @@ export async function POST(request: NextRequest) {
         ? String((runtime as any).decryptError)
         : null;
 
-    const credentials = runtime.credentials || {};
+    const storedCredentials = runtime.credentials || {};
+    const credentials = Object.keys(providedCredentials).length > 0 ? providedCredentials : storedCredentials;
+
     if (isDev) {
-      console.log(`Testing ${provider} with credential keys:`, Object.keys(credentials || {}));
+      console.log(
+        `Testing ${provider} with credential keys:`,
+        Object.keys(credentials || {}),
+        Object.keys(providedCredentials).length > 0 ? '(provided)' : '(stored)'
+      );
     }
 
     let testResult = { success: false, message: '' };
@@ -58,7 +81,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!testResult.success) {
-      if (decryptError) {
+      // If we were relying on stored creds and they can't be decrypted, surface the real root cause.
+      if (decryptError && Object.keys(providedCredentials).length === 0) {
         return NextResponse.json(
           {
             error:

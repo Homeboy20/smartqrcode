@@ -4,6 +4,8 @@ export type UniversalPaymentProvider = 'paystack' | 'flutterwave' | 'stripe' | '
 
 import { isAfricanCountryCode, type CurrencyCode } from '@/lib/currency';
 
+export const LOCAL_AFRICAN_CURRENCIES: CurrencyCode[] = ['NGN', 'GHS', 'KES', 'ZAR'];
+
 const PROVIDER_METHOD_SUPPORT: Record<UniversalPaymentProvider, Record<CheckoutPaymentMethod, boolean>> = {
   paystack: {
     card: true,
@@ -56,8 +58,7 @@ export function getSupportedPaymentMethodsForContext(options: {
   }
 
   // Africa: allow local-style methods only for local currencies.
-  const localCurrencies: CurrencyCode[] = ['NGN', 'GHS', 'KES', 'ZAR'];
-  const isLocalCurrency = localCurrencies.includes(options.currency);
+  const isLocalCurrency = LOCAL_AFRICAN_CURRENCIES.includes(options.currency);
 
   if (options.provider === 'flutterwave') {
     if (!isLocalCurrency) {

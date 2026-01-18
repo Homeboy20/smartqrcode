@@ -1,4 +1,4 @@
-import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js/min';
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export type CountryCallingCodeOption = {
   country: string; // ISO-3166-1 alpha-2

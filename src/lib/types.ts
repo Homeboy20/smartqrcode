@@ -169,6 +169,8 @@ export interface FlutterwaveCredentials {
   clientSecret: string;
   encryptionKey: string;
   webhookSecretHash?: string;
+  /** Optional ISO-3166-1 alpha-2 allow-list (comma-separated), e.g. "NG,GH,ZA" */
+  allowedCountries?: string;
 }
 
 export interface PaystackCredentials {
@@ -176,4 +178,6 @@ export interface PaystackCredentials {
   secretKey: string;
   planCodePro: string;
   planCodeBusiness: string;
+  /** Optional ISO-3166-1 alpha-2 allow-list (comma-separated), e.g. "NG,GH,ZA" */
+  allowedCountries?: string;
 } 

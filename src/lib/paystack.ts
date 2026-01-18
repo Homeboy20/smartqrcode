@@ -4,6 +4,31 @@ import { toMinorUnits, type CurrencyCode } from '@/lib/currency';
 // Paystack API base URLs
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
+// Paystack transaction channels (docs): card, bank, ussd, qr, mobile_money, bank_transfer, eft
+export const PAYSTACK_CHANNELS = [
+  'card',
+  'bank',
+  'ussd',
+  'qr',
+  'mobile_money',
+  'bank_transfer',
+  'eft',
+] as const;
+
+export type PaystackChannel = (typeof PAYSTACK_CHANNELS)[number];
+
+export function getPaystackChannelsForCheckoutMethod(method?: 'card' | 'mobile_money') {
+  if (method === 'card') return ['card'] as PaystackChannel[];
+
+  if (method === 'mobile_money') {
+    // In this app, "mobile_money" is a catch-all for non-card local methods.
+    // We do not force channels at initialization, but this represents what we'd typically allow.
+    return ['bank', 'ussd', 'mobile_money', 'bank_transfer'] as PaystackChannel[];
+  }
+
+  return [...PAYSTACK_CHANNELS] as PaystackChannel[];
+}
+
 // Paystack API client
 class PaystackClient {
   private secretKey: string;
@@ -139,6 +164,11 @@ class PaystackClient {
   async getCustomer(emailOrCode: string) {
     return this.request(`/customer/${emailOrCode}`);
   }
+
+  async listBanks(params?: { country?: string }) {
+    const query = params?.country ? `?country=${encodeURIComponent(params.country)}` : '';
+    return this.request(`/bank${query}`);
+  }
 }
 
 // Initialize Paystack client
@@ -272,6 +302,40 @@ export async function createPaystackCustomer({
     const message = String((error as any)?.message || 'Failed to create customer');
     throw new Error(message);
   }
+}
+
+function mapIsoCountryToPaystackCountryParam(countryCode: string): string | null {
+  const cc = String(countryCode || '').trim().toUpperCase();
+  // Paystack expects these as lowercase names (per their docs).
+  switch (cc) {
+    case 'NG':
+      return 'nigeria';
+    case 'GH':
+      return 'ghana';
+    case 'ZA':
+      return 'south africa';
+    default:
+      return null;
+  }
+}
+
+export async function listPaystackBanks(countryCode: string) {
+  const country = mapIsoCountryToPaystackCountryParam(countryCode);
+  if (!country) {
+    throw new Error(`Paystack bank list is only supported for NG, GH, ZA (got ${countryCode})`);
+  }
+
+  const client = await getPaystackClient();
+  const response = await client.listBanks({ country });
+  const banks = Array.isArray((response as any)?.data) ? (response as any).data : [];
+
+  return banks
+    .map((b: any) => ({
+      name: String(b?.name || ''),
+      code: b?.code ? String(b.code) : undefined,
+      slug: b?.slug ? String(b.slug) : undefined,
+    }))
+    .filter((b: any) => b.name);
 }
 
 // Create subscription (requires authorization code from previous transaction)

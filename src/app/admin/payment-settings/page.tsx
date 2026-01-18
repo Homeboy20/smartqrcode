@@ -16,6 +16,13 @@ export default function PaymentSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(false);
+  const [capabilitiesError, setCapabilitiesError] = useState<string | null>(null);
+  const [capabilitiesData, setCapabilitiesData] = useState<any>(null);
+  const [capabilitiesCountry, setCapabilitiesCountry] = useState('');
+  const [capabilitiesCurrency, setCapabilitiesCurrency] = useState('');
+  const [capabilitiesCopied, setCapabilitiesCopied] = useState(false);
   
   // Credentials state
   const [stripeCredentials, setStripeCredentials] = useState<StripeCredentials>({
@@ -37,14 +44,16 @@ export default function PaymentSettingsPage() {
     clientId: '',
     clientSecret: '',
     encryptionKey: '',
-    webhookSecretHash: ''
+    webhookSecretHash: '',
+    allowedCountries: ''
   });
   
   const [paystackCredentials, setPaystackCredentials] = useState<PaystackCredentials>({
     publicKey: '',
     secretKey: '',
     planCodePro: '',
-    planCodeBusiness: ''
+    planCodeBusiness: '',
+    allowedCountries: ''
   });
   
   const [providersStatus, setProvidersStatus] = useState({
@@ -127,6 +136,50 @@ export default function PaymentSettingsPage() {
     
     fetchCredentials();
   }, [session]);
+
+  const fetchCapabilities = async (options?: { country?: string; currency?: string }) => {
+    setCapabilitiesLoading(true);
+    setCapabilitiesError(null);
+    try {
+      const params = new URLSearchParams();
+      const country = (options?.country || '').trim().toUpperCase();
+      const currency = (options?.currency || '').trim().toUpperCase();
+      if (country) params.set('country', country);
+      if (currency) params.set('currency', currency);
+
+      const url = params.toString()
+        ? `/api/gateways/capabilities?${params.toString()}`
+        : '/api/gateways/capabilities';
+
+      const res = await fetch(url, { cache: 'no-store' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(String((data as any)?.error || `Failed to load capabilities (HTTP ${res.status})`));
+      }
+      setCapabilitiesData(data);
+    } catch (err: any) {
+      setCapabilitiesError(String(err?.message || 'Failed to load gateway capabilities'));
+    } finally {
+      setCapabilitiesLoading(false);
+    }
+  };
+
+  const copyCapabilitiesJson = async () => {
+    try {
+      if (!capabilitiesData) return;
+      const text = JSON.stringify(capabilitiesData, null, 2);
+      await navigator.clipboard.writeText(text);
+      setCapabilitiesCopied(true);
+      setTimeout(() => setCapabilitiesCopied(false), 1500);
+    } catch (err) {
+      setCapabilitiesError('Failed to copy JSON to clipboard');
+    }
+  };
+
+  useEffect(() => {
+    // Best-effort fetch; this endpoint is safe (no secrets) and helps admins confirm what is allowed.
+    fetchCapabilities().catch(() => {});
+  }, []);
 
   // Save credentials
   const saveCredentials = async (provider: 'stripe' | 'paypal' | 'flutterwave' | 'paystack') => {
@@ -240,6 +293,35 @@ export default function PaymentSettingsPage() {
         throw new Error('Authentication required');
       }
       
+      const credentialsForTest = (() => {
+        if (provider === 'paystack') {
+          return {
+            publicKey: paystackCredentials.publicKey,
+            secretKey: paystackCredentials.secretKey,
+          };
+        }
+        if (provider === 'flutterwave') {
+          return {
+            clientId: flutterwaveCredentials.clientId,
+            clientSecret: flutterwaveCredentials.clientSecret,
+            encryptionKey: flutterwaveCredentials.encryptionKey,
+            webhookSecretHash: flutterwaveCredentials.webhookSecretHash || '',
+          };
+        }
+        if (provider === 'stripe') {
+          return {
+            secretKey: stripeCredentials.secretKey,
+          };
+        }
+        if (provider === 'paypal') {
+          return {
+            clientId: paypalCredentials.clientId,
+            clientSecret: paypalCredentials.clientSecret,
+          };
+        }
+        return null;
+      })();
+
       const response = await fetch('/api/admin/payment-settings/test', {
         method: 'POST',
         headers: {
@@ -247,13 +329,30 @@ export default function PaymentSettingsPage() {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          provider
+          provider,
+          // Allow testing with the currently-entered values to avoid relying on
+          // decrypting old stored credentials (common when encryption key rotated).
+          credentials: credentialsForTest,
         }),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Connection test failed');
+        const contentType = response.headers.get('content-type') || '';
+        const raw = await response.text();
+        const payload = contentType.includes('application/json') && raw ? JSON.parse(raw) : null;
+
+        const message =
+          String(payload?.error || raw || 'Connection test failed').trim() || 'Connection test failed';
+
+        // Make the common encryption failure actionable for admins.
+        if (message.toLowerCase().includes('could not be decrypted')) {
+          throw new Error(
+            message +
+              '\n\nFix: set CREDENTIALS_ENCRYPTION_KEY (or CREDENTIALS_ENCRYPTION_KEYS) to the original key used to save credentials, or re-enter and save new credentials to re-encrypt them.'
+          );
+        }
+
+        throw new Error(message);
       }
       
       alert(`${provider.charAt(0).toUpperCase() + provider.slice(1)} connection test successful!`);
@@ -585,6 +684,175 @@ export default function PaymentSettingsPage() {
         
         {/* Gateway Overview with Toggle Buttons */}
         {renderGatewayOverview()}
+
+        {/* Gateway Capabilities (runtime audit, no secrets) */}
+        <div className="bg-white shadow rounded-lg mb-6">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-1">Gateway Capabilities</h3>
+                <p className="text-sm text-gray-500">
+                  Confirms which providers/currencies/countries are allowed at runtime (based on your configuration + enforcement rules).
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyCapabilitiesJson}
+                  disabled={!capabilitiesData}
+                  className="inline-flex justify-center py-2 px-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Copy the JSON response (no secrets)"
+                >
+                  {capabilitiesCopied ? 'Copied' : 'Copy JSON'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchCapabilities({ country: capabilitiesCountry, currency: capabilitiesCurrency })}
+                  disabled={capabilitiesLoading}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {capabilitiesLoading ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Country (optional)</label>
+                <input
+                  value={capabilitiesCountry}
+                  onChange={(e) => setCapabilitiesCountry(e.target.value)}
+                  placeholder="e.g. NG"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Currency (optional)</label>
+                <input
+                  value={capabilitiesCurrency}
+                  onChange={(e) => setCapabilitiesCurrency(e.target.value)}
+                  placeholder="e.g. NGN"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            {capabilitiesError && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {capabilitiesError}
+              </div>
+            )}
+
+            {capabilitiesData?.providers && (
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enabled</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Countries</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin countries</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currencies</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Methods</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider-native</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {(['flutterwave', 'paystack'] as const)
+                      .filter((p) => capabilitiesData.providers[p])
+                      .map((p) => {
+                        const row = capabilitiesData.providers[p];
+                        const enabled = Boolean(row?.enabled);
+                        const enabledReason = row?.enablementReason;
+                        const adminCountries = Array.isArray(row?.configuredAllowedCountries)
+                          ? row.configuredAllowedCountries
+                          : [];
+                        const countries = row?.supportedCountries;
+                        const currencies = Array.isArray(row?.supportedCurrencies) ? row.supportedCurrencies : [];
+                        const methods = Array.isArray(row?.supportedPaymentMethods) ? row.supportedPaymentMethods : [];
+                        const native = row?.providerNative;
+                        const nativeSummary =
+                          p === 'flutterwave'
+                            ? native?.flutterwave?.paymentOptions?.any
+                            : p === 'paystack'
+                              ? Array.isArray(native?.paystack?.channels?.any)
+                                ? native.paystack.channels.any.join(', ')
+                                : null
+                              : null;
+                        return (
+                          <tr key={p}>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{p}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                {enabled ? 'Enabled' : 'Disabled'}
+                              </span>
+                              {!enabled && enabledReason && (
+                                <div className="mt-1 text-xs text-gray-600">{String(enabledReason)}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {countries === 'ALL' ? 'ALL' : Array.isArray(countries) ? countries.join(', ') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {adminCountries.length ? adminCountries.join(', ') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{currencies.length ? currencies.join(', ') : '—'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{methods.length ? methods.join(', ') : '—'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">
+                              {nativeSummary ? (
+                                <code className="text-xs break-words">{String(nativeSummary)}</code>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {capabilitiesData?.context?.eligibility && (
+              <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
+                <div className="font-semibold mb-2">
+                  Eligibility for {String(capabilitiesData.context.countryCode)} / {String(capabilitiesData.context.currency)}
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(capabilitiesData.context.eligibility).map(([provider, info]: any) => (
+                    <div key={provider} className="flex items-start justify-between gap-3">
+                      <div className="font-medium">{provider}</div>
+                      <div className="flex-1 text-right">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${info?.allowed ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {info?.allowed ? 'Allowed' : 'Not allowed'}
+                        </span>
+                        {!info?.allowed && info?.reason && (
+                          <div className="text-xs text-gray-600 mt-1">{info.reason}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {capabilitiesData?.context?.paymentMethods && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="font-semibold mb-2">Allowed checkout methods (context)</div>
+                    <div className="space-y-1">
+                      {Object.entries(capabilitiesData.context.paymentMethods).map(([provider, methods]: any) => (
+                        <div key={provider} className="flex items-start justify-between gap-3">
+                          <div className="font-medium">{provider}</div>
+                          <div className="flex-1 text-right text-xs text-gray-700">
+                            {Array.isArray(methods) && methods.length ? methods.join(', ') : '—'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           {renderTabs()}
@@ -971,6 +1239,26 @@ export default function PaymentSettingsPage() {
                         Used to verify incoming webhook signatures.
                       </p>
                     </div>
+
+                    <div className="sm:col-span-6">
+                      <label htmlFor="flutterwaveAllowedCountries" className="block text-sm font-medium text-gray-700">
+                        Allowed Countries (optional)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="allowedCountries"
+                          id="flutterwaveAllowedCountries"
+                          placeholder="e.g. NG, GH, ZA (leave blank to allow all)"
+                          value={flutterwaveCredentials.allowedCountries || ''}
+                          onChange={handleFlutterwaveChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Comma-separated ISO country codes. If set, checkout will only allow Flutterwave for these countries.
+                      </p>
+                    </div>
                   </div>
                   
                   <div className="mt-6 flex items-center justify-end">
@@ -1098,6 +1386,26 @@ export default function PaymentSettingsPage() {
                           className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         />
                       </div>
+                    </div>
+
+                    <div className="sm:col-span-6">
+                      <label htmlFor="paystackAllowedCountries" className="block text-sm font-medium text-gray-700">
+                        Allowed Countries (optional)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="allowedCountries"
+                          id="paystackAllowedCountries"
+                          placeholder="e.g. NG, GH, ZA (leave blank to use default supported countries)"
+                          value={paystackCredentials.allowedCountries || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Comma-separated ISO country codes. If set, checkout will only allow Paystack for these countries.
+                      </p>
                     </div>
                   </div>
                   

@@ -37,6 +37,7 @@ interface SupabaseAuthContextType {
   resetPassword: (email: string) => Promise<boolean>;
   signInWithGoogle: (options?: { redirectTo?: string }) => Promise<boolean>;
   getAccessToken: () => Promise<string | null>;
+  refreshSession: () => Promise<void>;
   clearError: () => void;
   isAdmin: boolean;
 }
@@ -55,6 +56,7 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType>({
   resetPassword: async () => false,
   signInWithGoogle: async () => false,
   getAccessToken: async () => null,
+  refreshSession: async () => {},
   clearError: () => {},
   isAdmin: false,
 });
@@ -407,6 +409,20 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const refreshSession = async () => {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getSession(),
+        10_000,
+        'supabase.auth.getSession() (manual refresh)'
+      );
+      if (error) throw error;
+      await applySessionState(data.session);
+    } catch (err) {
+      console.warn('Manual auth session refresh failed:', err);
+    }
+  };
+
   return (
     <SupabaseAuthContext.Provider
       value={{
@@ -422,6 +438,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         resetPassword,
         signInWithGoogle,
         getAccessToken,
+        refreshSession,
         clearError,
         isAdmin,
       }}
