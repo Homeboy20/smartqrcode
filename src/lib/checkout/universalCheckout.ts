@@ -7,8 +7,6 @@ import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSet
 import { createPaystackCustomer, initializeSubscriptionPayment } from '@/lib/paystack';
 import {
   createFlutterwaveSubscriptionPayment,
-  getOrCreateFlutterwaveCustomer,
-  type FlutterwaveCustomer,
 } from '@/lib/flutterwave';
 import { getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
 
@@ -158,22 +156,6 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
       const planName = `${input.planId.charAt(0).toUpperCase() + input.planId.slice(1)} Plan`;
 
       const customerName = input.user?.user_metadata?.full_name || input.email.split('@')[0];
-      const nameParts = String(customerName).split(' ');
-
-      const flwCustomer: FlutterwaveCustomer = {
-        email: input.email,
-        name: {
-          first: nameParts[0] || '',
-          last: nameParts.slice(1).join(' ') || nameParts[0] || '',
-        },
-        meta: {
-          userId,
-          planId: input.planId,
-          source: 'smartqrcode',
-        },
-      };
-
-      const customer = await getOrCreateFlutterwaveCustomer(flwCustomer);
 
       const flutterwavePaymentMethod: 'card' | 'mobile_money' | undefined =
         input.paymentMethod === 'mobile_money'
@@ -197,7 +179,6 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
           userEmail: input.email,
           provider: 'flutterwave',
           paymentMethod: input.paymentMethod || 'card',
-          flwCustomerId: customer.id,
           currency: input.currency,
           countryCode: input.countryCode,
         },
