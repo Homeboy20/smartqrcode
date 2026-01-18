@@ -3,8 +3,8 @@
  *
  * This version loosens the build-time restrictions around environment variables.
  * Instead of failing the build when required Firebase variables are undefined,
- * it logs warnings and proceeds. This helps prevent Netlify deployments from
- * aborting when you intend to inject configuration later via the Netlify UI.
+ * it logs warnings and proceeds. This helps prevent deployments from aborting
+ * when you intend to inject configuration later via your hosting platform.
  */
 
 // Load environment variables from .env.local
@@ -45,7 +45,7 @@ function checkEnvVar(varName, isRequired = true) {
 }
 
 // Determine whether we’re in a production/build environment
-const isBuildEnv = process.env.NODE_ENV === 'production' || process.env.STATIC_EXPORT_ONLY === 'true';
+const isBuildEnv = process.env.NODE_ENV === 'production';
 console.log(`Environment: ${isBuildEnv ? 'Production/Build' : 'Development'}`);
 
 let missingRequired = false;
@@ -66,7 +66,7 @@ for (const envVar of optionalEnvVars) {
 if (missingRequired) {
   console.warn('⚠️ Missing required Firebase configuration environment variables!');
   console.warn('The build will continue, but some services may not function properly.');
-  console.warn('Please ensure these variables are defined in your deployment environment (e.g., Netlify UI).');
+  console.warn('Please ensure these variables are defined in your deployment environment.');
 } else {
   console.log('✅ All Firebase configuration environment variables are properly set.');
 }

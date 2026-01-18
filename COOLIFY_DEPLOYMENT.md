@@ -58,6 +58,32 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 NEXT_PUBLIC_APP_URL=https://your-domain.com
 ```
 
+#### Supabase (REQUIRED for checkout/admin/payment settings)
+These are used by App Router API routes like `POST /api/checkout/create-session`.
+
+**Build-time (client-side):**
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+
+**Runtime (server-side):**
+```
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+#### Credential encryption (REQUIRED if you set provider keys in the admin panel)
+Payment provider secrets saved via `/admin/payment-settings` are encrypted before being stored in the `payment_settings` table.
+Your server must be able to decrypt them to run checkout.
+
+**Runtime (server-side):**
+```
+CREDENTIALS_ENCRYPTION_KEY=change-me-32-bytes-or-a-long-passphrase
+# Or for rotation:
+# CREDENTIALS_ENCRYPTION_KEYS=key1,key2
+# CREDENTIALS_ENCRYPTION_KEY_OLD=old-key
+```
+
 #### Payment Providers (Optional)
 ```
 # Stripe
@@ -90,6 +116,29 @@ FLUTTERWAVE_ENCRYPTION_KEY=xxx
 Click **"Deploy"** and wait for the build to complete.
 
 ## Troubleshooting
+
+### Checkout error: "Unexpected token 'C'... Cannot POST ... is not valid JSON"
+This means your browser received a non-JSON response (usually a 404 text/HTML like `Cannot POST /api/checkout/create-session`).
+
+**Root cause:** the app is being served as a static site (or via the wrong build/start command), so `/api/*` routes do not exist.
+
+**Fix in Coolify:**
+- Use the provided `Dockerfile` (recommended) or a Node build that runs the Next server.
+- Build command must be `npm run build` (NOT any static-export scripts).
+- Start command should run the server: `npm run start` (which runs `node scripts/start.js`) or `node server.js` if using the Dockerfile output.
+
+**Quick verification:**
+- Visit `https://your-domain.com/api/health` — it must return JSON like `{ ok: true, ... }`.
+   - If it returns HTML/text or 404, you are not running the Next server.
+
+### Checkout shows "Unsupported provider" or no providers available
+This usually means the server could not read/decrypt provider credentials from `payment_settings`.
+
+Checklist:
+- `SUPABASE_SERVICE_ROLE_KEY` is set (runtime)
+- `NEXT_PUBLIC_SUPABASE_URL` is set (runtime/build)
+- `CREDENTIALS_ENCRYPTION_KEY(S)` is set (runtime)
+- In `/admin/payment-settings`, at least one provider is marked **Active** and has required fields filled
 
 ### Build Fails with "output: standalone" Error
 Make sure `next.config.js` has `output: 'standalone'` enabled.

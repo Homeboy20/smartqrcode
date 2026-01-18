@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { subscriptionFeatures, SubscriptionTier } from '@/lib/subscriptions';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
-import { getSupportedPaymentMethods, type CheckoutPaymentMethod, type UniversalPaymentProvider } from '@/lib/checkout/paymentMethodSupport';
+import type { UniversalPaymentProvider } from '@/lib/checkout/paymentMethodSupport';
 
 interface CurrencyInfo {
   country: string;
@@ -30,20 +31,11 @@ interface CurrencyInfo {
 }
 
 export default function PricingPage() {
-  const { user, getAccessToken } = useSupabaseAuth();
+  const router = useRouter();
+  const { user } = useSupabaseAuth();
   const { subscriptionTier, loading } = useSubscription();
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<UniversalPaymentProvider>('flutterwave');
-  const [email, setEmail] = useState('');
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(null);
   const [loadingCurrency, setLoadingCurrency] = useState(true);
-
-  useEffect(() => {
-    if (user?.email) {
-      setEmail(user.email);
-    }
-  }, [user?.email]);
 
   useEffect(() => {
     // Fetch currency information on mount
@@ -55,11 +47,7 @@ export default function PricingPage() {
         const providers = (data?.availableProviders || []) as UniversalPaymentProvider[];
         const recommended = data?.recommendedProvider as UniversalPaymentProvider | undefined;
 
-        if (recommended && providers.includes(recommended)) {
-          setSelectedProvider(recommended);
-        } else if (providers.length > 0) {
-          setSelectedProvider(providers[0]);
-        }
+        // Provider selection is handled on the /checkout page.
       })
       .catch((err) => {
         console.error('Failed to fetch currency info:', err);
@@ -74,147 +62,18 @@ export default function PricingPage() {
             business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
           },
         });
-
-        setSelectedProvider('flutterwave');
       })
       .finally(() => setLoadingCurrency(false));
   }, []);
 
-  const availableProviders = (currencyInfo?.availableProviders && currencyInfo.availableProviders.length > 0)
-    ? currencyInfo.availableProviders
-    : (['flutterwave', 'paystack'] as UniversalPaymentProvider[]);
-
-  useEffect(() => {
-    if (availableProviders.length === 0) return;
-    if (!availableProviders.includes(selectedProvider)) {
-      setSelectedProvider(availableProviders[0]);
-    }
-  }, [availableProviders, selectedProvider]);
-
-  const providerLabel = (provider: UniversalPaymentProvider) => {
-    switch (provider) {
-      case 'paystack':
-        return 'Paystack';
-      case 'flutterwave':
-        return 'Flutterwave';
-      case 'stripe':
-        return 'Stripe';
-      case 'paypal':
-        return 'PayPal';
-      default:
-        return provider;
-    }
-  };
-
-  const methodLabel = (method: CheckoutPaymentMethod) => {
-    switch (method) {
-      case 'card':
-        return 'Card';
-      case 'mobile_money':
-        return 'Mobile Money';
-      case 'apple_pay':
-        return 'Apple Pay';
-      case 'google_pay':
-        return 'Google Pay';
-      default:
-        return method;
-    }
-  };
-
   const handleUpgrade = async (tier: SubscriptionTier) => {
     if (tier === 'free') {
-      // Free plan should not open the payment modal.
-      setShowCheckoutModal(false);
       window.location.href = user ? '/dashboard' : '/register';
       return;
     }
 
-    // Set tier and show modal immediately - no login required!
-    setSelectedTier(tier);
-    setEmail(user?.email || '');
-    setShowCheckoutModal(true);
-  };
-
-  const handleCheckout = async () => {
-    if (!selectedTier || !email) {
-      alert('Please enter your email');
-      return;
-    }
-
-    if (selectedTier === 'free') {
-      alert('Free plan does not require payment.');
-      setShowCheckoutModal(false);
-      return;
-    }
-
-    try {
-      // For new users (no account), we'll auto-create on payment success
-      // For existing users, link payment to their account
-      const checkoutData = {
-        planId: selectedTier,
-        provider: selectedProvider,
-        email: email,
-        successUrl: `${window.location.origin}/dashboard?welcome=true`,
-        cancelUrl: `${window.location.origin}/pricing?canceled=true`,
-      };
-
-      // If user is logged in, include auth token
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
-
-      const accessToken = await getAccessToken();
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      // Create checkout session via API
-      const response = await fetch('/api/checkout/create-session', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(checkoutData),
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      const raw = await response.text();
-      const isJson = contentType.includes('application/json');
-      let data: any = null;
-
-      if (raw && isJson) {
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          // JSON header but invalid body
-          throw new Error(`Invalid JSON from checkout API (status ${response.status}).`);
-        }
-      }
-
-      if (!isJson) {
-        const snippet = (raw || '').slice(0, 200);
-        throw new Error(
-          `Checkout API returned non-JSON (status ${response.status}). ` +
-            (snippet ? `Response: ${snippet}` : 'Empty response')
-        );
-      }
-      
-      if (!response.ok) {
-        const errorMessage = data.error || 'Failed to create checkout session';
-        throw new Error(errorMessage);
-      }
-      
-      // Redirect to payment gateway
-      if (data.url) {
-        // Close modal before redirect
-        setShowCheckoutModal(false);
-        // Redirect to payment page
-        window.location.href = data.url;
-      } else {
-        throw new Error('No checkout URL received');
-      }
-    } catch (error) {
-      console.error('Error starting checkout:', error);
-      alert(`Checkout error: ${error instanceof Error ? error.message : 'Unknown error. Please try again.'}`);
-    }
+    // Dedicated checkout page for a focused, low-friction flow.
+    router.push(`/checkout?plan=${tier}`);
   };
 
   const renderFeatures = (tier: SubscriptionTier) => {
@@ -424,11 +283,11 @@ export default function PricingPage() {
                   }`}
                 >
                   {subscriptionTier === 'pro' ? '✓ Current Plan' : 
-                   subscriptionTier === 'business' ? 'Downgrade to Pro' : '🚀 Start Free Trial'}
+                   subscriptionTier === 'business' ? 'Downgrade to Pro' : 'Continue to checkout'}
                 </button>
                 {subscriptionTier !== 'pro' && (
                   <p className="mt-3 text-center text-xs text-gray-500">
-                    No payment required • Start trial in 30 seconds
+                    14-day money-back guarantee • Checkout in ~30 seconds
                   </p>
                 )}
               </div>
@@ -547,7 +406,7 @@ export default function PricingPage() {
                   Is there a free trial?
                   <span className="ml-2 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
-                <p className="mt-3 text-gray-600 text-sm">Yes! Pro and Business plans come with a 14-day free trial. No credit card required to start.</p>
+                <p className="mt-3 text-gray-600 text-sm">We don’t currently offer a free trial. You’re covered by a 14-day money-back guarantee, so you can upgrade with confidence.</p>
               </details>
               
               <details className="group border border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition">
@@ -561,177 +420,6 @@ export default function PricingPage() {
           </div>
         </div>
         
-        {/* Checkout Section */}
-        {showCheckoutModal && selectedTier && (
-          <div className="fixed inset-0 z-[9999] overflow-y-auto animate-fadeIn">
-            <div className="flex items-center justify-center min-h-screen px-4 py-8">
-              {/* Background overlay */}
-              <div 
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-                onClick={() => setShowCheckoutModal(false)}
-              ></div>
-
-              {/* Modal panel */}
-              <div className="relative bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all w-full max-w-lg animate-slideUp">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-2xl font-bold text-white">
-                        {selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} Plan
-                      </h3>
-                      <p className="mt-1 text-indigo-100 text-sm">
-                        14-day free trial • Cancel anytime
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowCheckoutModal(false)}
-                      className="text-white hover:text-gray-200 transition"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  {/* Price */}
-                  <div className="mt-4 flex items-baseline">
-                    <span className="text-5xl font-extrabold text-white">
-                      {selectedTier === 'pro' ? proPrice : businessPrice}
-                    </span>
-                    <span className="ml-2 text-xl text-indigo-100">/month</span>
-                  </div>
-                </div>
-
-                {/* Form */}
-                <div className="px-6 py-6 space-y-6">
-                  {/* Email field */}
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-semibold text-gray-900 mb-2">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                      required
-                    />
-                    <p className="mt-2 text-xs text-gray-500">
-                      {user ? 'We\'ll send your receipt here' : 'We\'ll create your account automatically'}
-                    </p>
-                  </div>
-
-                  {/* Payment Gateway Selection */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Payment Gateway
-                    </label>
-
-                    <div className="space-y-3">
-                      {availableProviders.map((provider) => {
-                        const supportedMethods = getSupportedPaymentMethods(provider);
-                        const isSelected = selectedProvider === provider;
-                        const isRecommended = currencyInfo?.recommendedProvider === provider;
-
-                        return (
-                          <button
-                            key={provider}
-                            type="button"
-                            onClick={() => setSelectedProvider(provider)}
-                            className={`w-full text-left border-2 rounded-xl p-4 transition-all ${
-                              isSelected
-                                ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                                : 'border-gray-200 hover:border-indigo-300'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <input
-                                id={`provider-${provider}`}
-                                name="paymentProvider"
-                                type="radio"
-                                value={provider}
-                                checked={isSelected}
-                                onChange={() => setSelectedProvider(provider)}
-                                className="mt-1 h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                              />
-
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-2">
-                                  <label htmlFor={`provider-${provider}`} className="text-sm font-semibold text-gray-900">
-                                    {providerLabel(provider)}
-                                  </label>
-                                  {isRecommended && (
-                                    <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">
-                                      Recommended
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {supportedMethods.map((method) => (
-                                    <span
-                                      key={`${provider}-${method}`}
-                                      className="text-[11px] font-medium px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-700"
-                                    >
-                                      {methodLabel(method)}
-                                    </span>
-                                  ))}
-                                </div>
-
-                                <p className="mt-2 text-xs text-gray-500">
-                                  You can choose the exact method on the checkout page.
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Trust signals */}
-                  <div className="flex items-center justify-center space-x-6 text-xs text-gray-500 border-t pt-4">
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-green-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                      Secure Payment
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-blue-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Cancel Anytime
-                    </div>
-                    <div className="flex items-center">
-                      <svg className="w-4 h-4 text-yellow-600 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                      </svg>
-                      Instant Access
-                    </div>
-                  </div>
-
-                  {/* CTA Button */}
-                  <button
-                    onClick={handleCheckout}
-                    disabled={false}
-                    className="w-full py-4 px-6 rounded-xl shadow-lg font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transform hover:scale-105 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    🚀 Start 14-Day Free Trial
-                  </button>
-
-                  <p className="text-center text-xs text-gray-500">
-                    No payment required now. You'll only be charged after your trial ends.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,5 +1,0 @@
-# NOTE: This file previously contained SPA rewrites to /index.html.
-# That breaks Next.js API routes on Netlify (e.g. POST /api/checkout/create-session)
-# by rewriting /api/* requests to an HTML page.
-#
-# Next.js routing (pages + API routes) is handled by @netlify/plugin-nextjs.

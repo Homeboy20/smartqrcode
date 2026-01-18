@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { createHash } from 'crypto';
 
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
 import { createPaystackCustomer, initializeSubscriptionPayment } from '@/lib/paystack';
@@ -15,6 +16,21 @@ import {
   providerSupportsPaymentMethod,
   type CheckoutPaymentMethod,
 } from '@/lib/checkout/paymentMethodSupport';
+
+const PROVIDER_CURRENCY_SUPPORT: Record<PaymentProvider, CurrencyCode[]> = {
+  // Paystack is used for NG/GH/ZA pricing in this app.
+  paystack: ['NGN', 'GHS', 'ZAR'],
+  // Flutterwave is our default for USD/EUR and also supports several African currencies.
+  flutterwave: ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR'],
+  // Not integrated (kept disabled)
+  stripe: [],
+  paypal: [],
+};
+
+export function providerSupportsCurrency(provider: PaymentProvider, currency: CurrencyCode): boolean {
+  const allowed = PROVIDER_CURRENCY_SUPPORT[provider] || [];
+  return allowed.includes(currency);
+}
 
 export type CheckoutPlanId = 'pro' | 'business';
 
@@ -36,6 +52,7 @@ export type CheckoutSessionInput = {
   email: string;
   paymentMethod?: CheckoutPaymentMethod;
   provider?: PaymentProvider;
+  idempotencyKey?: string;
 
   // Auth/context
   user?: any;
@@ -244,17 +261,23 @@ async function isProviderEnabled(provider: PaymentProvider): Promise<boolean> {
 }
 
 export async function getAvailableCheckoutProviders(): Promise<PaymentProvider[]> {
-  const available: PaymentProvider[] = [];
+  try {
+    const available: PaymentProvider[] = [];
 
-  for (const provider of INTEGRATED_PROVIDERS) {
-    // Must have an adapter AND be enabled/configured.
-    if (!(provider in ADAPTERS)) continue;
-    if (await isProviderEnabled(provider)) {
-      available.push(provider);
+    for (const provider of INTEGRATED_PROVIDERS) {
+      // Must have an adapter AND be enabled/configured.
+      if (!(provider in ADAPTERS)) continue;
+      if (await isProviderEnabled(provider)) {
+        available.push(provider);
+      }
     }
-  }
 
-  return available;
+    return available;
+  } catch {
+    // If Supabase/payment settings are not configured (common in local smoke tests),
+    // fall back to integrated providers so pricing can still suggest a provider.
+    return INTEGRATED_PROVIDERS.filter((p) => p in ADAPTERS);
+  }
 }
 
 export function chooseDefaultProvider(options: {
@@ -286,6 +309,13 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     return chooseDefaultProvider({ currency: input.currency, availableProviders });
   })();
 
+  if (!providerSupportsCurrency(selectedProvider, input.currency)) {
+    throw new Error(
+      `Selected provider does not support currency: ${input.currency}. ` +
+        `Try a different provider or change currency.`
+    );
+  }
+
   if (paymentMethod && !providerSupportsPaymentMethod(selectedProvider, paymentMethod)) {
     throw new Error(`Selected provider does not support payment method: ${paymentMethod}`);
   }
@@ -300,8 +330,82 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     throw new Error(`Provider not integrated: ${selectedProvider}`);
   }
 
-  const userId = input.user?.id || `guest_${Date.now()}`;
-  const reference = `${input.planId}_${userId}_${Date.now()}`;
+  const userId: string = input.user?.id || `guest_${Date.now()}`;
 
-  return adapter.createSession({ input, amount, reference, userId });
+  const idempotencyKey = String(input.idempotencyKey || '').trim();
+  const reference = (() => {
+    if (!idempotencyKey) return `${input.planId}_${userId}_${Date.now()}`;
+    const hash = createHash('sha256').update(idempotencyKey).digest('hex').slice(0, 12);
+    // Keep tx_ref short and URL-safe.
+    return `${input.planId}_${userId}_${hash}`;
+  })();
+
+  // Best-effort idempotency: for authenticated users, persist a pending transaction row keyed by tx_ref.
+  // This lets us safely return the same checkout URL on retries and avoid double-charging from rapid re-submits.
+  const canPersist = Boolean(input.user?.id);
+  if (canPersist && idempotencyKey) {
+    // If a session already exists for this reference, return it.
+    const { data: existing } = await input.supabaseAdmin
+      .from('transactions')
+      .select('transaction_id, payment_gateway, status, metadata, created_at')
+      .eq('transaction_id', reference)
+      .maybeSingle();
+
+    const existingUrl = (existing as any)?.metadata?.checkoutUrl as string | undefined;
+    if (existing && existingUrl) {
+      return {
+        provider: selectedProvider,
+        reference,
+        url: existingUrl,
+        testMode: process.env.NODE_ENV !== 'production',
+        flwRef: (existing as any)?.metadata?.flwRef,
+      };
+    }
+
+    // Try to reserve this reference for the current attempt.
+    // If another request has already reserved it, decide whether to allow retry.
+    if (!existing) {
+      await input.supabaseAdmin.from('transactions').insert({
+        user_id: input.user.id,
+        user_email: input.email,
+        amount,
+        currency: input.currency,
+        status: 'pending',
+        payment_gateway: selectedProvider,
+        payment_method: input.paymentMethod || 'card',
+        plan: input.planId,
+        transaction_id: reference,
+        metadata: {
+          stage: 'creating_checkout_session',
+          idempotencyKey,
+        },
+      });
+    } else {
+      const createdAt = (existing as any)?.created_at ? new Date((existing as any).created_at) : null;
+      const ageMs = createdAt ? Date.now() - createdAt.getTime() : 0;
+
+      // If the existing record is very recent and doesn't yet have a URL, treat as in-progress.
+      if (ageMs > 0 && ageMs < 30_000) {
+        throw new Error('Checkout session is already being created. Please wait a few seconds and try again.');
+      }
+    }
+  }
+
+  const session = await adapter.createSession({ input, amount, reference, userId });
+
+  if (canPersist && idempotencyKey) {
+    await input.supabaseAdmin
+      .from('transactions')
+      .update({
+        metadata: {
+          stage: 'checkout_session_created',
+          idempotencyKey,
+          checkoutUrl: session.url,
+          flwRef: (session as any).flwRef,
+        },
+      })
+      .eq('transaction_id', reference);
+  }
+
+  return session;
 }

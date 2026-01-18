@@ -23,8 +23,8 @@ const nextConfig = {
       },
     ],
   },
-  // Trailing-slash redirects can break POST /api/* on some hosts (e.g., Netlify)
-  // by redirecting to a path that isn't routed for functions.
+  // Trailing-slash redirects can break POST /api/* on some hosts
+  // by redirecting to a path that isn't routed for the server.
   trailingSlash: false,
   assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
   experimental: {
@@ -33,7 +33,6 @@ const nextConfig = {
     missingSuspenseWithCSRBailout: false,
   },
   // Removed output: 'export' to allow dynamic routes to work properly
-  // Netlify's Next.js adapter will handle SSR for dynamic routes
   distDir: '.next',
   // Exclude specific routes from static build
   excludeDefaultMomentLocales: true,

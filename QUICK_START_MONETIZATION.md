@@ -197,7 +197,7 @@ Your app now has:
 
 **This Week:**
 - [ ] Test complete payment flow
-- [ ] Deploy to production (Netlify/Vercel)
+- [ ] Deploy to production
 - [ ] Switch to live payment keys
 - [ ] Launch marketing!
 

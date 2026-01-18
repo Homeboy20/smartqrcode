@@ -9,11 +9,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/check-node-version.js && node scripts/check-firebase-config.js && next build",
-    "export": "next export",
-    "build:static": "next build && next export",
     "start": "node scripts/start.js",
     "lint": "next lint",
-    "netlify:build": "node scripts/netlify-build.js",
     "test:credentials": "ts-node --transpile-only --project tsconfig.scripts.json -r tsconfig-paths/register scripts/test-credentials.ts",
     "test:credentials:simple": "node scripts/test-credentials-simple.js",
     "test:credential-storage": "node scripts/test-credential-storage.js"
@@ -56,7 +53,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@netlify/plugin-nextjs": "^5.10.7",
     "@tailwindcss/postcss": "^4",
     "@types/file-saver": "^2.0.7",
     "@types/node": "^20",

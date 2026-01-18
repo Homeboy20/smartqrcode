@@ -220,7 +220,7 @@ WHERE email = 'YOUR_EMAIL_HERE@example.com';
 ## 🌍 Deployment
 
 ### Environment Variables
-Add to your hosting platform (Netlify/Vercel):
+Add to your hosting platform:
 
 ```env
 # Supabase
@@ -241,8 +241,11 @@ PAYSTACK_WEBHOOK_SECRET=whsec_xxx
 FLUTTERWAVE_WEBHOOK_HASH=xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
-# Encryption (for storing sensitive data)
-ENCRYPTION_KEY=your_random_32_char_key
+# Credential encryption (required if using /admin/payment-settings)
+# Used to encrypt/decrypt payment provider secrets stored in Supabase.
+CREDENTIALS_ENCRYPTION_KEY=change-me-32-bytes-or-a-long-passphrase
+# CREDENTIALS_ENCRYPTION_KEYS=key1,key2
+# CREDENTIALS_ENCRYPTION_KEY_OLD=old-key-for-rotation
 ```
 
 ### Production Checklist

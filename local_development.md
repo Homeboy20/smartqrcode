@@ -73,23 +73,18 @@ supabase secrets set CONTACT_NOTIFY_FROM="ScanMagic <noreply@scanmagic.online>"
 
 If you see CORS errors in the browser, it usually means the deployed function code is out of date and needs redeploying.
 
-## Testing the Netlify Build Process Locally
+## Testing a Production Build Locally
 
-If you want to test the Netlify build process locally:
+To validate that SSR + API routes work end-to-end, run a production build locally:
 
-1. **Install Netlify CLI**
+1. **Build**
    ```
-   npm install netlify-cli -g
-   ```
-
-2. **Build the site**
-   ```
-   npm run netlify-build
+   npm run build
    ```
 
-3. **Serve the built site locally**
+2. **Start**
    ```
-   netlify dev
+   npm start
    ```
 
 ## Common Issues

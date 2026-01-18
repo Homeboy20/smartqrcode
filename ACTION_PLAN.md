@@ -160,7 +160,7 @@ Once you complete the 4 steps above, your app is **FULLY FUNCTIONAL** and ready 
 - [ ] Verify premium access works
 
 ### This Week (Deploy!)
-- [ ] Choose hosting: Vercel or Netlify
+- [ ] Choose hosting (e.g., Coolify/Vercel/any Node host)
 - [ ] Deploy to production
 - [ ] Add custom domain
 - [ ] Switch to live payment keys

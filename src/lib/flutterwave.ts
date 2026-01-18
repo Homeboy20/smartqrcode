@@ -5,6 +5,19 @@ import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 
 const FLUTTERWAVE_V4_BASE_URL = 'https://api.flutterwave.com/v4';
 
+const DEFAULT_FLW_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // Types for Flutterwave V4 API
 export interface FlutterwaveCustomer {
   id?: string;
@@ -74,13 +87,14 @@ async function getFlutterwaveCredentials() {
 async function flutterwaveRequest(
   endpoint: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: any
+  body?: any,
+  requestOptions?: { timeoutMs?: number }
 ) {
   const { clientSecret } = await getFlutterwaveCredentials();
   
   const url = `${FLUTTERWAVE_V4_BASE_URL}${endpoint}`;
   
-  const options: RequestInit = {
+  const init: RequestInit = {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -89,22 +103,47 @@ async function flutterwaveRequest(
   };
   
   if (body && (method === 'POST' || method === 'PUT')) {
-    options.body = JSON.stringify(body);
+    init.body = JSON.stringify(body);
   }
-  
-  const response = await fetch(url, options);
-  const data = await response.json();
-  
-  if (!response.ok || data.status !== 'success') {
-    const errorMessage = data.message || `Flutterwave API error: ${response.statusText}`;
+
+  const timeoutMs = requestOptions?.timeoutMs ?? DEFAULT_FLW_TIMEOUT_MS;
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(url, init, timeoutMs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.toLowerCase().includes('aborted')) {
+      throw new Error('Flutterwave request timed out');
+    }
+    throw err;
+  }
+
+  const raw = await response.text();
+  let data: any = null;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
+    data = null;
+  }
+
+  const ok = response.ok && data?.status === 'success';
+  if (!ok) {
+    const errorMessage =
+      data?.message ||
+      data?.error ||
+      (raw && raw.length ? raw.slice(0, 200) : undefined) ||
+      `Flutterwave API error: ${response.status} ${response.statusText}`;
+
     console.error('Flutterwave API Error:', {
+      endpoint,
       status: response.status,
       message: errorMessage,
-      data
+      data,
     });
     throw new Error(errorMessage);
   }
-  
+
   return data;
 }
 
@@ -229,8 +268,6 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
   } = params;
   
   try {
-    const { clientSecret } = await getFlutterwaveCredentials();
-    
     const payload = {
       tx_ref: reference,
       amount: amount.toString(),
@@ -254,27 +291,12 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
       },
     };
 
-    const response = await fetch(`${FLUTTERWAVE_V4_BASE_URL}/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${clientSecret}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await response.json();
-
-    if (!response.ok || json?.status !== 'success') {
-      const message = json?.message || 'Failed to initialize Flutterwave payment';
-      console.error('Flutterwave V4 init error:', message, json);
-      throw new Error(message);
-    }
+    const response = await flutterwaveRequest('/payments', 'POST', payload);
 
     return {
       reference,
-      paymentLink: json.data?.link,
-      flwRef: json.data?.id,
+      paymentLink: response.data?.link,
+      flwRef: response.data?.id,
     };
   } catch (error) {
     console.error('Error creating Flutterwave subscription payment:', error);

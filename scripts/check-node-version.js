@@ -3,8 +3,8 @@
  *
  * This version logs warnings when the Node.js major version falls outside
  * the recommended range (>=18 and <22) instead of exiting the process.
- * This avoids aborting the build on platforms like Netlify that may use
- * slightly different Node versions.  It still informs you when the version
+ * This avoids aborting the build on some CI/build platforms that may use
+ * slightly different Node versions. It still informs you when the version
  * could be problematic so you can adjust the environment if necessary.
  */
 

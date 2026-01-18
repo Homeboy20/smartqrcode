@@ -2,6 +2,8 @@ export type CheckoutPaymentMethod = 'card' | 'mobile_money' | 'apple_pay' | 'goo
 
 export type UniversalPaymentProvider = 'paystack' | 'flutterwave' | 'stripe' | 'paypal';
 
+import { isAfricanCountryCode, type CurrencyCode } from '@/lib/currency';
+
 const PROVIDER_METHOD_SUPPORT: Record<UniversalPaymentProvider, Record<CheckoutPaymentMethod, boolean>> = {
   paystack: {
     card: true,
@@ -38,4 +40,39 @@ export function getSupportedPaymentMethods(provider: UniversalPaymentProvider): 
   const support = PROVIDER_METHOD_SUPPORT[provider];
   if (!support) return [];
   return (Object.keys(support) as CheckoutPaymentMethod[]).filter((method) => Boolean(support[method]));
+}
+
+export function getSupportedPaymentMethodsForContext(options: {
+  provider: UniversalPaymentProvider;
+  countryCode: string;
+  currency: CurrencyCode;
+}): CheckoutPaymentMethod[] {
+  const methods = getSupportedPaymentMethods(options.provider);
+  const countryIsAfrican = isAfricanCountryCode(options.countryCode);
+
+  // Outside Africa: card-only in USD/EUR.
+  if (!countryIsAfrican) {
+    return methods.filter((m) => m === 'card');
+  }
+
+  // Africa: allow local-style methods only for local currencies.
+  const localCurrencies: CurrencyCode[] = ['NGN', 'GHS', 'KES', 'ZAR'];
+  const isLocalCurrency = localCurrencies.includes(options.currency);
+
+  if (options.provider === 'flutterwave') {
+    if (!isLocalCurrency) {
+      return methods.filter((m) => m === 'card');
+    }
+    return methods;
+  }
+
+  // Paystack is primarily Africa-focused; keep mobile methods only where we have local currency pricing.
+  if (options.provider === 'paystack') {
+    if (!isLocalCurrency) {
+      return methods.filter((m) => m === 'card');
+    }
+    return methods;
+  }
+
+  return methods;
 }

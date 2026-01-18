@@ -1,3 +1,0 @@
-# This file tells Netlify to completely ignore the Next.js plugin
-# This is necessary because the plugin is being added from the Netlify UI
-@netlify/plugin-nextjs 

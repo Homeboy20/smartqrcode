@@ -100,19 +100,50 @@ export const SUBSCRIPTION_PRICING: Record<'pro' | 'business', PricingTier> = {
   },
 };
 
+// Used to decide when to show local payment options (e.g., mobile money) vs card-only.
+// ISO 3166-1 alpha-2 country codes.
+const AFRICAN_COUNTRY_CODES = new Set([
+  'DZ','AO','BJ','BW','BF','BI','CV','CM','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','ZM','ZW'
+]);
+
+// Countries where we prefer EUR by default when outside Africa.
+// (EU/EEA + a few common EUR users; keep conservative)
+const EUR_COUNTRY_CODES = new Set([
+  'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE',
+  'NO','IS','LI','CH',
+]);
+
+export function isAfricanCountryCode(countryCode: string): boolean {
+  return AFRICAN_COUNTRY_CODES.has(countryCode.toUpperCase());
+}
+
+export function isEurCountryCode(countryCode: string): boolean {
+  return EUR_COUNTRY_CODES.has(countryCode.toUpperCase());
+}
+
 /**
  * Get currency based on country code
  */
 export function getCurrencyForCountry(countryCode: string): CurrencyConfig {
   const upperCode = countryCode.toUpperCase();
-  
-  for (const currency of Object.values(CURRENCY_CONFIGS)) {
-    if (currency.countries.includes(upperCode)) {
-      return currency;
+
+  // 1) Africa: prefer a configured local currency (NGN/GHS/KES/ZAR etc) when available.
+  if (isAfricanCountryCode(upperCode)) {
+    for (const currency of Object.values(CURRENCY_CONFIGS)) {
+      if (currency.countries.includes(upperCode)) {
+        return currency;
+      }
     }
+    // If we don't have a local mapping yet, fall back to USD.
+    return CURRENCY_CONFIGS.USD;
   }
-  
-  // Default to USD
+
+  // 2) Outside Africa: show card payments in USD or EUR.
+  // Prefer EUR for common European countries, otherwise USD.
+  if (isEurCountryCode(upperCode)) {
+    return CURRENCY_CONFIGS.EUR;
+  }
+
   return CURRENCY_CONFIGS.USD;
 }
 
@@ -159,11 +190,15 @@ export function fromMinorUnits(amount: number, currency: CurrencyCode): number {
  */
 export function detectCountryFromHeaders(headers: Headers): string {
   // Check various headers that hosting providers set
+  const explicit = headers.get('x-checkout-country') || headers.get('x-country');
   const cfCountry = headers.get('cf-ipcountry'); // Cloudflare
   const vercelCountry = headers.get('x-vercel-ip-country'); // Vercel
-  const country = cfCountry || vercelCountry;
-  
-  return country || 'US'; // Default to US
+  const country = explicit || cfCountry || vercelCountry;
+
+  const normalized = (country || '').trim().toUpperCase();
+  // ISO 3166-1 alpha-2
+  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
+  return 'US'; // Default to US
 }
 
 /**

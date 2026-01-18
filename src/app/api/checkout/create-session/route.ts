@@ -8,15 +8,28 @@ import {
 } from '@/lib/currency';
 import { createUniversalCheckoutSession } from '@/lib/checkout/universalCheckout';
 
+function normalizeCountryCode(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) return null;
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     const supabaseAdmin = getSupabaseAdmin();
-    
-    // Detect user's country and currency
-    const countryCode = detectCountryFromHeaders(request.headers);
+
+    // Parse body early so we can respect an explicit billing/checkout country.
+    const body = await request.json();
+
+    // Detect user's country and currency (allow explicit override)
+    const explicitCountry = normalizeCountryCode(body?.countryCode);
+    const countryCode = explicitCountry || detectCountryFromHeaders(request.headers);
     const currencyConfig = getCurrencyForCountry(countryCode);
-    console.log(`Detected country: ${countryCode}, currency: ${currencyConfig.code}`);
+    console.log(
+      `Detected country: ${countryCode}${explicitCountry ? ' (explicit)' : ''}, currency: ${currencyConfig.code}`
+    );
     
     // Try to get user from token if provided
     let verifiedUser = null;
@@ -30,7 +43,6 @@ export async function POST(request: NextRequest) {
     }
 
     // If no token or invalid token, allow guest checkout with email
-    const body = await request.json();
     if (!verifiedUser && !body.email) {
       return NextResponse.json({ 
         error: 'Authentication required or email must be provided' 
@@ -68,7 +80,7 @@ async function processCheckout(
   currency: CurrencyCode, 
   countryCode: string
 ) {
-  const { planId, successUrl, cancelUrl, email, paymentMethod } = body;
+  const { planId, successUrl, cancelUrl, email, paymentMethod, idempotencyKey } = body;
 
   if (!planId || !successUrl || !cancelUrl) {
     return NextResponse.json({ error: 'Missing required fields: planId, successUrl, and cancelUrl are required' }, { status: 400 });
@@ -100,6 +112,7 @@ async function processCheckout(
       email: userEmail,
       paymentMethod,
       provider,
+      idempotencyKey,
       user,
       supabaseAdmin,
     });

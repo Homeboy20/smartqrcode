@@ -275,7 +275,7 @@ Run the SQL migration to create app_settings table:
 ### 5. **Production Deployment**
 - [ ] Run database migration in production
 - [ ] Set environment variables
-- [ ] Deploy to Vercel/Netlify
+- [ ] Deploy to your hosting platform
 - [ ] Test live payment flow
 - [ ] Monitor error logs
 

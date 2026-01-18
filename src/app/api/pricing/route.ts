@@ -7,15 +7,31 @@ import {
   getRecommendedProvider,
   SUBSCRIPTION_PRICING
 } from '@/lib/currency';
-import { chooseDefaultProvider, getAvailableCheckoutProviders } from '@/lib/checkout/universalCheckout';
+import {
+  chooseDefaultProvider,
+  getAvailableCheckoutProviders,
+  providerSupportsCurrency,
+} from '@/lib/checkout/universalCheckout';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function normalizeCountryCode(value: string | null | undefined): string | null {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
 
 export async function GET(request: NextRequest) {
   try {
-    // Detect country from headers
-    const countryCode = detectCountryFromHeaders(request.headers);
+    // Detect country from headers unless explicitly overridden.
+    const urlCountry = normalizeCountryCode(request.nextUrl.searchParams.get('country'));
+    const headerCountry = normalizeCountryCode(request.headers.get('x-checkout-country'));
+    const countryCode = urlCountry || headerCountry || detectCountryFromHeaders(request.headers);
     const currencyConfig = getCurrencyForCountry(countryCode);
 
-    const availableProviders = await getAvailableCheckoutProviders();
+    const allProviders = await getAvailableCheckoutProviders();
+    const availableProviders = allProviders.filter((p) => providerSupportsCurrency(p, currencyConfig.code));
     const recommendedProvider = chooseDefaultProvider({
       currency: currencyConfig.code,
       availableProviders,

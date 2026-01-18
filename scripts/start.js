@@ -4,10 +4,11 @@ const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-function run(command, args, extraEnv = {}) {
+function run(command, args, extraEnv = {}, options = {}) {
   const child = spawn(command, args, {
     stdio: 'inherit',
     env: { ...process.env, ...extraEnv },
+    ...options,
   });
 
   child.on('exit', (code) => {
@@ -38,6 +39,7 @@ function copyRecursiveSync(src, dest) {
 
 const projectRoot = process.cwd();
 const standaloneServer = path.join(projectRoot, '.next', 'standalone', 'server.js');
+const standaloneDir = path.join(projectRoot, '.next', 'standalone');
 
 const port = process.env.PORT || '3000';
 // Use HOST or default to 0.0.0.0 for binding (HOSTNAME is often the container ID)
@@ -65,10 +67,10 @@ if (fs.existsSync(standaloneServer)) {
   }
   
   console.log(`Starting Next.js standalone server on ${host}:${port}...`);
-  run(process.execPath, [standaloneServer], { PORT: port, HOSTNAME: host });
+  run(process.execPath, [standaloneServer], { PORT: port, HOSTNAME: host }, { cwd: standaloneDir });
 } else {
   // Fallback for non-standalone builds.
-  const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   console.log(`Starting Next.js (next start) on ${host}:${port}...`);
-  run(npxCmd, ['next', 'start', '-H', host, '-p', port], {});
+  const nextCli = require.resolve('next/dist/bin/next');
+  run(process.execPath, [nextCli, 'start', '-H', host, '-p', port], {}, { cwd: projectRoot });
 }
