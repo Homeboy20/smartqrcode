@@ -331,6 +331,10 @@ export function detectCountryFromHeaders(headers: Headers): string {
   const country = explicit || cfCountry || vercelCountry;
 
   const normalized = (country || '').trim().toUpperCase();
+  // Cloudflare can return special/unknown values like:
+  // - "T1" for Tor
+  // - "XX" / "ZZ" for unknown (varies by setup)
+  if (normalized === 'T1' || normalized === 'XX' || normalized === 'ZZ') return 'US';
   // ISO 3166-1 alpha-2
   if (/^[A-Z]{2}$/.test(normalized)) return normalized;
   return 'US'; // Default to US

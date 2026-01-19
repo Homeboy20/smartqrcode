@@ -117,6 +117,21 @@ Click **"Deploy"** and wait for the build to complete.
 
 ## Troubleshooting
 
+### Country detection / local currency not working
+SmartQRCode can auto-select country/currency for pricing and checkout using Cloudflare's IP geolocation header.
+
+**Recommended setup (Cloudflare in front of Coolify):**
+1. In Cloudflare DNS, ensure your app record is **Proxied** (orange cloud).
+2. In Cloudflare Dashboard → **Network** → enable **IP Geolocation**.
+   - This makes Cloudflare send the `CF-IPCountry` header to your origin.
+3. Redeploy (or just refresh) and verify:
+   - Visit `https://your-domain.com/api/pricing` and confirm the JSON includes a realistic `country` (not always `US`).
+   - If you want to test manually, set the header `x-checkout-country: TZ` and confirm the API responds with `country: "TZ"` and `currency.code: "TZS"`.
+
+Notes:
+- VPNs/Tor can cause Cloudflare to return an unknown country; in that case the app safely falls back to USD/US.
+- Users can still override billing country in the checkout UI.
+
 ### Checkout error: "Unexpected token 'C'... Cannot POST ... is not valid JSON"
 This means your browser received a non-JSON response (usually a 404 text/HTML like `Cannot POST /api/checkout/create-session`).
 
