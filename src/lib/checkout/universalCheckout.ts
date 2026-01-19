@@ -8,8 +8,9 @@ import { createPaystackCustomer, getPaystackPublicKey, initializeSubscriptionPay
 import {
   createFlutterwaveSubscriptionPayment,
   getFlutterwavePaymentOptionsForCheckoutMethod,
+  getFlutterwavePaymentOptionsForCountry,
 } from '@/lib/flutterwave';
-import { CURRENCY_CONFIGS, getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
+import { CURRENCY_CONFIGS, SUBSCRIPTION_PRICING, getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
 
 import {
   providerSupportsPaymentMethod,
@@ -21,7 +22,46 @@ const PROVIDER_CURRENCY_SUPPORT: Record<PaymentProvider, CurrencyCode[]> = {
   // Paystack is used for NG/GH/ZA pricing in this app.
   paystack: ['NGN', 'GHS', 'ZAR', 'KES'],
   // Flutterwave is our default for USD/EUR and also supports several African currencies.
-  flutterwave: ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR'],
+  flutterwave: [
+    'USD',
+    'EUR',
+    'GBP',
+    'NGN',
+    'GHS',
+    'KES',
+    'ZAR',
+    'TZS',
+    'UGX',
+    'RWF',
+    'ZMW',
+    'XOF',
+    'XAF',
+    'EGP',
+    'MAD',
+    'ETB',
+    'DZD',
+    'TND',
+    'MUR',
+    'BWP',
+    'NAD',
+    'MWK',
+    'MZN',
+    'AOA',
+    'CVE',
+    'SCR',
+    'GMD',
+    'SLL',
+    'LRD',
+    'CDF',
+    'SDG',
+    'ZWL',
+    'DJF',
+    'SOS',
+    'KMF',
+    'LSL',
+    'SZL',
+    'MGA',
+  ],
   // Not integrated (kept disabled)
   stripe: [],
   paypal: [],
@@ -252,7 +292,10 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
 
       const flutterwaveRuntime = await getProviderRuntimeConfig('flutterwave');
       const flutterwavePublicKey = String((flutterwaveRuntime as any)?.credentials?.clientId || '').trim();
-      const paymentOptions = getFlutterwavePaymentOptionsForCheckoutMethod(flutterwavePaymentMethod);
+      const paymentOptions = getFlutterwavePaymentOptionsForCountry({
+        countryCode: input.countryCode,
+        method: flutterwavePaymentMethod,
+      });
       const redirectUrl = appendQueryParam(input.successUrl, 'reference', reference);
 
       const payment = await createFlutterwaveSubscriptionPayment({
@@ -490,7 +533,75 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     throw new Error('Invalid plan ID or free plan selected');
   }
 
-  const amount = getLocalPrice(input.planId, input.currency);
+  const amount = await (async () => {
+    // Keep charged amount consistent with /api/pricing:
+    // - support app_settings.general.pricing overrides
+    // - support optional pricing.fxRates conversion from USD
+    try {
+      const { data } = await input.supabaseAdmin
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'general')
+        .maybeSingle();
+
+      const overrides = (data as any)?.value?.pricing ?? null;
+      if (!overrides) return getLocalPrice(input.planId, input.currency);
+
+      const base = SUBSCRIPTION_PRICING as any;
+      const merged = {
+        pro: {
+          ...base.pro,
+          ...(overrides?.pro ?? {}),
+          localPrices: {
+            ...(base.pro.localPrices ?? {}),
+            ...((overrides?.pro?.localPrices ?? overrides?.pro?.local_prices ?? {}) as any),
+          },
+        },
+        business: {
+          ...base.business,
+          ...(overrides?.business ?? {}),
+          localPrices: {
+            ...(base.business.localPrices ?? {}),
+            ...((overrides?.business?.localPrices ?? overrides?.business?.local_prices ?? {}) as any),
+          },
+        },
+      } as any;
+
+      const fxRatesRaw = overrides?.fxRates ?? overrides?.fx_rates;
+      const fxRates: Record<string, number> = {};
+      if (fxRatesRaw && typeof fxRatesRaw === 'object') {
+        for (const [k, v] of Object.entries(fxRatesRaw as any)) {
+          const code = String(k || '').toUpperCase().trim();
+          const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+          if (!code || !Number.isFinite(n) || n <= 0) continue;
+          fxRates[code] = n;
+        }
+      }
+
+      const tier = input.planId;
+      const currency = input.currency;
+
+      const explicit = (merged?.[tier]?.localPrices ?? {})[currency];
+      if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit > 0) return explicit;
+
+      const usdPrice = Number(merged?.[tier]?.usdPrice || 0);
+      if (currency !== 'USD') {
+        const rate = fxRates[currency];
+        if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0 && usdPrice > 0) {
+          const cfg: any = (CURRENCY_CONFIGS as any)[currency];
+          const minorUnit = Number(cfg?.minorUnit || 100);
+          const raw = usdPrice * rate;
+          if (minorUnit === 1) return Math.round(raw);
+          if (minorUnit === 1000) return Math.round(raw * 1000) / 1000;
+          return Math.round(raw * 100) / 100;
+        }
+      }
+
+      return usdPrice || getLocalPrice(tier, currency);
+    } catch {
+      return getLocalPrice(input.planId, input.currency);
+    }
+  })();
   if (!amount || amount <= 0) {
     throw new Error('Invalid plan ID or free plan selected');
   }

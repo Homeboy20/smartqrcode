@@ -4,7 +4,43 @@ export type UniversalPaymentProvider = 'paystack' | 'flutterwave' | 'stripe' | '
 
 import { isAfricanCountryCode, type CurrencyCode } from '@/lib/currency';
 
-export const LOCAL_AFRICAN_CURRENCIES: CurrencyCode[] = ['NGN', 'GHS', 'KES', 'ZAR'];
+export const LOCAL_AFRICAN_CURRENCIES: CurrencyCode[] = [
+  'NGN',
+  'GHS',
+  'KES',
+  'ZAR',
+  'TZS',
+  'UGX',
+  'RWF',
+  'ZMW',
+  'XOF',
+  'XAF',
+  'EGP',
+  'MAD',
+  'ETB',
+  'DZD',
+  'TND',
+  'MUR',
+  'BWP',
+  'NAD',
+  'MWK',
+  'MZN',
+  'AOA',
+  'CVE',
+  'SCR',
+  'GMD',
+  'SLL',
+  'LRD',
+  'CDF',
+  'SDG',
+  'ZWL',
+  'DJF',
+  'SOS',
+  'KMF',
+  'LSL',
+  'SZL',
+  'MGA',
+];
 
 const PROVIDER_METHOD_SUPPORT: Record<UniversalPaymentProvider, Record<CheckoutPaymentMethod, boolean>> = {
   paystack: {

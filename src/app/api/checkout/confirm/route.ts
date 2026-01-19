@@ -16,9 +16,7 @@ type ConfirmBody =
 
 function normalizeCurrencyCode(value: unknown): CurrencyCode | null {
   const s = String(value || '').toUpperCase().trim();
-  if (s === 'USD' || s === 'NGN' || s === 'KES' || s === 'GHS' || s === 'ZAR' || s === 'EUR' || s === 'GBP') {
-    return s as CurrencyCode;
-  }
+  if (/^[A-Z]{3}$/.test(s)) return s as CurrencyCode;
   return null;
 }
 

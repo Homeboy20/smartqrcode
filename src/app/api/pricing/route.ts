@@ -4,7 +4,8 @@ import {
   getCurrencyForCountry,
   formatCurrency,
   getRecommendedProvider,
-  SUBSCRIPTION_PRICING
+  SUBSCRIPTION_PRICING,
+  CURRENCY_CONFIGS
 } from '@/lib/currency';
 import { createAnonClient } from '@/lib/supabase/server';
 import {
@@ -42,6 +43,49 @@ async function getPricingOverridesFromAppSettings() {
   } catch {
     return null;
   }
+}
+
+function toFxRateMap(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') return {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(value as any)) {
+    const code = String(k || '').toUpperCase().trim();
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+    if (!code || !Number.isFinite(n) || n <= 0) continue;
+    out[code] = n;
+  }
+  return out;
+}
+
+function roundForCurrency(amount: number, currencyCode: string): number {
+  const cfg = (CURRENCY_CONFIGS as any)[currencyCode];
+  const minorUnit = Number(cfg?.minorUnit || 100);
+  if (minorUnit === 1) return Math.round(amount);
+  if (minorUnit === 1000) return Math.round(amount * 1000) / 1000;
+  return Math.round(amount * 100) / 100;
+}
+
+function getAmountForCurrency(params: {
+  tier: 'pro' | 'business';
+  currencyCode: string;
+  mergedPricing: any;
+  fxRates: Record<string, number>;
+}): number {
+  const { tier, currencyCode, mergedPricing, fxRates } = params;
+  const localPrices = (mergedPricing?.[tier]?.localPrices ?? {}) as Record<string, number>;
+  const usdPrice = Number(mergedPricing?.[tier]?.usdPrice || 0);
+
+  const explicit = localPrices?.[currencyCode];
+  if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  if (currencyCode !== 'USD') {
+    const rate = fxRates[currencyCode];
+    if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0 && usdPrice > 0) {
+      return roundForCurrency(usdPrice * rate, currencyCode);
+    }
+  }
+
+  return usdPrice;
 }
 
 function normalizeCountryCode(value: string | null | undefined): string | null {
@@ -100,6 +144,8 @@ export async function GET(request: NextRequest) {
       },
     };
 
+    const fxRates = toFxRateMap(overrides?.fxRates ?? overrides?.fx_rates);
+
     // Safety: ensure numeric overrides.
     for (const tier of ['pro', 'business'] as const) {
       const usd = toNumberOrUndefined((mergedPricing as any)[tier]?.usdPrice);
@@ -114,8 +160,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const proAmount = (mergedPricing.pro.localPrices as any)[currencyConfig.code] ?? mergedPricing.pro.usdPrice;
-    const businessAmount = (mergedPricing.business.localPrices as any)[currencyConfig.code] ?? mergedPricing.business.usdPrice;
+    const proAmount = getAmountForCurrency({
+      tier: 'pro',
+      currencyCode: currencyConfig.code,
+      mergedPricing,
+      fxRates,
+    });
+    const businessAmount = getAmountForCurrency({
+      tier: 'business',
+      currencyCode: currencyConfig.code,
+      mergedPricing,
+      fxRates,
+    });
     
     // Get pricing for all tiers
     const pricing = {

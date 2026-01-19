@@ -46,7 +46,7 @@ function mergePricingSettings(raw: any, defaults: SubscriptionPricing): Subscrip
       const upper = String(code || '').toUpperCase() as CurrencyCode;
       const n = toNumberOrUndefined(value);
       if (!n) continue;
-      if (!['USD', 'NGN', 'GHS', 'KES', 'ZAR', 'GBP', 'EUR'].includes(upper)) continue;
+      if (!/^[A-Z]{3}$/.test(upper)) continue;
       (merged[tier].localPrices as any)[upper] = n;
     }
   }

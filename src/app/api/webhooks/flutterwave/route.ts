@@ -5,7 +5,7 @@ import { checkRateLimit, getClientIP, RATE_LIMITS } from '@/lib/rate-limit';
 import { createErrorResponse, handleApiError, logError } from '@/lib/api-response';
 import { getCredential } from '@/lib/credentials';
 import { verifyFlutterwaveTransaction } from '@/lib/flutterwave';
-import { getLocalPrice, type CurrencyCode } from '@/lib/currency';
+import { getLocalPrice, SUBSCRIPTION_PRICING, type CurrencyCode } from '@/lib/currency';
 
 // Initialize Supabase admin client
 const supabaseAdmin = createClient(
@@ -35,9 +35,8 @@ function isUuid(value: unknown): boolean {
 
 function normalizeCurrencyCode(value: unknown): CurrencyCode | null {
   const s = String(value || '').toUpperCase().trim();
-  if (s === 'USD' || s === 'NGN' || s === 'KES' || s === 'GHS' || s === 'ZAR' || s === 'EUR' || s === 'GBP') {
-    return s as CurrencyCode;
-  }
+  // Allow broader currency support; pricing logic can still choose to fall back.
+  if (/^[A-Z]{3}$/.test(s)) return s as CurrencyCode;
   return null;
 }
 
@@ -187,13 +186,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Optional sanity check: verify amount matches our configured plan pricing.
-    // (We allow a tiny tolerance because gateways can return floats.)
+    // If the app is using FX conversion (no explicit local price), we avoid enforcing
+    // a strict match because rates can drift.
     try {
       const currency =
         normalizeCurrencyCode(meta?.currency || verified.currency || data?.currency) || 'USD';
       const expected = getLocalPrice(planId, currency);
       const receivedAmount = Number(verified.amount || 0);
-      if (expected > 0 && Math.abs(receivedAmount - expected) > 0.01) {
+      const hasExplicitLocalPrice =
+        currency === 'USD' ||
+        Boolean((SUBSCRIPTION_PRICING as any)?.[planId]?.localPrices?.[currency]);
+
+      if (hasExplicitLocalPrice && expected > 0 && Math.abs(receivedAmount - expected) > 0.01) {
         logError('flutterwave-webhook', new Error('Amount mismatch for verified transaction'), {
           transactionId,
           expected,

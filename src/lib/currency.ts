@@ -1,7 +1,48 @@
 import { AFRICAN_COUNTRIES } from '@/lib/countries/africa';
 
 // Multi-currency support for payment system
-export type CurrencyCode = 'USD' | 'NGN' | 'GHS' | 'KES' | 'ZAR' | 'GBP' | 'EUR';
+export type CurrencyCode =
+  | 'USD'
+  | 'NGN'
+  | 'GHS'
+  | 'KES'
+  | 'ZAR'
+  | 'GBP'
+  | 'EUR'
+  // Additional African currencies (Flutterwave local payments)
+  | 'TZS'
+  | 'UGX'
+  | 'RWF'
+  | 'ZMW'
+  | 'XOF'
+  | 'XAF'
+  | 'EGP'
+  | 'MAD'
+  | 'ETB'
+  | 'DZD'
+  | 'TND'
+  | 'MUR'
+  | 'BWP'
+  | 'NAD'
+  | 'MWK'
+  | 'MZN'
+  | 'AOA'
+  | 'XCD'
+  | 'CVE'
+  | 'SCR'
+  | 'GMD'
+  | 'SLL'
+  | 'LRD'
+  | 'CDF'
+  | 'SDG'
+  | 'ZWL'
+  | 'DJF'
+  | 'SOS'
+  | 'KMF'
+  | 'LSL'
+  | 'SZL'
+  | 'MGA'
+  | 'TJS';
 
 export interface CurrencyConfig {
   code: CurrencyCode;
@@ -69,6 +110,98 @@ export const CURRENCY_CONFIGS: Record<CurrencyCode, CurrencyConfig> = {
     preferredProvider: 'flutterwave',
     countries: ['DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'IE', 'PT', 'FI', 'GR'],
   },
+
+  // ---- Flutterwave-focused African currencies ----
+  TZS: { code: 'TZS', symbol: 'TSh', name: 'Tanzanian Shilling', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['TZ'] },
+  UGX: { code: 'UGX', symbol: 'USh', name: 'Ugandan Shilling', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['UG'] },
+  RWF: { code: 'RWF', symbol: 'RF', name: 'Rwandan Franc', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['RW'] },
+  ZMW: { code: 'ZMW', symbol: 'ZK', name: 'Zambian Kwacha', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['ZM'] },
+  XOF: { code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['BJ','BF','CI','GW','ML','NE','SN','TG'] },
+  XAF: { code: 'XAF', symbol: 'CFA', name: 'Central African CFA Franc', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['CM','CF','TD','CG','GA','GQ'] },
+  EGP: { code: 'EGP', symbol: 'E£', name: 'Egyptian Pound', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['EG'] },
+  MAD: { code: 'MAD', symbol: 'د.م.', name: 'Moroccan Dirham', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['MA'] },
+  ETB: { code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['ET'] },
+  DZD: { code: 'DZD', symbol: 'د.ج', name: 'Algerian Dinar', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['DZ'] },
+  TND: { code: 'TND', symbol: 'د.ت', name: 'Tunisian Dinar', minorUnit: 1000, preferredProvider: 'flutterwave', countries: ['TN'] },
+  MUR: { code: 'MUR', symbol: 'Rs', name: 'Mauritian Rupee', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['MU'] },
+  BWP: { code: 'BWP', symbol: 'P', name: 'Botswana Pula', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['BW'] },
+  NAD: { code: 'NAD', symbol: 'N$', name: 'Namibian Dollar', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['NA'] },
+  MWK: { code: 'MWK', symbol: 'MK', name: 'Malawian Kwacha', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['MW'] },
+  MZN: { code: 'MZN', symbol: 'MT', name: 'Mozambican Metical', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['MZ'] },
+  AOA: { code: 'AOA', symbol: 'Kz', name: 'Angolan Kwanza', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['AO'] },
+  XCD: { code: 'XCD', symbol: '$', name: 'East Caribbean Dollar', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['LC'] },
+  CVE: { code: 'CVE', symbol: '$', name: 'Cape Verdean Escudo', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['CV'] },
+  SCR: { code: 'SCR', symbol: '₨', name: 'Seychellois Rupee', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['SC'] },
+  GMD: { code: 'GMD', symbol: 'D', name: 'Gambian Dalasi', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['GM'] },
+  SLL: { code: 'SLL', symbol: 'Le', name: 'Sierra Leonean Leone', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['SL'] },
+  LRD: { code: 'LRD', symbol: '$', name: 'Liberian Dollar', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['LR'] },
+  CDF: { code: 'CDF', symbol: 'FC', name: 'Congolese Franc', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['CD'] },
+  SDG: { code: 'SDG', symbol: 'ج.س.', name: 'Sudanese Pound', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['SD'] },
+  ZWL: { code: 'ZWL', symbol: '$', name: 'Zimbabwean Dollar', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['ZW'] },
+  DJF: { code: 'DJF', symbol: 'Fdj', name: 'Djiboutian Franc', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['DJ'] },
+  SOS: { code: 'SOS', symbol: 'Sh', name: 'Somali Shilling', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['SO'] },
+  KMF: { code: 'KMF', symbol: 'CF', name: 'Comorian Franc', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['KM'] },
+  LSL: { code: 'LSL', symbol: 'L', name: 'Lesotho Loti', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['LS'] },
+  SZL: { code: 'SZL', symbol: 'E', name: 'Swazi Lilangeni', minorUnit: 100, preferredProvider: 'flutterwave', countries: ['SZ'] },
+  MGA: { code: 'MGA', symbol: 'Ar', name: 'Malagasy Ariary', minorUnit: 1, preferredProvider: 'flutterwave', countries: ['MG'] },
+  TJS: { code: 'TJS', symbol: 'ЅМ', name: 'Tajikistani Somoni', minorUnit: 100, preferredProvider: 'flutterwave', countries: [] },
+};
+
+const AFRICA_COUNTRY_TO_CURRENCY: Partial<Record<string, CurrencyCode>> = {
+  DZ: 'DZD',
+  AO: 'AOA',
+  BJ: 'XOF',
+  BW: 'BWP',
+  BF: 'XOF',
+  BI: 'RWF',
+  CV: 'CVE',
+  CM: 'XAF',
+  CF: 'XAF',
+  TD: 'XAF',
+  KM: 'KMF',
+  CG: 'XAF',
+  CD: 'CDF',
+  CI: 'XOF',
+  DJ: 'DJF',
+  EG: 'EGP',
+  GQ: 'XAF',
+  ER: 'USD',
+  SZ: 'SZL',
+  ET: 'ETB',
+  GA: 'XAF',
+  GM: 'GMD',
+  GH: 'GHS',
+  GN: 'USD',
+  GW: 'XOF',
+  KE: 'KES',
+  LS: 'LSL',
+  LR: 'LRD',
+  LY: 'USD',
+  MG: 'MGA',
+  MW: 'MWK',
+  ML: 'XOF',
+  MR: 'USD',
+  MU: 'MUR',
+  MA: 'MAD',
+  MZ: 'MZN',
+  NA: 'NAD',
+  NE: 'XOF',
+  NG: 'NGN',
+  RW: 'RWF',
+  ST: 'USD',
+  SN: 'XOF',
+  SC: 'SCR',
+  SL: 'SLL',
+  SO: 'SOS',
+  ZA: 'ZAR',
+  SS: 'USD',
+  SD: 'SDG',
+  TZ: 'TZS',
+  TG: 'XOF',
+  TN: 'TND',
+  UG: 'UGX',
+  ZM: 'ZMW',
+  ZW: 'ZWL',
 };
 
 // Pricing in base currency (USD) with exchange rates
@@ -129,12 +262,13 @@ export function getCurrencyForCountry(countryCode: string): CurrencyConfig {
 
   // 1) Africa: prefer a configured local currency (NGN/GHS/KES/ZAR etc) when available.
   if (isAfricanCountryCode(upperCode)) {
+    const mapped = AFRICA_COUNTRY_TO_CURRENCY[upperCode];
+    if (mapped && CURRENCY_CONFIGS[mapped]) return CURRENCY_CONFIGS[mapped];
+
     for (const currency of Object.values(CURRENCY_CONFIGS)) {
-      if (currency.countries.includes(upperCode)) {
-        return currency;
-      }
+      if (currency.countries.includes(upperCode)) return currency;
     }
-    // If we don't have a local mapping yet, fall back to USD.
+
     return CURRENCY_CONFIGS.USD;
   }
 
@@ -166,7 +300,8 @@ export function formatCurrency(
   currency: CurrencyCode
 ): string {
   const config = CURRENCY_CONFIGS[currency];
-  return `${config.symbol}${amount.toFixed(2)}`;
+  const decimals = config.minorUnit === 1 ? 0 : config.minorUnit === 1000 ? 3 : 2;
+  return `${config.symbol}${amount.toFixed(decimals)}`;
 }
 
 /**

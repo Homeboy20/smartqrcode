@@ -270,12 +270,47 @@ export interface FlutterwavePaymentParams {
 
 function getFlutterwavePaymentOptions(paymentMethod?: 'card' | 'mobile_money') {
   if (paymentMethod === 'card') return 'card';
-  if (paymentMethod === 'mobile_money') return 'mobilemoney,ussd,account,banktransfer';
-  return 'card,mobilemoney,ussd,account,banktransfer';
+  if (paymentMethod === 'mobile_money') {
+    // Keep this broad; country-specific refinement happens in getFlutterwavePaymentOptionsForCountry.
+    return 'mobilemoney,mpesa,ussd,account,banktransfer';
+  }
+  return 'card,mobilemoney,mpesa,ussd,account,banktransfer';
 }
 
 export function getFlutterwavePaymentOptionsForCheckoutMethod(method?: 'card' | 'mobile_money') {
   return getFlutterwavePaymentOptions(method);
+}
+
+export function getFlutterwavePaymentOptionsForCountry(options: {
+  countryCode: string;
+  method?: 'card' | 'mobile_money';
+}) {
+  const cc = String(options.countryCode || '').trim().toUpperCase();
+  const method = options.method;
+
+  if (method === 'card') return 'card';
+
+  // Flutterwave's payment_options is a comma-separated allow-list. Many local methods are country-specific.
+  // We keep a conservative mapping for well-known local options and fall back to a broad set.
+  switch (cc) {
+    case 'KE':
+      // Kenya: M-Pesa and cards.
+      return method === 'mobile_money' ? 'mpesa' : 'card,mpesa';
+    case 'TZ':
+      // Tanzania: mobile money Tanzania.
+      return method === 'mobile_money' ? 'mobilemoneytanzania' : 'card,mobilemoneytanzania';
+    case 'UG':
+      return method === 'mobile_money' ? 'mobilemoneyuganda' : 'card,mobilemoneyuganda';
+    case 'RW':
+      return method === 'mobile_money' ? 'mobilemoneyrwanda' : 'card,mobilemoneyrwanda';
+    case 'GH':
+      return method === 'mobile_money' ? 'mobilemoneyghana' : 'card,mobilemoneyghana';
+    case 'NG':
+      // Nigeria: keep broad; users may choose card, USSD, bank transfer.
+      return method === 'mobile_money' ? 'ussd,banktransfer,account' : 'card,ussd,banktransfer,account';
+    default:
+      return getFlutterwavePaymentOptions(method);
+  }
 }
 
 export function getFlutterwavePaymentOptionsMatrix() {
