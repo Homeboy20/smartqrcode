@@ -23,6 +23,14 @@ export default function PaymentSettingsPage() {
   const [capabilitiesCountry, setCapabilitiesCountry] = useState('');
   const [capabilitiesCurrency, setCapabilitiesCurrency] = useState('');
   const [capabilitiesCopied, setCapabilitiesCopied] = useState(false);
+
+  const [discoveryProvider, setDiscoveryProvider] = useState<'paystack' | 'flutterwave'>('paystack');
+  const [discoveryOffset, setDiscoveryOffset] = useState(0);
+  const [discoveryLimit, setDiscoveryLimit] = useState(25);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryData, setDiscoveryData] = useState<any>(null);
+  const [discoveryCopied, setDiscoveryCopied] = useState(false);
   
   // Credentials state
   const [stripeCredentials, setStripeCredentials] = useState<StripeCredentials>({
@@ -176,6 +184,74 @@ export default function PaymentSettingsPage() {
     } catch (err) {
       setCapabilitiesError('Failed to copy JSON to clipboard');
     }
+  };
+
+  const runDiscovery = async (options?: { offset?: number; limit?: number; persist?: boolean }) => {
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    try {
+      const accessToken = session?.access_token;
+      if (!accessToken) {
+        throw new Error('Authentication required');
+      }
+
+      const offset = typeof options?.offset === 'number' ? options.offset : discoveryOffset;
+      const limit = typeof options?.limit === 'number' ? options.limit : discoveryLimit;
+
+      const res = await fetch('/api/admin/gateways/discover', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          provider: discoveryProvider,
+          offset,
+          limit,
+          persist: Boolean(options?.persist),
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(String((data as any)?.details || (data as any)?.error || `Discovery failed (HTTP ${res.status})`));
+      }
+
+      setDiscoveryData(data);
+      setDiscoveryOffset(typeof (data as any)?.nextOffset === 'number' ? (data as any).nextOffset : offset);
+    } catch (err: any) {
+      setDiscoveryError(String(err?.message || 'Failed to run discovery'));
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  };
+
+  const copyDiscoveryJson = async () => {
+    try {
+      if (!discoveryData) return;
+      const text = JSON.stringify(discoveryData, null, 2);
+      await navigator.clipboard.writeText(text);
+      setDiscoveryCopied(true);
+      setTimeout(() => setDiscoveryCopied(false), 1500);
+    } catch (err) {
+      setDiscoveryError('Failed to copy JSON to clipboard');
+    }
+  };
+
+  const applyDiscoveryToAllowedCountries = () => {
+    const supported = Array.isArray(discoveryData?.supportedCountryCodes)
+      ? discoveryData.supportedCountryCodes
+      : [];
+    const csv = supported.join(',');
+
+    if (discoveryProvider === 'paystack') {
+      setPaystackCredentials((prev) => ({ ...prev, allowedCountries: csv }));
+      setActiveTab('paystack');
+      return;
+    }
+
+    setFlutterwaveCredentials((prev) => ({ ...prev, allowedCountries: csv }));
+    setActiveTab('flutterwave');
   };
 
   useEffect(() => {
@@ -851,6 +927,125 @@ export default function PaymentSettingsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Gateway Discovery (admin-only; probes provider APIs, no secrets returned) */}
+        <div className="bg-white shadow rounded-lg mb-6">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-1">Gateway Discovery</h3>
+                <p className="text-sm text-gray-500">
+                  Probes provider APIs (banks list) to verify which African countries work for your configured account. Run in batches to avoid timeouts.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyDiscoveryJson}
+                  disabled={!discoveryData}
+                  className="inline-flex justify-center py-2 px-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {discoveryCopied ? 'Copied' : 'Copy JSON'}
+                </button>
+                <button
+                  type="button"
+                  onClick={applyDiscoveryToAllowedCountries}
+                  disabled={!Array.isArray(discoveryData?.supportedCountryCodes) || discoveryLoading}
+                  className="inline-flex justify-center py-2 px-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Overwrites the provider's allowedCountries field with the discovered supported country codes"
+                >
+                  Apply to allowedCountries
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runDiscovery({ persist: true })}
+                  disabled={discoveryLoading}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {discoveryLoading ? 'Running…' : 'Run batch'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Provider</label>
+                <select
+                  value={discoveryProvider}
+                  onChange={(e) => {
+                    setDiscoveryProvider(e.target.value as any);
+                    setDiscoveryData(null);
+                    setDiscoveryError(null);
+                    setDiscoveryOffset(0);
+                  }}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="paystack">paystack</option>
+                  <option value="flutterwave">flutterwave</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Offset</label>
+                <input
+                  value={String(discoveryOffset)}
+                  onChange={(e) => setDiscoveryOffset(Number(e.target.value || 0))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Limit</label>
+                <input
+                  value={String(discoveryLimit)}
+                  onChange={(e) => setDiscoveryLimit(Number(e.target.value || 25))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => runDiscovery({ offset: 0, limit: discoveryLimit, persist: true })}
+                disabled={discoveryLoading}
+                className="inline-flex justify-center py-2 px-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Restart (offset 0)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = typeof discoveryData?.nextOffset === 'number' ? discoveryData.nextOffset : null;
+                  if (next === null) return;
+                  runDiscovery({ offset: next, limit: discoveryLimit, persist: true });
+                }}
+                disabled={discoveryLoading || typeof discoveryData?.nextOffset !== 'number'}
+                className="inline-flex justify-center py-2 px-3 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next batch
+              </button>
+              {typeof discoveryData?.nextOffset !== 'number' && discoveryData?.summary && (
+                <div className="text-xs text-gray-600">
+                  Done (ok {String(discoveryData.summary.ok)}, failed {String(discoveryData.summary.failed)}, {String(discoveryData.summary.ms)}ms)
+                </div>
+              )}
+            </div>
+
+            {discoveryError && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {discoveryError}
+              </div>
+            )}
+
+            {discoveryData && (
+              <div className="mt-4">
+                <div className="text-sm text-gray-700 mb-2">
+                  Supported country codes in this batch: <span className="font-semibold">{Array.isArray(discoveryData.supportedCountryCodes) ? discoveryData.supportedCountryCodes.join(', ') : '—'}</span>
+                </div>
+                <pre className="max-h-72 overflow-auto rounded-md bg-gray-900 text-gray-100 p-3 text-xs">{JSON.stringify(discoveryData, null, 2)}</pre>
               </div>
             )}
           </div>
