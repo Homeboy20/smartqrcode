@@ -12,7 +12,9 @@ function normalizeProvidedCredentials(input: any): Record<string, string> {
     if (typeof v !== 'string') continue;
     // If the UI sent masked secrets, treat as "not provided".
     if (v === MASK) continue;
-    out[k] = v;
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    out[k] = trimmed;
   }
 
   return out;
@@ -48,7 +50,9 @@ export async function POST(request: NextRequest) {
         : null;
 
     const storedCredentials = runtime.credentials || {};
-    const credentials = Object.keys(providedCredentials).length > 0 ? providedCredentials : storedCredentials;
+    // Merge stored + provided (provided overrides). This lets admins test using
+    // stored secrets without re-typing, while still allowing overrides.
+    const credentials = { ...storedCredentials, ...providedCredentials };
 
     if (isDev) {
       console.log(
@@ -59,6 +63,27 @@ export async function POST(request: NextRequest) {
     }
 
     let testResult = { success: false, message: '' };
+
+    // If required secrets are missing and we have a decryptError, report the real cause.
+    const requiredByProvider: Record<PaymentProvider, string[]> = {
+      paystack: ['secretKey'],
+      flutterwave: ['clientSecret'],
+      stripe: ['secretKey'],
+      paypal: ['clientId', 'clientSecret'],
+    };
+    const required = requiredByProvider[provider];
+    const missingRequired = required.filter(k => !(credentials as any)?.[k]);
+    const missingDueToNotProvided = missingRequired.filter(k => !(providedCredentials as any)?.[k]);
+    if (decryptError && missingDueToNotProvided.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            `Stored payment credentials could not be decrypted. ${decryptError} ` +
+            'Ensure CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server and matches the key used to encrypt the stored credentials, or re-enter and save the missing credential fields.',
+        },
+        { status: 500 }
+      );
+    }
 
     switch (provider) {
       case 'paystack':
@@ -81,17 +106,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!testResult.success) {
-      // If we were relying on stored creds and they can't be decrypted, surface the real root cause.
-      if (decryptError && Object.keys(providedCredentials).length === 0) {
-        return NextResponse.json(
-          {
-            error:
-              `Stored payment credentials could not be decrypted. ${decryptError} ` +
-              'Ensure CREDENTIALS_ENCRYPTION_KEY(S) is set correctly on the server and matches the key used to encrypt the stored credentials.',
-          },
-          { status: 500 }
-        );
-      }
       return NextResponse.json(
         { error: testResult.message },
         { status: 400 }
