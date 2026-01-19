@@ -314,6 +314,8 @@ function mapIsoCountryToPaystackCountryParam(countryCode: string): string | null
       return 'ghana';
     case 'ZA':
       return 'south africa';
+    case 'KE':
+      return 'kenya';
     default:
       return null;
   }
@@ -322,7 +324,7 @@ function mapIsoCountryToPaystackCountryParam(countryCode: string): string | null
 export async function listPaystackBanks(countryCode: string) {
   const country = mapIsoCountryToPaystackCountryParam(countryCode);
   if (!country) {
-    throw new Error(`Paystack bank list is only supported for NG, GH, ZA (got ${countryCode})`);
+    throw new Error(`Paystack bank list is only supported for NG, GH, ZA, KE (got ${countryCode})`);
   }
 
   const client = await getPaystackClient();

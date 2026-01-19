@@ -53,6 +53,8 @@ export default function PaymentSettingsPage() {
     secretKey: '',
     planCodePro: '',
     planCodeBusiness: '',
+    planCodeProKes: '',
+    planCodeBusinessKes: '',
     allowedCountries: ''
   });
   

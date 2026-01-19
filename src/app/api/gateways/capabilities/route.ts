@@ -5,6 +5,7 @@ import {
   getProviderEnablement,
   getProviderEligibility,
   isProviderEnabled,
+  getProviderSupportedCountriesSnapshot,
   providerSupportsCountry,
   providerSupportsCurrency,
   type ProviderEligibility,
@@ -36,18 +37,6 @@ function normalizeCurrencyCode(value: string | null | undefined): CurrencyCode |
   if (!normalized) return null;
   if (normalized in CURRENCY_CONFIGS) return normalized as CurrencyCode;
   return null;
-}
-
-function getConfiguredPaystackCountries(): string[] {
-  return Array.from(
-    new Set(
-      Object.values(CURRENCY_CONFIGS)
-        .filter((c) => c.preferredProvider === 'paystack')
-        .flatMap((c) => c.countries)
-        .filter((cc) => cc && cc !== 'DEFAULT')
-        .map((cc) => cc.toUpperCase())
-    )
-  ).sort();
 }
 
 export async function GET(request: NextRequest) {
@@ -104,8 +93,7 @@ export async function GET(request: NextRequest) {
         providerSupportsCurrency(provider, ccy)
       );
 
-      const supportedCountries: string[] | 'ALL' =
-        provider === 'flutterwave' ? 'ALL' : provider === 'paystack' ? getConfiguredPaystackCountries() : [];
+      const supportedCountries: string[] | 'ALL' = getProviderSupportedCountriesSnapshot(provider);
 
       const supportedPaymentMethods = getSupportedPaymentMethods(provider as unknown as UniversalPaymentProvider);
 

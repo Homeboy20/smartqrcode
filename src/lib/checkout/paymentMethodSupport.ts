@@ -61,9 +61,10 @@ export function getSupportedPaymentMethodsForContext(options: {
   const isLocalCurrency = LOCAL_AFRICAN_CURRENCIES.includes(options.currency);
 
   if (options.provider === 'flutterwave') {
-    if (!isLocalCurrency) {
-      return methods.filter((m) => m === 'card');
-    }
+    // Flutterwave supports many African local payment methods.
+    // Some African countries in our app still fall back to USD pricing; we still
+    // want to offer local-style methods (e.g., mobile money) when available.
+    // Provider-level enforcement remains in server-side checkout creation.
     return methods;
   }
 

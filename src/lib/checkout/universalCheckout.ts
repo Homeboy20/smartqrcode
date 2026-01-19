@@ -18,7 +18,7 @@ import {
 
 const PROVIDER_CURRENCY_SUPPORT: Record<PaymentProvider, CurrencyCode[]> = {
   // Paystack is used for NG/GH/ZA pricing in this app.
-  paystack: ['NGN', 'GHS', 'ZAR'],
+  paystack: ['NGN', 'GHS', 'ZAR', 'KES'],
   // Flutterwave is our default for USD/EUR and also supports several African currencies.
   flutterwave: ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR'],
   // Not integrated (kept disabled)
@@ -31,21 +31,30 @@ export function providerSupportsCurrency(provider: PaymentProvider, currency: Cu
   return allowed.includes(currency);
 }
 
+const PAYSTACK_SUPPORTED_COUNTRIES = new Set<string>([
+  'NG',
+  'GH',
+  'ZA',
+  // Paystack supports Kenya (KES) products for many accounts.
+  'KE',
+]);
+
 const PROVIDER_COUNTRY_SUPPORT: Record<PaymentProvider, Set<string> | 'ALL'> = {
-  // Derive Paystack countries from our currency config so it stays consistent.
-  paystack: new Set(
-    Object.values(CURRENCY_CONFIGS)
-      .filter((c) => c.preferredProvider === 'paystack')
-      .flatMap((c) => c.countries)
-      .filter((cc) => cc && cc !== 'DEFAULT')
-      .map((cc) => cc.toUpperCase())
-  ),
+  // Keep Paystack supported countries explicit so it's not accidentally
+  // constrained by our local pricing/recommended-provider config.
+  paystack: PAYSTACK_SUPPORTED_COUNTRIES,
   // Flutterwave is our global provider in this app.
   flutterwave: 'ALL',
   // Not integrated (kept disabled)
   stripe: new Set<string>(),
   paypal: new Set<string>(),
 };
+
+export function getProviderSupportedCountriesSnapshot(provider: PaymentProvider): 'ALL' | string[] {
+  const allowed = PROVIDER_COUNTRY_SUPPORT[provider];
+  if (allowed === 'ALL') return 'ALL';
+  return Array.from(allowed || []).sort();
+}
 
 export function providerSupportsCountry(provider: PaymentProvider, countryCode: string): boolean {
   const normalized = String(countryCode || '').trim().toUpperCase();
@@ -109,14 +118,28 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
     provider: 'paystack',
     async createSession({ input, amount, reference, userId }) {
       const paystackRuntime = await getProviderRuntimeConfig('paystack');
-      const paystackPlanCodes: Record<CheckoutPlanId, string> = {
-        pro: paystackRuntime.credentials.planCodePro || '',
-        business: paystackRuntime.credentials.planCodeBusiness || '',
+
+      const planCodeForCurrency = (planId: CheckoutPlanId, currency: CurrencyCode): string => {
+        const creds: any = (paystackRuntime as any)?.credentials || {};
+
+        // Optional KES-specific plan codes.
+        if (currency === 'KES') {
+          const kes = planId === 'pro' ? creds.planCodeProKes : creds.planCodeBusinessKes;
+          if (typeof kes === 'string' && kes.trim()) return kes.trim();
+        }
+
+        const fallback = planId === 'pro' ? creds.planCodePro : creds.planCodeBusiness;
+        return typeof fallback === 'string' ? fallback.trim() : '';
       };
 
-      const planCode = paystackPlanCodes[input.planId];
+      const planCode = planCodeForCurrency(input.planId, input.currency);
+
       if (!planCode) {
-        throw new Error('Invalid plan ID for Paystack. Available plans: pro, business');
+        throw new Error(
+          input.currency === 'KES'
+            ? 'Missing Paystack plan code for KES. Configure Pro/Business Plan Code (KES) in admin payment settings.'
+            : 'Invalid plan ID for Paystack. Available plans: pro, business'
+        );
       }
 
       // Only look up customer code if user is authenticated
