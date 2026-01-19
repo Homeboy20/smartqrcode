@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createServerClient } from '@/lib/supabase/server';
 import {
-  decryptString,
+  decryptStringWithKeyIndex,
   encryptString,
   getMaskedValue,
   isEncryptedPayload,
@@ -50,17 +50,26 @@ function maskCredentials(provider: PaymentProvider, credentials: StoredCredentia
 function decryptCredentials(provider: PaymentProvider, credentials: StoredCredentials): {
   credentials: Record<string, string>;
   decryptError?: string;
+  rotatedSecrets?: Record<string, EncryptedPayload>;
 } {
   const out: Record<string, string> = {};
   if (!credentials) return { credentials: out };
 
   const decryptErrors: string[] = [];
+  const rotatedSecrets: Record<string, EncryptedPayload> = {};
 
   for (const [key, value] of Object.entries(credentials)) {
     if (isSecretField(provider, key)) {
       if (isEncryptedPayload(value)) {
         try {
-          out[key] = decryptString(value);
+          const { plain, keyIndex } = decryptStringWithKeyIndex(value);
+          out[key] = plain;
+
+          // If we decrypted using a non-primary key, transparently re-encrypt
+          // with the primary key so future decrypts don't require old keys.
+          if (keyIndex > 0) {
+            rotatedSecrets[key] = encryptString(plain);
+          }
         } catch (e: any) {
           const message = e?.message || 'Failed to decrypt stored secret';
           decryptErrors.push(`${key}: ${message}`);
@@ -78,6 +87,7 @@ function decryptCredentials(provider: PaymentProvider, credentials: StoredCreden
   return {
     credentials: out,
     decryptError: decryptErrors.length ? decryptErrors.join('; ') : undefined,
+    ...(Object.keys(rotatedSecrets).length ? { rotatedSecrets } : {}),
   };
 }
 
@@ -176,6 +186,24 @@ export async function getProviderRuntimeConfig(provider: PaymentProvider) {
   }
 
   const decrypted = decryptCredentials(provider, (data.credentials ?? null) as StoredCredentials);
+
+  // Best-effort key rotation: if any secret decrypted using a non-primary key,
+  // rewrite those fields encrypted with the primary key.
+  if (decrypted.rotatedSecrets && data.credentials && typeof data.credentials === 'object') {
+    try {
+      const nextStored = { ...(data.credentials as any) };
+      for (const [field, payload] of Object.entries(decrypted.rotatedSecrets)) {
+        nextStored[field] = payload;
+      }
+
+      await supabaseAdmin
+        .from('payment_settings')
+        .update({ credentials: nextStored, updated_at: new Date().toISOString() })
+        .eq('provider', provider);
+    } catch {
+      // Ignore rotation failures; runtime decryption already succeeded.
+    }
+  }
 
   return {
     exists: true,

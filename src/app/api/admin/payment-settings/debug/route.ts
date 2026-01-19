@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
-import { decryptString, isEncryptedPayload } from '@/lib/secure/credentialCrypto';
+import { decryptStringWithKeyIndex, isEncryptedPayload } from '@/lib/secure/credentialCrypto';
 
 // GET - Debug payment settings encryption/decryption
 export async function GET(request: NextRequest) {
@@ -65,9 +65,11 @@ export async function GET(request: NextRequest) {
         
         // Try to decrypt
         try {
-          const decrypted = decryptString(value as any);
+          const { plain: decrypted, keyIndex } = decryptStringWithKeyIndex(value as any);
           fieldDebug.decryptionSuccess = true;
           fieldDebug.decryptedLength = decrypted.length;
+          fieldDebug.decryptedWithKeyIndex = keyIndex;
+          fieldDebug.needsRotation = keyIndex > 0;
           // Show first 4 and last 4 characters for verification
           if (decrypted.length > 8) {
             fieldDebug.preview = `${decrypted.substring(0, 4)}...${decrypted.substring(decrypted.length - 4)}`;
@@ -92,7 +94,7 @@ export async function GET(request: NextRequest) {
     // If clientSecret was decrypted successfully, test it
     if (debug.fieldDetails.clientSecret?.decryptionSuccess) {
       try {
-        const clientSecret = decryptString((credentials as any).clientSecret);
+        const clientSecret = decryptStringWithKeyIndex((credentials as any).clientSecret).plain;
         debug.clientSecretValidation = {
           format: clientSecret.startsWith('FLWSECK-') || clientSecret.startsWith('FLWSECK_TEST-') 
             ? 'Valid format' 

@@ -80,18 +80,19 @@ export function encryptString(plain: string): EncryptedPayload {
   return { encrypted, iv: iv.toString('hex') };
 }
 
-export function decryptString(payload: EncryptedPayload): string {
+export function decryptStringWithKeyIndex(payload: EncryptedPayload): { plain: string; keyIndex: number } {
   const keys = getCandidateKeys();
   let lastError: unknown = null;
 
-  for (const key of keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
     try {
       const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(payload.iv, 'hex'));
 
       let decrypted = decipher.update(payload.encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
 
-      return decrypted;
+      return { plain: decrypted, keyIndex: i };
     } catch (error) {
       lastError = error;
       continue;
@@ -101,4 +102,8 @@ export function decryptString(payload: EncryptedPayload): string {
   throw lastError instanceof Error
     ? lastError
     : new Error('Failed to decrypt payload with available CREDENTIALS_ENCRYPTION_KEYS');
+}
+
+export function decryptString(payload: EncryptedPayload): string {
+  return decryptStringWithKeyIndex(payload).plain;
 }
