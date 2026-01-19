@@ -17,6 +17,37 @@ import {
   type UniversalPaymentProvider,
 } from '@/lib/checkout/paymentMethodSupport';
 
+declare global {
+  interface Window {
+    PaystackPop?: any;
+    FlutterwaveCheckout?: any;
+  }
+}
+
+function loadExternalScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') return resolve();
+
+    const existing = document.querySelector(`script[src="${src}"]`) as HTMLScriptElement | null;
+    if (existing?.dataset?.loaded === 'true') return resolve();
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.addEventListener('load', () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    });
+    script.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+    document.body.appendChild(script);
+  });
+}
+
 type CurrencyInfo = {
   country: string;
   currency: {
@@ -94,6 +125,8 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('');
   const [provider, setProvider] = useState<UniversalPaymentProvider>('flutterwave');
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>('card');
+
+  const [checkoutUi, setCheckoutUi] = useState<'inline' | 'redirect'>('inline');
 
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
   const providerNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -333,6 +366,7 @@ export default function CheckoutPage() {
         countryCode: effectiveCountryCode,
         successUrl: `${window.location.origin}/dashboard?welcome=true`,
         cancelUrl: `${window.location.origin}/pricing?canceled=true`,
+        checkoutUi,
       };
 
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -362,11 +396,153 @@ export default function CheckoutPage() {
         throw new Error(data?.error || 'Failed to create checkout session');
       }
 
-      if (!data?.url) {
-        throw new Error('No checkout URL received');
+      const redirectUrl = String(data?.url || '').trim();
+
+      const canInline = checkoutUi === 'inline' && Boolean(user?.id) && (provider === 'paystack' || provider === 'flutterwave');
+
+      if (!canInline) {
+        if (!redirectUrl) throw new Error('No checkout URL received');
+        window.location.href = redirectUrl;
+        return;
       }
 
-      window.location.href = data.url;
+      // Inline checkout requires configured provider public keys.
+      if (provider === 'paystack') {
+        const inline = data?.inline?.paystack;
+        const publicKey = String(inline?.publicKey || '').trim();
+        const accessCode = String(inline?.accessCode || '').trim();
+        const reference = String(data?.reference || '').trim();
+
+        if (!publicKey || !accessCode || !reference) {
+          if (!redirectUrl) throw new Error('Inline setup unavailable (missing Paystack publicKey/accessCode)');
+          showProviderNotice('Inline checkout is unavailable for Paystack right now; redirecting instead.');
+          window.location.href = redirectUrl;
+          return;
+        }
+
+        await loadExternalScript('https://js.paystack.co/v1/inline.js');
+        if (!window.PaystackPop?.setup) {
+          if (!redirectUrl) throw new Error('Failed to load Paystack inline checkout');
+          showProviderNotice('Paystack inline failed to load; redirecting instead.');
+          window.location.href = redirectUrl;
+          return;
+        }
+
+        const handler = window.PaystackPop.setup({
+          key: publicKey,
+          email: trimmedEmail,
+          access_code: accessCode,
+          callback: async (response: any) => {
+            try {
+              const ref = String(response?.reference || reference).trim();
+              const accessToken = await getAccessToken();
+              const confirmRes = await fetch('/api/checkout/confirm', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                },
+                body: JSON.stringify({ provider: 'paystack', reference: ref }),
+              });
+              const confirmJson = await confirmRes.json().catch(() => null);
+              if (!confirmRes.ok) {
+                throw new Error(String((confirmJson as any)?.error || 'Payment confirmed, but activation is pending'));
+              }
+              window.location.href = `${window.location.origin}/dashboard?welcome=true`;
+            } catch (err: any) {
+              setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
+              setIsSubmitting(false);
+            }
+          },
+          onClose: () => {
+            setIsSubmitting(false);
+          },
+        });
+
+        handler.openIframe();
+        return;
+      }
+
+      if (provider === 'flutterwave') {
+        const inline = data?.inline?.flutterwave;
+        const publicKey = String(inline?.publicKey || '').trim();
+        const reference = String(data?.reference || '').trim();
+        const amount = Number(inline?.amount || 0);
+        const currency = String(inline?.currency || '').trim();
+        const paymentOptions = String(inline?.paymentOptions || '').trim();
+        const customerName = String(inline?.customerName || trimmedEmail.split('@')[0] || '').trim();
+        const meta = inline?.meta || {};
+
+        if (!publicKey || !reference || !amount || !currency) {
+          if (!redirectUrl) throw new Error('Inline setup unavailable (missing Flutterwave config)');
+          showProviderNotice('Inline checkout is unavailable for Flutterwave right now; redirecting instead.');
+          window.location.href = redirectUrl;
+          return;
+        }
+
+        await loadExternalScript('https://checkout.flutterwave.com/v3.js');
+        if (typeof window.FlutterwaveCheckout !== 'function') {
+          if (!redirectUrl) throw new Error('Failed to load Flutterwave inline checkout');
+          showProviderNotice('Flutterwave inline failed to load; redirecting instead.');
+          window.location.href = redirectUrl;
+          return;
+        }
+
+        window.FlutterwaveCheckout({
+          public_key: publicKey,
+          tx_ref: reference,
+          amount,
+          currency,
+          payment_options: paymentOptions || undefined,
+          customer: {
+            email: trimmedEmail,
+            name: customerName,
+          },
+          meta,
+          callback: async (resp: any) => {
+            try {
+              const status = String(resp?.status || '').toLowerCase();
+              const transactionId = String(resp?.transaction_id || resp?.id || '').trim();
+
+              if (!transactionId) {
+                throw new Error('Missing Flutterwave transaction id');
+              }
+
+              if (status && status !== 'successful') {
+                throw new Error('Payment was not successful');
+              }
+
+              const accessToken = await getAccessToken();
+              const confirmRes = await fetch('/api/checkout/confirm', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                },
+                body: JSON.stringify({ provider: 'flutterwave', reference, transactionId }),
+              });
+              const confirmJson = await confirmRes.json().catch(() => null);
+              if (!confirmRes.ok) {
+                throw new Error(String((confirmJson as any)?.error || 'Payment confirmed, but activation is pending'));
+              }
+
+              window.location.href = `${window.location.origin}/dashboard?welcome=true`;
+            } catch (err: any) {
+              setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
+              setIsSubmitting(false);
+            }
+          },
+          onclose: () => {
+            setIsSubmitting(false);
+          },
+        });
+        return;
+      }
+
+      if (!redirectUrl) {
+        throw new Error('No checkout URL received');
+      }
+      window.location.href = redirectUrl;
     } catch (e) {
       console.error('Checkout error:', e);
       setError(e instanceof Error ? e.message : 'Checkout failed. Please try again.');
@@ -428,6 +604,43 @@ export default function CheckoutPage() {
               </div>
 
               <div className="mt-6 space-y-5">
+                {/* Checkout experience */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Checkout experience</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutUi('inline')}
+                      className={`text-left border-2 rounded-xl p-4 transition-all ${
+                        checkoutUi === 'inline'
+                          ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                          : 'border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900">Stay on this site</div>
+                      <div className="mt-1 text-sm text-gray-600">Opens a secure provider modal (recommended).</div>
+                      {!user?.id && (
+                        <div className="mt-1 text-xs text-amber-700">Sign in required for inline checkout.</div>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCheckoutUi('redirect')}
+                      className={`text-left border-2 rounded-xl p-4 transition-all ${
+                        checkoutUi === 'redirect'
+                          ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                          : 'border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="font-semibold text-gray-900">Redirect</div>
+                      <div className="mt-1 text-sm text-gray-600">Takes you to the provider checkout page.</div>
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    You’ll still be paying securely with Paystack/Flutterwave. Card details are handled by the provider.
+                  </p>
+                </div>
+
                 {/* Billing / checkout country */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2" htmlFor="checkout-country">

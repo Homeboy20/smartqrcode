@@ -4,9 +4,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
 
 import { getProviderRuntimeConfig, type PaymentProvider } from '@/lib/paymentSettingsStore';
-import { createPaystackCustomer, initializeSubscriptionPayment } from '@/lib/paystack';
+import { createPaystackCustomer, getPaystackPublicKey, initializeSubscriptionPayment } from '@/lib/paystack';
 import {
   createFlutterwaveSubscriptionPayment,
+  getFlutterwavePaymentOptionsForCheckoutMethod,
 } from '@/lib/flutterwave';
 import { CURRENCY_CONFIGS, getLocalPrice, getRecommendedProvider, type CurrencyCode } from '@/lib/currency';
 
@@ -71,6 +72,21 @@ export type CheckoutSessionResult = {
   reference: string;
   url: string;
   testMode: boolean;
+  inline?: {
+    paystack?: {
+      publicKey: string;
+      accessCode: string;
+    };
+    flutterwave?: {
+      publicKey: string;
+      amount: number;
+      currency: CurrencyCode;
+      paymentOptions: string;
+      redirectUrl: string;
+      customerName: string;
+      meta: Record<string, any>;
+    };
+  };
   // Optional gateway-specific fields (kept for back-compat with existing API)
   flwRef?: string;
 };
@@ -189,11 +205,23 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         },
       });
 
+      const publicKey = (await getPaystackPublicKey()) || '';
+      const accessCode = String((payment as any)?.access_code || '').trim();
+
       return {
         provider: 'paystack',
         reference,
         url: payment.authorization_url,
         testMode: process.env.NODE_ENV !== 'production',
+        inline:
+          publicKey && accessCode
+            ? {
+                paystack: {
+                  publicKey,
+                  accessCode,
+                },
+              }
+            : undefined,
       };
     },
   },
@@ -212,6 +240,21 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
             ? 'card'
             : undefined;
 
+      const meta = {
+        userId,
+        planId: input.planId,
+        userEmail: input.email,
+        provider: 'flutterwave',
+        paymentMethod: input.paymentMethod || 'card',
+        currency: input.currency,
+        countryCode: input.countryCode,
+      };
+
+      const flutterwaveRuntime = await getProviderRuntimeConfig('flutterwave');
+      const flutterwavePublicKey = String((flutterwaveRuntime as any)?.credentials?.clientId || '').trim();
+      const paymentOptions = getFlutterwavePaymentOptionsForCheckoutMethod(flutterwavePaymentMethod);
+      const redirectUrl = appendQueryParam(input.successUrl, 'reference', reference);
+
       const payment = await createFlutterwaveSubscriptionPayment({
         amount,
         currency: input.currency,
@@ -219,17 +262,9 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         customerName,
         planName,
         reference,
-        redirectUrl: appendQueryParam(input.successUrl, 'reference', reference),
+        redirectUrl,
         paymentMethod: flutterwavePaymentMethod,
-        metadata: {
-          userId,
-          planId: input.planId,
-          userEmail: input.email,
-          provider: 'flutterwave',
-          paymentMethod: input.paymentMethod || 'card',
-          currency: input.currency,
-          countryCode: input.countryCode,
-        },
+        metadata: meta,
         testMode: process.env.NODE_ENV !== 'production',
       });
 
@@ -239,6 +274,19 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         url: payment.paymentLink,
         flwRef: payment.flwRef,
         testMode: process.env.NODE_ENV !== 'production',
+        inline: flutterwavePublicKey
+          ? {
+              flutterwave: {
+                publicKey: flutterwavePublicKey,
+                amount,
+                currency: input.currency,
+                paymentOptions,
+                redirectUrl,
+                customerName,
+                meta,
+              },
+            }
+          : undefined,
       };
     },
   },
