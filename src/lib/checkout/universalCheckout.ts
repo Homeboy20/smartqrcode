@@ -361,12 +361,33 @@ export async function getProviderEligibility(options: {
   const enablement = await getProviderEnablement(options.provider);
   const enabled = enablement.enabled;
 
-  const allowed = Boolean(enabled && supportsCountry && supportsCurrency);
+  let allowed = Boolean(enabled && supportsCountry && supportsCurrency);
+
+  // Currency-specific configuration requirements.
+  // Paystack subscriptions are plan-code based and typically currency-specific.
+  if (allowed && options.provider === 'paystack' && options.currency === 'KES') {
+    try {
+      const runtime = await getProviderRuntimeConfig('paystack');
+      const creds: any = (runtime as any)?.credentials || {};
+      const proKes = String(creds.planCodeProKes || '').trim();
+      const bizKes = String(creds.planCodeBusinessKes || '').trim();
+      if (!proKes || !bizKes) {
+        allowed = false;
+      }
+    } catch {
+      // If we can't read settings, keep default allowed; adapter will throw with details.
+    }
+  }
 
   const reason = (() => {
     if (!enabled) return enablement.reason || 'Not configured.';
     if (!supportsCountry) return `Not available for billing country ${String(options.countryCode).toUpperCase()}.`;
     if (!supportsCurrency) return `Not available for currency ${String(options.currency).toUpperCase()}.`;
+
+     if (options.provider === 'paystack' && options.currency === 'KES' && !allowed) {
+       return 'Paystack for Kenya (KES) requires KES-specific plan codes. Configure Pro/Business Plan Code (KES) in admin payment settings.';
+     }
+
     return undefined;
   })();
 

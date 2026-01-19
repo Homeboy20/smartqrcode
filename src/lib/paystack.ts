@@ -1,5 +1,6 @@
 import { getProviderRuntimeConfig } from '@/lib/paymentSettingsStore';
 import { toMinorUnits, type CurrencyCode } from '@/lib/currency';
+import { AFRICAN_COUNTRIES } from '@/lib/countries/africa';
 
 // Paystack API base URLs
 const PAYSTACK_BASE_URL = 'https://api.paystack.co';
@@ -304,9 +305,25 @@ export async function createPaystackCustomer({
   }
 }
 
+function normalizePaystackCountryName(name: string): string {
+  // Convert to a basic ASCII-ish lowercase string:
+  // - strip diacritics
+  // - remove punctuation
+  // - collapse whitespace
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ') // remove parentheticals
+    .replace(/[^a-z\s]/g, ' ') // remove punctuation
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function mapIsoCountryToPaystackCountryParam(countryCode: string): string | null {
   const cc = String(countryCode || '').trim().toUpperCase();
-  // Paystack expects these as lowercase names (per their docs).
+
+  // Known overrides / better matches for Paystack parameter naming.
   switch (cc) {
     case 'NG':
       return 'nigeria';
@@ -316,15 +333,21 @@ function mapIsoCountryToPaystackCountryParam(countryCode: string): string | null
       return 'south africa';
     case 'KE':
       return 'kenya';
-    default:
-      return null;
+    case 'CI':
+      return "cote d ivoire";
   }
+
+  const entry = AFRICAN_COUNTRIES.find((c) => c.code.toUpperCase() === cc);
+  if (!entry) return null;
+
+  const normalized = normalizePaystackCountryName(entry.name);
+  return normalized || null;
 }
 
 export async function listPaystackBanks(countryCode: string) {
   const country = mapIsoCountryToPaystackCountryParam(countryCode);
   if (!country) {
-    throw new Error(`Paystack bank list is only supported for NG, GH, ZA, KE (got ${countryCode})`);
+    throw new Error(`Paystack bank list is not supported for country ${countryCode}`);
   }
 
   const client = await getPaystackClient();
