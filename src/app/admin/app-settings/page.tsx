@@ -29,7 +29,7 @@ interface AppSettings {
     recaptchaSiteKey?: string;
   };
 
-  pricing?: Record<'pro' | 'business', PricingTier>;
+  pricing?: (Record<'pro' | 'business', PricingTier> & { fxRates?: Record<string, number> });
 }
 
 export default function AppSettingsPage() {
@@ -42,6 +42,10 @@ export default function AppSettingsPage() {
   const [firebaseUploadError, setFirebaseUploadError] = useState<string | null>(null);
   const [showPasteArea, setShowPasteArea] = useState(false);
   const [pasteValue, setPasteValue] = useState('');
+
+  const [fxCurrency, setFxCurrency] = useState('');
+  const [fxRate, setFxRate] = useState('');
+  const [fxImportJson, setFxImportJson] = useState('');
   
   const [settings, setSettings] = useState<AppSettings>({
     freeMode: false,
@@ -320,6 +324,72 @@ export default function AppSettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateFxRate = (currencyCode: string, rawRate: string) => {
+    const upper = String(currencyCode || '').toUpperCase();
+    if (!/^[A-Z]{3}$/.test(upper)) return;
+
+    setSettings((prev) => {
+      const pricing = (prev.pricing ?? (SUBSCRIPTION_PRICING as any)) as any;
+      const nextFxRates: Record<string, number> = { ...(pricing.fxRates ?? {}) };
+
+      if (rawRate.trim() === '') {
+        delete nextFxRates[upper];
+      } else {
+        const n = Number(rawRate);
+        if (!Number.isFinite(n) || n <= 0) return prev;
+        nextFxRates[upper] = n;
+      }
+
+      return {
+        ...prev,
+        pricing: {
+          ...pricing,
+          fxRates: nextFxRates,
+        },
+      } as any;
+    });
+  };
+
+  const addOrUpdateFxRate = () => {
+    const upper = String(fxCurrency || '').toUpperCase().trim();
+    const n = Number(String(fxRate || '').trim());
+    if (!/^[A-Z]{3}$/.test(upper)) {
+      setError('FX currency must be a 3-letter code (e.g., TZS, KES).');
+      return;
+    }
+    if (!Number.isFinite(n) || n <= 0) {
+      setError('FX rate must be a positive number (USD → local).');
+      return;
+    }
+
+    setError(null);
+    updateFxRate(upper, String(n));
+    setFxCurrency('');
+    setFxRate('');
+  };
+
+  const importFxRatesFromJson = () => {
+    if (!fxImportJson.trim()) return;
+    try {
+      const parsed = JSON.parse(fxImportJson);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        setError('FX import must be a JSON object like {"TZS": 2500, "KES": 160}.');
+        return;
+      }
+      setError(null);
+      for (const [code, value] of Object.entries(parsed as Record<string, unknown>)) {
+        const upper = String(code || '').toUpperCase();
+        if (!/^[A-Z]{3}$/.test(upper)) continue;
+        const n = typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(n) || n <= 0) continue;
+        updateFxRate(upper, String(n));
+      }
+      setFxImportJson('');
+    } catch (e: any) {
+      setError(e?.message ? `Failed to parse FX JSON: ${e.message}` : 'Failed to parse FX JSON');
     }
   };
 
@@ -946,6 +1016,114 @@ export default function AppSettingsPage() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* FX Rates */}
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">FX Rates (USD → Local)</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Used when a tier has no explicit local price. Example: if Pro USD is $10 and TZS fxRate is 2500, price becomes 25,000 TZS.
+              </p>
+            </div>
+            <div className="px-4 py-5 sm:p-6">
+              {(() => {
+                const fxRates = ((settings.pricing as any)?.fxRates ?? {}) as Record<string, number>;
+                const entries = Object.entries(fxRates).sort((a, b) => a[0].localeCompare(b[0]));
+
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                        <input
+                          type="text"
+                          value={fxCurrency}
+                          onChange={(e) => setFxCurrency(e.target.value.toUpperCase())}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          placeholder="TZS"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rate</label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={fxRate}
+                          onChange={(e) => setFxRate(e.target.value)}
+                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          placeholder="2500"
+                        />
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={addOrUpdateFxRate}
+                          className="inline-flex items-center justify-center w-full px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+                        >
+                          Add / Update
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bulk import JSON</label>
+                      <textarea
+                        rows={4}
+                        value={fxImportJson}
+                        onChange={(e) => setFxImportJson(e.target.value)}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono"
+                        placeholder='{"TZS": 2500, "KES": 160, "UGX": 3900}'
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={importFxRatesFromJson}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm rounded-md bg-white hover:bg-gray-50"
+                        >
+                          Import
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="grid grid-cols-3 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600">
+                        <div>Currency</div>
+                        <div>USD → Local</div>
+                        <div></div>
+                      </div>
+                      {entries.length === 0 ? (
+                        <div className="px-3 py-3 text-sm text-gray-500">No FX rates configured.</div>
+                      ) : (
+                        entries.map(([ccy, rate]) => (
+                          <div key={ccy} className="grid grid-cols-3 px-3 py-2 border-t border-gray-100 items-center">
+                            <div className="text-sm font-medium text-gray-900">{ccy}</div>
+                            <div>
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={String(rate)}
+                                onChange={(e) => updateFxRate(ccy, e.target.value)}
+                                className="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => updateFxRate(ccy, '')}
+                                className="text-sm text-red-600 hover:text-red-700"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

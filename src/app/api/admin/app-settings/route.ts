@@ -17,6 +17,7 @@ type FirebaseSettings = {
 };
 
 type SubscriptionPricing = Record<'pro' | 'business', PricingTier>;
+type PricingSettings = SubscriptionPricing & { fxRates?: Record<string, number> };
 
 function toNumberOrUndefined(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -27,11 +28,11 @@ function toNumberOrUndefined(value: unknown): number | undefined {
   return undefined;
 }
 
-function mergePricingSettings(raw: any, defaults: SubscriptionPricing): SubscriptionPricing {
+function mergePricingSettings(raw: any, defaults: SubscriptionPricing): PricingSettings {
   const input = (raw?.pricing ?? raw?.subscriptionPricing ?? raw?.subscription_pricing ?? {}) as any;
   const tiers: Array<'pro' | 'business'> = ['pro', 'business'];
 
-  const merged: SubscriptionPricing = {
+  const merged: PricingSettings = {
     pro: { ...defaults.pro, localPrices: { ...(defaults.pro.localPrices ?? {}) } },
     business: { ...defaults.business, localPrices: { ...(defaults.business.localPrices ?? {}) } },
   };
@@ -49,6 +50,20 @@ function mergePricingSettings(raw: any, defaults: SubscriptionPricing): Subscrip
       if (!/^[A-Z]{3}$/.test(upper)) continue;
       (merged[tier].localPrices as any)[upper] = n;
     }
+  }
+
+  const fxRatesRaw = (input?.fxRates ?? input?.fx_rates ?? {}) as Record<string, unknown>;
+  const fxRates: Record<string, number> = {};
+  for (const [code, value] of Object.entries(fxRatesRaw)) {
+    const upper = String(code || '').toUpperCase();
+    const n = toNumberOrUndefined(value);
+    if (n === undefined) continue;
+    if (n <= 0) continue;
+    if (!/^[A-Z]{3}$/.test(upper)) continue;
+    fxRates[upper] = n;
+  }
+  if (Object.keys(fxRates).length > 0) {
+    merged.fxRates = fxRates;
   }
 
   return merged;
