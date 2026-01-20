@@ -13,6 +13,7 @@ import {
   findOptionByCountry,
 } from '@/lib/phone/countryCallingCodes';
 import { normalizeToE164 } from '@/lib/phone/e164';
+import { toFriendlyFirebasePhoneAuthError } from '@/lib/phone/firebasePhoneErrors';
 
 type VerificationStep = 'inputPhone' | 'verifyCode';
 
@@ -44,25 +45,7 @@ export default function PhoneSignup() {
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
-  const toFriendlyFirebaseAuthError = (err: any): string => {
-    const code = String(err?.code || '').toLowerCase();
-    const message = String(err?.message || '').toLowerCase();
-    const combined = `${code} ${message}`;
-
-    if (combined.includes('auth/billing-not-enabled')) {
-      return 'Phone sign-in is not available because billing is not enabled for this Firebase project. Ask the administrator to upgrade the Firebase project to the Blaze plan (Billing enabled) and try again.';
-    }
-
-    if (combined.includes('auth/too-many-requests')) {
-      return 'Too many attempts. Please wait a moment and try again.';
-    }
-
-    if (combined.includes('error-code:-39') || combined.includes('recaptcha')) {
-      return 'reCAPTCHA verification failed. This usually means the reCAPTCHA site key is invalid or not properly configured for this domain. Ask the administrator to verify the reCAPTCHA configuration in Firebase Console (Authentication → Sign-in method → Phone → reCAPTCHA verifier).';
-    }
-
-    return String(err?.message || 'Something went wrong. Please try again.');
-  };
+  const toFriendlyFirebaseAuthError = (err: any): string => toFriendlyFirebasePhoneAuthError(err);
 
   const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
   const selectedOption = React.useMemo(

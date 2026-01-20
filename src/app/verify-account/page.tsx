@@ -11,6 +11,7 @@ import {
   findOptionByCountry,
 } from '@/lib/phone/countryCallingCodes';
 import { normalizeToE164 } from '@/lib/phone/e164';
+import { toFriendlyFirebasePhoneAuthError } from '@/lib/phone/firebasePhoneErrors';
 
 export default function VerifyAccountPage() {
   const {
@@ -135,12 +136,12 @@ export default function VerifyAccountPage() {
           setStatusMessage('Verification code sent to your phone. Please enter it below.');
         } catch (error: any) {
           console.error('Error sending phone verification:', error);
-          setStatusMessage(`Error sending verification code: ${error.message}`);
+          setStatusMessage(`Error sending verification code: ${toFriendlyFirebasePhoneAuthError(error)}`);
         }
       }
     } catch (error: any) {
       console.error('Error sending verification:', error);
-      setStatusMessage(`Error: ${error.message}`);
+      setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
     } finally {
       setSending(false);
     }
@@ -194,7 +195,7 @@ export default function VerifyAccountPage() {
       }
     } catch (error: any) {
       console.error('Error verifying phone:', error);
-      setStatusMessage(`Error: ${error.message}`);
+      setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
     } finally {
       setVerifying(false);
     }
