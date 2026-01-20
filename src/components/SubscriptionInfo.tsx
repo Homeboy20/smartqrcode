@@ -7,6 +7,10 @@ import { supabase } from '@/lib/supabase/client';
 
 type BillingInterval = 'monthly' | 'yearly' | 'unknown';
 
+type SubscriptionInfoProps = {
+  variant?: 'default' | 'compact';
+};
+
 function parseDate(value: any): Date | null {
   if (!value) return null;
   try {
@@ -26,7 +30,7 @@ function computeBillingIntervalFromDates(start: any, end: any): BillingInterval 
   return days >= 300 ? 'yearly' : 'monthly';
 }
 
-export default function SubscriptionInfo() {
+export default function SubscriptionInfo({ variant = 'default' }: SubscriptionInfoProps) {
   const { 
     subscriptionTier, 
     loading,
@@ -34,6 +38,8 @@ export default function SubscriptionInfo() {
     featuresUsage,
     error
   } = useSubscription();
+
+  const isCompact = variant === 'compact';
 
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('unknown');
 
@@ -77,87 +83,152 @@ export default function SubscriptionInfo() {
   }, [billingInterval]);
 
   if (loading) {
-    return <div className="animate-pulse bg-gray-200 h-32 rounded-lg w-full"></div>;
+    return (
+      <div
+        className={
+          isCompact
+            ? 'animate-pulse bg-gray-200 h-14 rounded-lg w-full'
+            : 'animate-pulse bg-gray-200 h-32 rounded-lg w-full'
+        }
+      ></div>
+    );
   }
   
   if (error) {
     // Show a warning instead of an error since we're falling back to defaults
-    return <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
-      {error}
-    </div>;
+    return (
+      <div className={
+        isCompact
+          ? 'bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded-md'
+          : 'bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4'
+      }>
+        {error}
+      </div>
+    );
   }
 
+  const qrLimit = getLimit('qrGenerationLimit');
+  const barcodeLimit = getLimit('barcodeGenerationLimit');
+  const bulkLimit = getLimit('bulkGenerationLimit');
+
+  const usageSummary = [
+    `QR ${featuresUsage.qrCodesGenerated}/${qrLimit}`,
+    `Barcode ${featuresUsage.barcodesGenerated}/${barcodeLimit}`,
+    bulkLimit > 0 ? `Bulk ${featuresUsage.bulkGenerations}/${bulkLimit}` : null,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
   return (
-    <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-800">Your Subscription</h2>
-        <span className="px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800 capitalize">
-          {subscriptionTier}
-        </span>
+    <div className={
+      isCompact
+        ? 'rounded-lg border border-gray-200 bg-white px-4 py-3'
+        : 'bg-white shadow-md rounded-lg p-6 mb-6'
+    }>
+      <div className={
+        isCompact
+          ? 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'
+          : 'flex justify-between items-center mb-4'
+      }>
+        <div className={isCompact ? 'flex items-center gap-2' : undefined}>
+          <h2 className={isCompact ? 'text-sm font-semibold text-gray-900' : 'text-xl font-bold text-gray-800'}>
+            Your Subscription
+          </h2>
+          {subscriptionTier !== 'free' && isCompact ? (
+            <span className="text-xs font-semibold text-gray-500">({billingLabel})</span>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={
+            isCompact
+              ? 'px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 capitalize'
+              : 'px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800 capitalize'
+          }>
+            {subscriptionTier}
+          </span>
+
+          {subscriptionTier === 'free' ? (
+            <Link
+              href="/pricing"
+              className={
+                isCompact
+                  ? 'inline-flex items-center justify-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700'
+                  : 'block text-center w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition duration-200'
+              }
+            >
+              Upgrade
+            </Link>
+          ) : null}
+        </div>
       </div>
 
-      {subscriptionTier !== 'free' && (
+      {subscriptionTier !== 'free' && !isCompact && (
         <div className="mb-4 text-sm text-gray-600">
           <span className="font-medium text-gray-700">Billing:</span> {billingLabel}
         </div>
       )}
-      
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-2">QR Codes Generated</h3>
-          <div className="flex items-center">
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div 
-                className="bg-blue-600 h-2.5 rounded-full" 
-                style={{ 
-                  width: `${Math.min(100, (featuresUsage.qrCodesGenerated / getLimit('qrGenerationLimit')) * 100)}%` 
-                }}
-              ></div>
-            </div>
-            <span className="text-sm font-medium text-gray-700 ml-2">
-              {featuresUsage.qrCodesGenerated} / {getLimit('qrGenerationLimit')}
-            </span>
-          </div>
-        </div>
-        
-        <div>
-          <h3 className="text-sm font-medium text-gray-500 mb-2">Barcodes Generated</h3>
-          <div className="flex items-center">
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div 
-                className="bg-green-600 h-2.5 rounded-full" 
-                style={{ 
-                  width: `${Math.min(100, (featuresUsage.barcodesGenerated / getLimit('barcodeGenerationLimit')) * 100)}%` 
-                }}
-              ></div>
-            </div>
-            <span className="text-sm font-medium text-gray-700 ml-2">
-              {featuresUsage.barcodesGenerated} / {getLimit('barcodeGenerationLimit')}
-            </span>
-          </div>
-        </div>
-        
-        {getLimit('bulkGenerationLimit') > 0 && (
+
+      {isCompact ? (
+        <p className="mt-2 text-xs text-gray-600">{usageSummary}</p>
+      ) : (
+        <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Bulk Generations</h3>
+            <h3 className="text-sm font-medium text-gray-500 mb-2">QR Codes Generated</h3>
             <div className="flex items-center">
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div 
-                  className="bg-purple-600 h-2.5 rounded-full" 
+                  className="bg-blue-600 h-2.5 rounded-full" 
                   style={{ 
-                    width: `${Math.min(100, (featuresUsage.bulkGenerations / getLimit('bulkGenerationLimit')) * 100)}%` 
+                    width: `${Math.min(100, (featuresUsage.qrCodesGenerated / qrLimit) * 100)}%` 
                   }}
                 ></div>
               </div>
               <span className="text-sm font-medium text-gray-700 ml-2">
-                {featuresUsage.bulkGenerations} / {getLimit('bulkGenerationLimit')}
+                {featuresUsage.qrCodesGenerated} / {qrLimit}
               </span>
             </div>
           </div>
-        )}
-      </div>
-      
-      {subscriptionTier === 'free' && (
+          
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 mb-2">Barcodes Generated</h3>
+            <div className="flex items-center">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-green-600 h-2.5 rounded-full" 
+                  style={{ 
+                    width: `${Math.min(100, (featuresUsage.barcodesGenerated / barcodeLimit) * 100)}%` 
+                  }}
+                ></div>
+              </div>
+              <span className="text-sm font-medium text-gray-700 ml-2">
+                {featuresUsage.barcodesGenerated} / {barcodeLimit}
+              </span>
+            </div>
+          </div>
+          
+          {bulkLimit > 0 && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Bulk Generations</h3>
+              <div className="flex items-center">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-purple-600 h-2.5 rounded-full" 
+                    style={{ 
+                      width: `${Math.min(100, (featuresUsage.bulkGenerations / bulkLimit) * 100)}%` 
+                    }}
+                  ></div>
+                </div>
+                <span className="text-sm font-medium text-gray-700 ml-2">
+                  {featuresUsage.bulkGenerations} / {bulkLimit}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subscriptionTier === 'free' && !isCompact && (
         <div className="mt-6">
           <Link 
             href="/pricing" 

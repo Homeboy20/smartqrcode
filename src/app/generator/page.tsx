@@ -110,7 +110,7 @@ export default function GeneratorPage() {
 
         <div className="px-6 py-6">
           <div className="mb-6">
-            <SubscriptionInfo />
+            <SubscriptionInfo variant="compact" />
           </div>
           <UnifiedGenerator />
         </div>
