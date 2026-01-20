@@ -119,7 +119,7 @@ function normalizePlan(plan: string | null): Exclude<SubscriptionTier, 'free'> {
 export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyInfo | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, getAccessToken } = useSupabaseAuth();
+  const { user, getAccessToken, refreshSession } = useSupabaseAuth();
   const { settings: appSettings } = useAppSettings();
 
   const selectedPlan = useMemo(
@@ -426,6 +426,17 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
   const isPhoneVerified = Boolean(
     (user as any)?.user_metadata?.phone_verified_at || (user as any)?.user_metadata?.phone_number
   );
+
+  // Ensure we see the latest user_metadata (phone_verified_at) after returning from /verify-account.
+  // This avoids false negatives due to cached session state.
+  const phoneCheckRanRef = React.useRef(false);
+  useEffect(() => {
+    if (!requiresPhoneVerification) return;
+    if (!user?.id) return;
+    if (phoneCheckRanRef.current) return;
+    phoneCheckRanRef.current = true;
+    refreshSession();
+  }, [requiresPhoneVerification, refreshSession, user?.id]);
 
   async function submitCheckout() {
     setError(null);
@@ -944,10 +955,18 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                 <button
                   type="button"
                   onClick={submitCheckout}
-                  disabled={loadingCurrency || isSubmitting}
+                  disabled={
+                    loadingCurrency ||
+                    isSubmitting ||
+                    (requiresPhoneVerification && !!user?.id && !isPhoneVerified)
+                  }
                   className="w-full py-4 px-6 rounded-xl shadow-lg font-bold text-lg text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? 'Redirecting to secure payment…' : `Continue to secure payment`}
+                  {requiresPhoneVerification && !!user?.id && !isPhoneVerified
+                    ? 'Verify phone to continue'
+                    : isSubmitting
+                      ? 'Redirecting to secure payment…'
+                      : 'Continue to secure payment'}
                 </button>
 
                 <div className="flex items-center justify-center gap-6 text-xs text-gray-500">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
@@ -13,6 +14,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const { user, signUp, signInWithGoogle, error: authError, loading: authChecking, clearError } = useSupabaseAuth();
+  const { settings: appSettings } = useAppSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams?.get('redirect') || '/dashboard';
@@ -20,12 +22,21 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const requiresPhoneVerification = Boolean(appSettings?.firebase?.phoneAuthEnabled);
+  const isPhoneVerified = Boolean(
+    (user as any)?.user_metadata?.phone_verified_at || (user as any)?.user_metadata?.phone_number
+  );
+
   // Redirect if user is already logged in
   useEffect(() => {
     if (user && !authChecking) {
+      if (requiresPhoneVerification && !isPhoneVerified) {
+        router.push(`/verify-account?redirect=${encodeURIComponent(redirect)}`);
+        return;
+      }
       router.push(redirect);
     }
-  }, [user, authChecking, router, redirect]);
+  }, [user, authChecking, router, redirect, requiresPhoneVerification, isPhoneVerified]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -46,7 +57,11 @@ export default function RegisterPage() {
         return;
       }
       // Supabase may require email confirmation, so we can't always redirect immediately.
-      setSuccessMessage('Account created. If email confirmation is enabled, check your inbox to verify, then sign in.');
+      setSuccessMessage(
+        requiresPhoneVerification
+          ? 'Account created. If email confirmation is enabled, verify your email, then sign in to verify your phone.'
+          : 'Account created. If email confirmation is enabled, check your inbox to verify, then sign in.'
+      );
     } catch (err) {
       setError((err as Error).message || "Registration failed. Please try again.");
     } finally {
