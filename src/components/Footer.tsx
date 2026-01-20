@@ -4,7 +4,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
   
   const productLinks = [
-    { href: "/dashboard#generator", label: "Generator" },
+    { href: "/generator", label: "Generator" },
     { href: "/pricing/", label: "Pricing Plans" },
   ];
 

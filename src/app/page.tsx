@@ -118,8 +118,8 @@ export default function Home() {
   const { user } = useSupabaseAuth();
   const { geo, countryName } = useGeoCurrencyInfo();
 
-  const ctaHref = user ? '/dashboard#generator' : '/register/';
-  const ctaLabel = user ? 'Open Dashboard Generator' : 'Create an Account';
+  const ctaHref = user ? '/generator' : '/register/';
+  const ctaLabel = user ? 'Open Generator' : 'Create an Account';
 
   const geoCode = String(geo?.country || '').toUpperCase();
   const geoCurrency = geo?.currency?.code;

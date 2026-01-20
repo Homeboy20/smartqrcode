@@ -39,7 +39,7 @@ export default function BarcodesForInventoryPage() {
 
         <div className="mt-10 flex flex-wrap gap-3">
           <Link
-            href="/dashboard#generator"
+            href="/generator"
             className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
           >
             Create a Barcode

@@ -122,7 +122,7 @@ export default function Header() {
   }, [logout]);
 
   const navLinks = useMemo(() => {
-    const createHref = user ? '/dashboard#generator' : '/register/';
+    const createHref = user ? '/generator' : '/register/';
     return [
       { href: createHref, label: 'Create', icon: '✨' },
       { href: '/pricing/', label: 'Pricing', icon: '💎' },

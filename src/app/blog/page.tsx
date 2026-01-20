@@ -54,7 +54,7 @@ export default function BlogPage() {
             View Pricing
           </Link>
           <Link
-            href="/dashboard#generator"
+            href="/generator"
             className="inline-flex items-center justify-center rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800"
           >
             Open Generator
