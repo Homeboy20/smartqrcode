@@ -335,6 +335,7 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
 
       const flutterwaveRuntime = await getProviderRuntimeConfig('flutterwave');
       const flutterwavePublicKey = String((flutterwaveRuntime as any)?.credentials?.clientId || '').trim();
+      const canInline = /^FLWPUBK_/i.test(flutterwavePublicKey);
       const paymentOptions = getFlutterwavePaymentOptionsForCountry({
         countryCode: input.countryCode,
         method: flutterwavePaymentMethod,
@@ -360,7 +361,7 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         url: payment.paymentLink,
         flwRef: payment.flwRef,
         testMode: process.env.NODE_ENV !== 'production',
-        inline: flutterwavePublicKey
+        inline: canInline
           ? {
               flutterwave: {
                 publicKey: flutterwavePublicKey,

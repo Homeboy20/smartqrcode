@@ -26,6 +26,16 @@ declare global {
   }
 }
 
+function looksLikePaystackPublicKey(value: string) {
+  const v = (value || '').trim();
+  return /^pk_(test|live)_/i.test(v);
+}
+
+function looksLikeFlutterwavePublicKey(value: string) {
+  const v = (value || '').trim();
+  return /^FLWPUBK_/i.test(v);
+}
+
 function loadExternalScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof document === 'undefined') return resolve();
@@ -513,9 +523,13 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
         const accessCode = String(inline?.accessCode || '').trim();
         const reference = String(data?.reference || '').trim();
 
-        if (!publicKey || !accessCode || !reference) {
+        if (!publicKey || !accessCode || !reference || !looksLikePaystackPublicKey(publicKey)) {
           if (!redirectUrl) throw new Error('Inline setup unavailable (missing Paystack publicKey/accessCode)');
-          showProviderNotice('Inline checkout is unavailable for Paystack right now; redirecting instead.');
+          showProviderNotice(
+            !looksLikePaystackPublicKey(publicKey)
+              ? 'Paystack public key looks misconfigured (expected pk_test_* or pk_live_*). Redirecting instead.'
+              : 'Inline checkout is unavailable for Paystack right now; redirecting instead.'
+          );
           window.location.href = redirectUrl;
           return;
         }
@@ -573,9 +587,13 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
         const customerName = String(inline?.customerName || trimmedEmail.split('@')[0] || '').trim();
         const meta = inline?.meta || {};
 
-        if (!publicKey || !reference || !amount || !currency) {
+        if (!publicKey || !reference || !amount || !currency || !looksLikeFlutterwavePublicKey(publicKey)) {
           if (!redirectUrl) throw new Error('Inline setup unavailable (missing Flutterwave config)');
-          showProviderNotice('Inline checkout is unavailable for Flutterwave right now; redirecting instead.');
+          showProviderNotice(
+            !looksLikeFlutterwavePublicKey(publicKey)
+              ? 'Flutterwave public key looks misconfigured (expected FLWPUBK_*). Redirecting instead.'
+              : 'Inline checkout is unavailable for Flutterwave right now; redirecting instead.'
+          );
           window.location.href = redirectUrl;
           return;
         }
