@@ -169,7 +169,9 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
     intervalInitializedRef.current = true;
   }, [searchParams]);
 
-  const [checkoutUi, setCheckoutUi] = useState<'inline' | 'redirect'>('inline');
+  // Keep checkout inline by default (provider modal when available).
+  // We still fall back to redirect automatically if inline isn't possible.
+  const checkoutUi: 'inline' = 'inline';
 
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
   const providerNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -496,7 +498,7 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
 
       const redirectUrl = String(data?.url || '').trim();
 
-      const canInline = checkoutUi === 'inline' && Boolean(user?.id) && (provider === 'paystack' || provider === 'flutterwave');
+      const canInline = Boolean(user?.id) && (provider === 'paystack' || provider === 'flutterwave');
 
       if (!canInline) {
         if (!redirectUrl) throw new Error('No checkout URL received');
@@ -756,43 +758,6 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
               </div>
 
               <div className="mt-6 space-y-5">
-                {/* Checkout experience */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Checkout experience</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setCheckoutUi('inline')}
-                      className={`text-left border-2 rounded-xl p-4 transition-all ${
-                        checkoutUi === 'inline'
-                          ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                          : 'border-gray-200 hover:border-indigo-300'
-                      }`}
-                    >
-                      <div className="font-semibold text-gray-900">Stay on this site</div>
-                      <div className="mt-1 text-sm text-gray-600">Opens a secure provider modal (recommended).</div>
-                      {!user?.id && (
-                        <div className="mt-1 text-xs text-amber-700">Sign in required for inline checkout.</div>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCheckoutUi('redirect')}
-                      className={`text-left border-2 rounded-xl p-4 transition-all ${
-                        checkoutUi === 'redirect'
-                          ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                          : 'border-gray-200 hover:border-indigo-300'
-                      }`}
-                    >
-                      <div className="font-semibold text-gray-900">Redirect</div>
-                      <div className="mt-1 text-sm text-gray-600">Takes you to the provider checkout page.</div>
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    You’ll still be paying securely with Paystack/Flutterwave. Card details are handled by the provider.
-                  </p>
-                </div>
-
                 {/* Billing / checkout country */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2" htmlFor="checkout-country">
