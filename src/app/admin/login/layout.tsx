@@ -2,8 +2,8 @@ import React from 'react';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Admin Login - Smart QR Code Generator',
-  description: 'Login to access the admin panel for Smart QR Code Generator',
+  title: 'Admin Login - ScanMagic',
+  description: 'Login to access the admin panel for ScanMagic',
 };
 
 export default function AdminLoginLayout({

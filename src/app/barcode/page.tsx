@@ -3,7 +3,7 @@ import BarcodeGenerator from "@/components/BarcodeGenerator";
 // import TabNavigation from "@/components/TabNavigation"; // Removed
 
 export const metadata = {
-  title: "Barcode Generator - Smart QR & Barcode",
+  title: "Barcode Generator - ScanMagic",
   description: "Generate various barcode formats like Code 128, EAN, UPC, and more.",
 };
 

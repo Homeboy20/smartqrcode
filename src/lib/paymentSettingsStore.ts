@@ -284,6 +284,12 @@ export function mapEnvStylePaymentKeysToProviders(credentials: Record<string, st
   if (credentials.PAYSTACK_SECRET_KEY) paystack.secretKey = credentials.PAYSTACK_SECRET_KEY;
   if (credentials.PAYSTACK_PLAN_CODE_PRO) paystack.planCodePro = credentials.PAYSTACK_PLAN_CODE_PRO;
   if (credentials.PAYSTACK_PLAN_CODE_BUSINESS) paystack.planCodeBusiness = credentials.PAYSTACK_PLAN_CODE_BUSINESS;
+  if (credentials.PAYSTACK_PLAN_CODE_PRO_YEARLY) paystack.planCodeProYearly = credentials.PAYSTACK_PLAN_CODE_PRO_YEARLY;
+  if (credentials.PAYSTACK_PLAN_CODE_BUSINESS_YEARLY) paystack.planCodeBusinessYearly = credentials.PAYSTACK_PLAN_CODE_BUSINESS_YEARLY;
+  if (credentials.PAYSTACK_PLAN_CODE_PRO_KES) paystack.planCodeProKes = credentials.PAYSTACK_PLAN_CODE_PRO_KES;
+  if (credentials.PAYSTACK_PLAN_CODE_BUSINESS_KES) paystack.planCodeBusinessKes = credentials.PAYSTACK_PLAN_CODE_BUSINESS_KES;
+  if (credentials.PAYSTACK_PLAN_CODE_PRO_YEARLY_KES) paystack.planCodeProYearlyKes = credentials.PAYSTACK_PLAN_CODE_PRO_YEARLY_KES;
+  if (credentials.PAYSTACK_PLAN_CODE_BUSINESS_YEARLY_KES) paystack.planCodeBusinessYearlyKes = credentials.PAYSTACK_PLAN_CODE_BUSINESS_YEARLY_KES;
   // Also support NEXT_PUBLIC naming.
   if (credentials.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY && !paystack.publicKey) paystack.publicKey = credentials.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
   if (Object.keys(paystack).length > 0) updates.push({ provider: 'paystack', credentials: paystack });

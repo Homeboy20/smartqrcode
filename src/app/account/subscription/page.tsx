@@ -250,7 +250,7 @@ export default function UserSubscriptionPage() {
             <p className="mt-1 max-w-2xl text-sm text-gray-500">
               {subscription?.status === 'active' ? 'Your subscription is active.' : 
                subscription?.status === 'canceled' ? 'Your subscription will end at the end of the billing period.' :
-               'You are currently on the free plan.'}
+               'No active subscription.'}
             </p>
           </div>
           <div className="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800 font-medium">

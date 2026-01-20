@@ -2,7 +2,7 @@ import React from "react";
 import BulkSequenceGenerator from "@/components/BulkSequenceGenerator";
 
 export const metadata = {
-  title: "Bulk Sequence Generator - Smart QR & Barcode",
+  title: "Bulk Sequence Generator - ScanMagic",
   description: "Generate and download multiple QR codes or barcodes at once",
 };
 

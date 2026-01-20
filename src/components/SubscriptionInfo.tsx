@@ -1,8 +1,30 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSubscription } from '../hooks/useSubscription';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
+
+type BillingInterval = 'monthly' | 'yearly' | 'unknown';
+
+function parseDate(value: any): Date | null {
+  if (!value) return null;
+  try {
+    const d = value instanceof Date ? value : new Date(value);
+    return Number.isFinite(d.getTime()) ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+function computeBillingIntervalFromDates(start: any, end: any): BillingInterval {
+  const s = parseDate(start);
+  const e = parseDate(end);
+  if (!s || !e) return 'unknown';
+  const days = (e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24);
+  if (!Number.isFinite(days) || days <= 0) return 'unknown';
+  return days >= 300 ? 'yearly' : 'monthly';
+}
 
 export default function SubscriptionInfo() {
   const { 
@@ -12,6 +34,47 @@ export default function SubscriptionInfo() {
     featuresUsage,
     error
   } = useSubscription();
+
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('unknown');
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function fetchInterval() {
+      try {
+        // Only attempt to read subscription rows when the user is not on free tier.
+        // RLS should allow users to read their own subscription row; if not, we just keep "unknown".
+        if (subscriptionTier === 'free') {
+          if (mounted) setBillingInterval('unknown');
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('subscriptions')
+          .select('current_period_start,current_period_end,updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (error) return;
+        const row = (data as any)?.[0];
+        const interval = computeBillingIntervalFromDates(row?.current_period_start, row?.current_period_end);
+        if (mounted) setBillingInterval(interval);
+      } catch {
+        // ignore
+      }
+    }
+
+    fetchInterval();
+    return () => {
+      mounted = false;
+    };
+  }, [subscriptionTier]);
+
+  const billingLabel = useMemo(() => {
+    if (billingInterval === 'yearly') return 'Yearly';
+    if (billingInterval === 'monthly') return 'Monthly';
+    return 'Unknown';
+  }, [billingInterval]);
 
   if (loading) {
     return <div className="animate-pulse bg-gray-200 h-32 rounded-lg w-full"></div>;
@@ -32,6 +95,12 @@ export default function SubscriptionInfo() {
           {subscriptionTier}
         </span>
       </div>
+
+      {subscriptionTier !== 'free' && (
+        <div className="mb-4 text-sm text-gray-600">
+          <span className="font-medium text-gray-700">Billing:</span> {billingLabel}
+        </div>
+      )}
       
       <div className="space-y-4">
         <div>

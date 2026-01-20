@@ -65,6 +65,28 @@ function roundForCurrency(amount: number, currencyCode: string): number {
   return Math.round(amount * 100) / 100;
 }
 
+function toYearlyAmount(monthlyAmount: number, currencyCode: string): number {
+  // Default: 2 months free (10x monthly).
+  const YEARLY_MULTIPLIER = 10;
+  return roundForCurrency(monthlyAmount * YEARLY_MULTIPLIER, currencyCode);
+}
+
+function getPaidTrialConfig(): { days: number; multiplier: number } {
+  const daysRaw = Number(process.env.PAID_TRIAL_DAYS ?? 7);
+  const multiplierRaw = Number(process.env.PAID_TRIAL_MULTIPLIER ?? 0.3);
+
+  const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(31, Math.floor(daysRaw))) : 7;
+  const multiplier = Number.isFinite(multiplierRaw)
+    ? Math.max(0.05, Math.min(1, multiplierRaw))
+    : 0.3;
+
+  return { days, multiplier };
+}
+
+function toTrialAmount(monthlyAmount: number, currencyCode: string, multiplier: number): number {
+  return roundForCurrency(monthlyAmount * multiplier, currencyCode);
+}
+
 function getAmountForCurrency(params: {
   tier: 'pro' | 'business';
   currencyCode: string;
@@ -186,6 +208,36 @@ export async function GET(request: NextRequest) {
         usd: mergedPricing.business.usdPrice,
       },
     };
+
+    const pricingYearly = {
+      pro: {
+        amount: toYearlyAmount(proAmount, currencyConfig.code),
+        formatted: formatCurrency(toYearlyAmount(proAmount, currencyConfig.code), currencyConfig.code),
+        usd: mergedPricing.pro.usdPrice,
+      },
+      business: {
+        amount: toYearlyAmount(businessAmount, currencyConfig.code),
+        formatted: formatCurrency(toYearlyAmount(businessAmount, currencyConfig.code), currencyConfig.code),
+        usd: mergedPricing.business.usdPrice,
+      },
+    };
+
+    const paidTrial = getPaidTrialConfig();
+    const pricingTrial = {
+      pro: {
+        amount: toTrialAmount(proAmount, currencyConfig.code, paidTrial.multiplier),
+        formatted: formatCurrency(toTrialAmount(proAmount, currencyConfig.code, paidTrial.multiplier), currencyConfig.code),
+        usd: mergedPricing.pro.usdPrice,
+      },
+      business: {
+        amount: toTrialAmount(businessAmount, currencyConfig.code, paidTrial.multiplier),
+        formatted: formatCurrency(
+          toTrialAmount(businessAmount, currencyConfig.code, paidTrial.multiplier),
+          currencyConfig.code
+        ),
+        usd: mergedPricing.business.usdPrice,
+      },
+    };
     
     return NextResponse.json({
       country: countryCode,
@@ -198,6 +250,12 @@ export async function GET(request: NextRequest) {
       recommendedProvider,
       providerEligibility,
       pricing,
+      pricingYearly,
+      paidTrial: {
+        days: paidTrial.days,
+        multiplier: paidTrial.multiplier,
+      },
+      pricingTrial,
     });
   } catch (error) {
     console.error('Error detecting currency:', error);
@@ -233,6 +291,23 @@ export async function GET(request: NextRequest) {
           formatted: '$29.99',
           usd: 29.99,
         },
+      },
+      pricingYearly: {
+        pro: {
+          amount: 99.9,
+          formatted: '$99.90',
+          usd: 9.99,
+        },
+        business: {
+          amount: 299.9,
+          formatted: '$299.90',
+          usd: 29.99,
+        },
+      },
+      paidTrial: { days: 7, multiplier: 0.3 },
+      pricingTrial: {
+        pro: { amount: 2.99, formatted: '$2.99', usd: 9.99 },
+        business: { amount: 8.99, formatted: '$8.99', usd: 29.99 },
       },
     });
   }

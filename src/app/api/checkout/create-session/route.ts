@@ -80,7 +80,7 @@ async function processCheckout(
   currency: CurrencyCode, 
   countryCode: string
 ) {
-  const { planId, successUrl, cancelUrl, email, paymentMethod, idempotencyKey } = body;
+  const { planId, successUrl, cancelUrl, email, paymentMethod, idempotencyKey, billingInterval } = body;
 
   if (!planId || !successUrl || !cancelUrl) {
     return NextResponse.json({ error: 'Missing required fields: planId, successUrl, and cancelUrl are required' }, { status: 400 });
@@ -105,6 +105,12 @@ async function processCheckout(
   try {
     const session = await createUniversalCheckoutSession({
       planId,
+      billingInterval:
+        String(billingInterval || '').toLowerCase().trim() === 'yearly'
+          ? 'yearly'
+          : String(billingInterval || '').toLowerCase().trim() === 'trial'
+            ? 'trial'
+            : 'monthly',
       currency,
       countryCode,
       successUrl,

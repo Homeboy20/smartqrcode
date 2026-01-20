@@ -794,7 +794,7 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
                 {subscriptionTier === 'free' && qrCodesRemaining < 3 && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="absolute transform rotate-45 text-gray-300 text-lg font-bold opacity-50">
-                      SMART QR
+                      SCANMAGIC
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 bg-gray-100 text-xs text-center py-1 opacity-70">
                       Free version - Upgrade to remove

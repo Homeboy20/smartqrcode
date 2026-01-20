@@ -3,7 +3,7 @@ import QRCodeGenerator from "@/components/QRCodeGenerator";
 // import TabNavigation from "@/components/TabNavigation"; // Removed
 
 export const metadata = {
-  title: "QR Code Generator - Smart QR & Barcode",
+  title: "QR Code Generator - ScanMagic",
   description: "Generate custom QR codes for URLs, text, email, phone, and more.",
 };
 

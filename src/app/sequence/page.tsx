@@ -2,7 +2,7 @@ import React from "react";
 import SequenceGenerator from "@/components/SequenceGenerator";
 
 export const metadata = {
-  title: "Sequence Generator - Smart QR & Barcode",
+  title: "Sequence Generator - ScanMagic",
   description: "Generate sequential QR codes and barcodes with custom options",
 };
 

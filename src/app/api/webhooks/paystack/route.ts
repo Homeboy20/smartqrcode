@@ -15,6 +15,32 @@ const supabaseAdmin = createClient(
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function getPaidTrialConfig(): { days: number } {
+  const daysRaw = Number(process.env.PAID_TRIAL_DAYS ?? 7);
+  const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(31, Math.floor(daysRaw))) : 7;
+  return { days };
+}
+
+function normalizeBillingInterval(value: unknown): 'monthly' | 'yearly' | 'trial' {
+  const s = String(value || '').toLowerCase().trim();
+  if (s === 'yearly') return 'yearly';
+  if (s === 'trial') return 'trial';
+  return 'monthly';
+}
+
+function computePeriodEnd(interval: 'monthly' | 'yearly' | 'trial'): Date {
+  const endDate = new Date();
+  if (interval === 'yearly') {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  } else if (interval === 'trial') {
+    const { days } = getPaidTrialConfig();
+    endDate.setDate(endDate.getDate() + days);
+  } else {
+    endDate.setMonth(endDate.getMonth() + 1);
+  }
+  return endDate;
+}
+
 async function verifyTransactionWithPaystack(secretKey: string, reference: string) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15_000);
@@ -117,19 +143,18 @@ export async function POST(request: NextRequest) {
         const meta = (verified?.metadata ?? data.metadata ?? {}) as any;
         const userId = meta?.userId;
         const planId = meta?.planId;
+        const billingInterval = normalizeBillingInterval(meta?.billingInterval);
         
         if (!userId || !planId) {
           logError('paystack-webhook', new Error('Missing userId or planId in metadata'), { reference });
           return createErrorResponse('VALIDATION_ERROR', 'Missing metadata', 400);
         }
 
-        // Check if this is a subscription payment
+        // Subscription payment (Paystack plan-based)
         if (data.plan || verified?.plan) {
           const now = new Date().toISOString();
-          
-          // Calculate subscription end date (30 days for monthly)
-          const endDate = new Date();
-          endDate.setMonth(endDate.getMonth() + 1);
+
+          const endDate = computePeriodEnd(billingInterval);
 
           // Derive a stable subscription code for idempotency.
           const subscriptionCode =
@@ -192,6 +217,58 @@ export async function POST(request: NextRequest) {
             .eq('id', userId);
 
           console.log('Subscription processed successfully for user:', userId);
+        } else if (billingInterval === 'trial') {
+          // Paid trial: one-time charge (no plan) but we still grant limited-time access.
+          const now = new Date().toISOString();
+          const endDate = computePeriodEnd('trial');
+
+          const subscriptionCode = `trial_${reference}`;
+
+          try {
+            await supabaseAdmin
+              .from('payments')
+              .upsert(
+                {
+                  user_id: userId,
+                  amount: Number((verified as any)?.amount) ? Number((verified as any)?.amount) / 100 : undefined,
+                  currency: String((verified as any)?.currency || (data as any)?.currency || 'NGN'),
+                  status: 'succeeded',
+                  paystack_reference: reference,
+                  paystack_transaction_id: String((verified as any)?.id || ''),
+                  description: `Paid trial (${planId})`,
+                  created_at: now,
+                } as any,
+                { onConflict: 'paystack_reference' }
+              );
+          } catch {
+            // ignore if table isn't provisioned
+          }
+
+          await supabaseAdmin
+            .from('subscriptions')
+            .upsert(
+              {
+                user_id: userId,
+                plan: planId,
+                status: 'trialing',
+                paystack_subscription_code: subscriptionCode,
+                current_period_start: now,
+                current_period_end: endDate.toISOString(),
+                cancel_at_period_end: true,
+                updated_at: now,
+              } as any,
+              { onConflict: 'paystack_subscription_code' }
+            );
+
+          await supabaseAdmin
+            .from('users')
+            .update({
+              subscription_tier: planId,
+              updated_at: now,
+            })
+            .eq('id', userId);
+
+          console.log('Paid trial processed successfully for user:', userId);
         }
         
         break;

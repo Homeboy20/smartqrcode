@@ -3,8 +3,8 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Admin Dashboard - Smart QR Code Generator',
-  description: 'Admin panel for managing Smart QR Code Generator',
+  title: 'Admin Dashboard - ScanMagic',
+  description: 'Admin panel for managing ScanMagic',
 };
 
 // For static export, we can't use force-dynamic

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import SubscriptionInfo from '@/components/SubscriptionInfo';
 import { useSubscription } from '@/hooks/useSubscription';
+import UnifiedGenerator from '@/components/UnifiedGenerator';
 
 export default function DashboardPage() {
   const { user } = useSupabaseAuth();
@@ -48,7 +49,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
             <div className="space-y-2">
               <Link 
-                href="/qrcode" 
+                href="/dashboard#generator" 
                 className="flex items-center p-3 bg-blue-50 hover:bg-blue-100 rounded-md transition"
               >
                 <span className="p-2 bg-blue-500 rounded-md mr-3">
@@ -60,7 +61,7 @@ export default function DashboardPage() {
               </Link>
               
               <Link 
-                href="/barcode" 
+                href="/dashboard#generator" 
                 className="flex items-center p-3 bg-purple-50 hover:bg-purple-100 rounded-md transition"
               >
                 <span className="p-2 bg-purple-500 rounded-md mr-3">
@@ -73,7 +74,7 @@ export default function DashboardPage() {
               
               {subscriptionTier !== 'free' && (
                 <Link 
-                  href="/bulk" 
+                  href="/dashboard#generator" 
                   className="flex items-center p-3 bg-green-50 hover:bg-green-100 rounded-md transition"
                 >
                   <span className="p-2 bg-green-500 rounded-md mr-3">
@@ -122,6 +123,23 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      <section id="generator" className="mt-8">
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Generator</h2>
+              <p className="text-gray-600 text-sm">
+                Create QR codes, barcodes, sequences, and bulk batches.
+              </p>
+            </div>
+            <Link href="/pricing/" className="text-indigo-600 hover:text-indigo-800 text-sm font-semibold">
+              Upgrade for premium features →
+            </Link>
+          </div>
+          <UnifiedGenerator />
+        </div>
+      </section>
     </div>
   );
 } 

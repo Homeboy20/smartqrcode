@@ -218,6 +218,9 @@ export const SUBSCRIPTION_PRICING: Record<'pro' | 'business', PricingTier> = {
       GHS: 150,    // ≈$10
       KES: 1200,   // ≈$10
       ZAR: 180,    // ≈$10
+      // Tanzania (TZS): keep an explicit local price to avoid showing USD values with a TZS symbol
+      // when FX rates are not configured via app_settings.
+      TZS: 26000,
       GBP: 8.49,   // ≈$10
       EUR: 9.49,   // ≈$10
     },
@@ -229,6 +232,8 @@ export const SUBSCRIPTION_PRICING: Record<'pro' | 'business', PricingTier> = {
       GHS: 450,    // ≈$30
       KES: 3600,   // ≈$30
       ZAR: 540,    // ≈$30
+      // Tanzania (TZS)
+      TZS: 78000,
       GBP: 24.99,  // ≈$30
       EUR: 27.99,  // ≈$30
     },

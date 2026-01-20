@@ -1,15 +1,47 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from 'next/navigation';
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import {
+  CHECKOUT_COUNTRY_OVERRIDE_KEY,
+  clearGeoCurrencyCache,
+  useGeoCurrencyInfo,
+} from '@/hooks/useGeoCurrencyInfo';
+
+const LOCATION_OPTIONS: Array<{ code: string; label: string }> = [
+  { code: 'AUTO', label: 'Auto (detect)' },
+  { code: 'US', label: 'United States' },
+  { code: 'GB', label: 'United Kingdom' },
+  { code: 'NG', label: 'Nigeria' },
+  { code: 'GH', label: 'Ghana' },
+  { code: 'KE', label: 'Kenya' },
+  { code: 'ZA', label: 'South Africa' },
+  { code: 'TZ', label: 'Tanzania' },
+  { code: 'UG', label: 'Uganda' },
+];
 
 export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, loading, logout, isAdmin } = useSupabaseAuth();
   const { settings: appSettings } = useAppSettings();
+  const [geoEnabled, setGeoEnabled] = useState(false);
+
+  const [countryOverride, setCountryOverride] = useState<string>('AUTO');
+
+  const showPricingContext = useMemo(() => {
+    const p = pathname || '';
+    return p.startsWith('/pricing') || p.startsWith('/checkout');
+  }, [pathname]);
+
+  const showLocationOverride = showPricingContext || countryOverride !== 'AUTO';
+
+  const { geo, countryName } = useGeoCurrencyInfo({ enabled: geoEnabled && showPricingContext });
 
   const siteName = appSettings?.branding?.siteName || 'ScanMagic';
   const logoUrl = appSettings?.branding?.logoSvgUrl || appSettings?.branding?.logoUrl || '';
@@ -21,32 +53,82 @@ export default function Header() {
   }, [logoUrl]);
 
   useEffect(() => {
+    // Avoid doing geo/pricing work during initial paint.
+    setGeoEnabled(true);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(CHECKOUT_COUNTRY_OVERRIDE_KEY);
+      const normalized = String(stored || '').trim().toUpperCase();
+      setCountryOverride(/^[A-Z]{2}$/.test(normalized) ? normalized : 'AUTO');
+    } catch {
+      setCountryOverride('AUTO');
+    }
+  }, []);
+
+  const applyCountryOverride = useCallback((next: string) => {
+    const normalized = String(next || '').trim().toUpperCase();
+    const value = normalized === 'AUTO' ? '' : normalized;
+    try {
+      if (!value) {
+        window.localStorage.removeItem(CHECKOUT_COUNTRY_OVERRIDE_KEY);
+      } else {
+        window.localStorage.setItem(CHECKOUT_COUNTRY_OVERRIDE_KEY, value);
+      }
+    } catch {
+      // ignore
+    }
+
+    clearGeoCurrencyCache();
+    setCountryOverride(value || 'AUTO');
+
+    // Refresh server components (pricing/checkout pages use server prefetch).
+    router.refresh();
+  }, [router]);
+
+  useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+      if (ticking) return;
+      ticking = true;
+
+      window.requestAnimationFrame(() => {
+        const next = window.scrollY > 10;
+        setIsScrolled((prev) => (prev === next ? prev : next));
+        ticking = false;
+      });
     };
-    
-    window.addEventListener('scroll', handleScroll);
+
+    // Initialize once so the style matches current scroll position.
+    handleScroll();
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleLogout = async () => {
+  useEffect(() => {
+    // Close mobile menu after navigation.
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
     } catch (error) {
       console.error("Logout error:", error);
     }
-  };
+  }, [logout]);
 
-  const navLinks = [
-    { href: "/#generator", label: "Generator", icon: "🔲" },
-    { href: "/pricing/", label: "Pricing", icon: "💎" },
-    { href: "/about/", label: "About", icon: "ℹ️" },
-  ];
-
-  const legalLinks = [
-    { href: "/privacypolicy", label: "Privacy" },
-    { href: "/terms&condition", label: "Terms" },
-  ];
+  const navLinks = useMemo(() => {
+    const createHref = user ? '/dashboard#generator' : '/register/';
+    return [
+      { href: createHref, label: 'Create', icon: '✨' },
+      { href: '/pricing/', label: 'Pricing', icon: '💎' },
+      { href: '/about/', label: 'About', icon: 'ℹ️' },
+    ];
+  }, [user]);
 
   return (
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 ${
@@ -55,6 +137,27 @@ export default function Header() {
         : 'bg-white py-3'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {!!geo?.currency?.code && !!geo?.country && (
+          <div className="hidden md:flex items-center justify-center pb-2">
+            <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 text-indigo-800 px-4 py-1 text-xs font-semibold border border-indigo-100">
+              <span>
+                Welcome{countryName ? `, ${countryName}` : ''}
+              </span>
+              <span className="text-indigo-400">•</span>
+              <span>
+                Prices in {geo.currency.code}
+              </span>
+              {geo.recommendedProvider && (
+                <>
+                  <span className="text-indigo-400">•</span>
+                  <span className="capitalize">
+                    Pay with {geo.recommendedProvider}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex justify-between items-center">
           {/* Logo & Branding */}
           <Link href="/" className="flex items-center space-x-3 group">
@@ -89,15 +192,6 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            {legalLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="px-4 py-2 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg font-medium transition-all"
-              >
-                {link.label}
-              </Link>
-            ))}
             {user && !isAdmin && (
               <Link 
                 href="/dashboard/" 
@@ -119,6 +213,27 @@ export default function Header() {
               </Link>
             )}
           </nav>
+
+          {/* Location override (desktop) */}
+          {showLocationOverride && (
+          <div className="hidden md:flex items-center gap-2">
+            <label className="text-xs font-semibold text-gray-500" htmlFor="country-override">
+              Location
+            </label>
+            <select
+              id="country-override"
+              value={countryOverride}
+              onChange={(e) => applyCountryOverride(e.target.value)}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 hover:border-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            >
+              {LOCATION_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          )}
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-3">
@@ -153,7 +268,7 @@ export default function Header() {
                   href="/register/" 
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg"
                 >
-                  Get Started Free
+                  Create Account
                 </Link>
               </>
             )}
@@ -181,6 +296,27 @@ export default function Header() {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-gray-100 animate-in slide-in-from-top duration-200">
             <nav className="flex flex-col space-y-1 mt-4">
+              {/* Location override (mobile) */}
+              {showLocationOverride && (
+              <div className="px-4 py-3">
+                <label className="block text-xs font-semibold text-gray-500 mb-2" htmlFor="country-override-mobile">
+                  Location
+                </label>
+                <select
+                  id="country-override-mobile"
+                  value={countryOverride}
+                  onChange={(e) => applyCountryOverride(e.target.value)}
+                  className="w-full h-11 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  {LOCATION_OPTIONS.map((opt) => (
+                    <option key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              )}
+
               {navLinks.map((link) => (
                 <Link 
                   key={link.href}
@@ -189,17 +325,6 @@ export default function Header() {
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   <span>{link.icon}</span>
-                  {link.label}
-                </Link>
-              ))}
-              {legalLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center gap-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-all py-3 px-4 rounded-lg"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span>📄</span>
                   {link.label}
                 </Link>
               ))}
@@ -260,7 +385,7 @@ export default function Header() {
                       className="block text-center py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg shadow-md"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      Get Started Free
+                      Create Account
                     </Link>
                   </div>
                 )}

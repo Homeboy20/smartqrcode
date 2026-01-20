@@ -178,9 +178,15 @@ export interface PaystackCredentials {
   secretKey: string;
   planCodePro: string;
   planCodeBusiness: string;
+  /** Optional yearly/annual Paystack plan codes (for annual subscriptions). */
+  planCodeProYearly?: string;
+  planCodeBusinessYearly?: string;
   /** Optional Paystack plan codes for Kenyan Shilling (KES), if you use Paystack in Kenya. */
   planCodeProKes?: string;
   planCodeBusinessKes?: string;
+  /** Optional yearly/annual Paystack plan codes for Kenyan Shilling (KES). */
+  planCodeProYearlyKes?: string;
+  planCodeBusinessYearlyKes?: string;
   /** Optional ISO-3166-1 alpha-2 allow-list (comma-separated), e.g. "NG,GH,ZA" */
   allowedCountries?: string;
 } 

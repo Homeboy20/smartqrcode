@@ -205,7 +205,7 @@ export async function createFlutterwavePaymentLink({
         name: customerName || customerEmail.split('@')[0],
       },
       customizations: {
-        title: 'SmartQRCode Payment',
+        title: 'ScanMagic Payment',
         description,
         logo: process.env.NEXT_PUBLIC_APP_LOGO_URL || '',
       },
@@ -350,7 +350,7 @@ export async function createFlutterwaveSubscriptionPayment(params: FlutterwavePa
       customizations: {
         title: planName,
         description: `Subscription payment for ${planName}`,
-        logo: process.env.NEXT_PUBLIC_APP_LOGO_URL || 'https://smartqrcode.app/logo.png',
+        logo: process.env.NEXT_PUBLIC_APP_LOGO_URL || 'https://scanmagic.online/favicon.ico',
       },
       meta: {
         ...metadata,

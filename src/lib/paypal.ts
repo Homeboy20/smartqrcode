@@ -77,7 +77,7 @@ export async function createPayPalOrder({
         },
       ],
       application_context: {
-        brand_name: 'SmartQRCode',
+        brand_name: 'ScanMagic',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
         return_url: returnUrl,

@@ -1,13 +1,10 @@
-import React from "react";
 import Link from "next/link";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
   
   const productLinks = [
-    { href: "/#generator", label: "QR Code Generator" },
-    { href: "/#barcode", label: "Barcode Generator" },
-    { href: "/#bulk", label: "Bulk Generator" },
+    { href: "/dashboard#generator", label: "Generator" },
     { href: "/pricing/", label: "Pricing Plans" },
   ];
 
@@ -19,6 +16,7 @@ export default function Footer() {
   ];
 
   const legalLinks = [
+    { href: "/refunds/", label: "Refund Policy" },
     { href: "/privacypolicy", label: "Privacy Policy" },
     { href: "/terms&condition", label: "Terms of Service" },
     { href: "/cookies/", label: "Cookie Policy" },
@@ -72,7 +70,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 text-gray-400 text-sm leading-relaxed max-w-sm">
-              Create professional QR codes and barcodes instantly. Free, fast, and secure. 
+              Create professional QR codes and barcodes instantly. Fast and secure.
               Perfect for businesses, marketers, and developers.
             </p>
             

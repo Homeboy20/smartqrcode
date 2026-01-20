@@ -220,7 +220,7 @@ export async function initializeSubscriptionPayment({
   email: string;
   amount: number;
   currency?: CurrencyCode;
-  plan: string;
+  plan?: string;
   reference: string;
   callbackUrl: string;
   metadata?: Record<string, any>;
@@ -237,14 +237,14 @@ export async function initializeSubscriptionPayment({
       currency,
       reference,
       callback_url: callbackUrl,
-      plan,
+      ...(plan && plan.trim() ? { plan } : {}),
       metadata: {
         ...metadata,
         custom_fields: [
           {
             display_name: 'Plan',
             variable_name: 'plan',
-            value: metadata.planId || plan,
+            value: metadata.planId || plan || 'trial',
           }
         ]
       },

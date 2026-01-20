@@ -43,10 +43,13 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-6 bg-white rounded-lg shadow p-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reset your password</h1>
-          <p className="mt-2 text-sm text-gray-600">Enter your email and we’ll send you a reset link.</p>
+      <div className="max-w-md w-full space-y-6 bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8">
+        <div className="text-center">
+          <Link href="/" className="inline-flex items-center justify-center">
+            <span className="text-lg font-semibold text-gray-900">ScanMagic</span>
+          </Link>
+          <h1 className="mt-3 text-2xl font-bold text-gray-900">Reset your password</h1>
+          <p className="mt-1 text-sm text-gray-600">Enter your email and we’ll send you a reset link.</p>
         </div>
 
         {message && (
@@ -92,6 +95,18 @@ export default function ForgotPasswordPage() {
             Back to sign in
           </Link>
         </div>
+
+        <p className="text-center text-xs text-gray-500">
+          By continuing, you agree to our{' '}
+          <Link href="/terms&condition" className="font-medium text-gray-600 hover:text-gray-900">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacypolicy" className="font-medium text-gray-600 hover:text-gray-900">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

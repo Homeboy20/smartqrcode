@@ -267,7 +267,7 @@ export default function ProfilePage() {
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-lg font-medium text-green-800">Welcome to Smart QR Code Generator!</h3>
+              <h3 className="text-lg font-medium text-green-800">Welcome to ScanMagic!</h3>
               <div className="mt-2 text-sm text-green-700">
                 <p>Your account has been created successfully. You can now:</p>
                 <ul className="list-disc pl-5 mt-1 space-y-1">

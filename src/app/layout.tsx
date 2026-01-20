@@ -15,10 +15,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL('https://scanmagic.online'),
   title: {
-    default: 'Free QR Code Generator Online | Create QR Codes & Barcodes - ScanMagic',
+    default: 'QR Code Generator Online | Create QR Codes & Barcodes - ScanMagic',
     template: '%s | ScanMagic - QR Code Generator',
   },
-  description: 'Create free QR codes and barcodes online instantly. Generate custom QR codes for URLs, WiFi, vCards, text, and more. Download in PNG, SVG, JPEG. No signup required. Professional quality for business cards, marketing, and products.',
+  description: 'Create QR codes and barcodes online. Generate custom QR codes for URLs, WiFi, vCards, text, and more. Download in PNG, SVG, JPEG. Professional quality for business cards, marketing, and products.',
   keywords: [
     'QR code generator',
     'free QR code maker',
@@ -60,21 +60,21 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://scanmagic.online',
     siteName: 'ScanMagic',
-    title: 'Free QR Code Generator Online | Create QR Codes & Barcodes Instantly',
-    description: 'Create free QR codes and barcodes online. Generate custom QR codes for URLs, WiFi, vCards, business cards, and more. Download in PNG, SVG, JPEG. No signup required.',
+    title: 'QR Code Generator Online | Create QR Codes & Barcodes Instantly',
+    description: 'Create QR codes and barcodes online. Generate custom QR codes for URLs, WiFi, vCards, business cards, and more. Download in PNG, SVG, JPEG.',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'ScanMagic - Free QR Code & Barcode Generator',
+        alt: 'ScanMagic - QR Code & Barcode Generator',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Free QR Code Generator | Create QR Codes & Barcodes Online',
-    description: 'Create free QR codes and barcodes instantly. Custom colors, multiple formats, no signup required. Perfect for business cards, marketing, and products.',
+    title: 'QR Code Generator | Create QR Codes & Barcodes Online',
+    description: 'Create QR codes and barcodes instantly. Custom colors, multiple formats. Perfect for business cards, marketing, and products.',
     images: ['/og-image.png'],
     creator: '@scanmagic',
   },

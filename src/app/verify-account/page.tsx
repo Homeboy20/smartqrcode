@@ -213,40 +213,52 @@ export default function VerifyAccountPage() {
   }
   
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">Verify Your Account</h1>
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 py-10 px-4 sm:px-6">
+      <div className="w-full max-w-md">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8">
+          <div className="text-center">
+            <Link href="/" className="inline-flex items-center justify-center">
+              <span className="text-lg font-semibold text-gray-900">ScanMagic</span>
+            </Link>
+            <h1 className="mt-3 text-2xl font-bold text-gray-900">Verify your account</h1>
+            <p className="mt-1 text-sm text-gray-600">Confirm your email or phone number to unlock all features.</p>
+          </div>
       
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+        <div className="mt-6 rounded-md bg-red-50 p-4 text-sm text-red-800 border border-red-200" role="alert" aria-live="polite">
           {error}
         </div>
       )}
       
       {statusMessage && (
-        <div className={`mb-4 p-3 rounded-md ${statusMessage.includes('Error') 
-          ? 'bg-red-100 text-red-700' 
-          : 'bg-green-100 text-green-700'}`}>
+        <div
+          className={`mt-6 rounded-md p-4 text-sm border ${statusMessage.includes('Error')
+            ? 'bg-red-50 text-red-800 border-red-200'
+            : 'bg-green-50 text-green-800 border-green-200'}`}
+          role={statusMessage.includes('Error') ? 'alert' : 'status'}
+          aria-live="polite"
+        >
           {statusMessage}
         </div>
       )}
       
-      <div className="mb-6">
-        <div className="flex justify-center space-x-4 mb-4">
+      <div className="mt-6">
+        <div className="flex justify-center gap-3 mb-5">
           <button
-            className={`px-4 py-2 rounded-md transition ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
               verificationMethod === 'email'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             onClick={() => setVerificationMethod('email')}
           >
             Email Verification
           </button>
           <button
-            className={`px-4 py-2 rounded-md transition ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
               verificationMethod === 'phone'
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             onClick={() => setVerificationMethod('phone')}
           >
@@ -266,7 +278,7 @@ export default function VerifyAccountPage() {
                 <button
                   onClick={handleSendVerification}
                   disabled={sending}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {sending ? 'Sending...' : 'Resend Verification Email'}
                 </button>
@@ -275,7 +287,7 @@ export default function VerifyAccountPage() {
               <button
                 onClick={handleSendVerification}
                 disabled={sending}
-                className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
               >
                 {sending ? 'Sending...' : 'Send Verification Email'}
               </button>
@@ -297,13 +309,13 @@ export default function VerifyAccountPage() {
                     placeholder="Search country (e.g. Nigeria, NG, +234)"
                     value={countryQuery}
                     onChange={(e) => setCountryQuery(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   />
                   <select
                     id="phoneCountry"
                     value={selectedCountry}
                     onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
                   >
                     {filteredCountryOptions.map((opt) => (
                       <option key={opt.country} value={opt.country}>
@@ -324,7 +336,7 @@ export default function VerifyAccountPage() {
                         if (match) setSelectedCountry(match.country);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                   <p className="text-sm text-gray-500">
                     Select your country and enter your number, or paste a full international number starting with +.
@@ -335,7 +347,7 @@ export default function VerifyAccountPage() {
                   id="phone-auth-button" // This ID is important for reCAPTCHA
                   onClick={handleSendVerification}
                   disabled={sending || !phoneNumber}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {sending ? 'Sending Code...' : 'Send Verification Code'}
                 </button>
@@ -352,14 +364,14 @@ export default function VerifyAccountPage() {
                     placeholder="Enter 6-digit code"
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
                 
                 <button
                   onClick={handleVerifyCode}
                   disabled={verifying || !verificationCode}
-                  className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {verifying ? 'Verifying...' : 'Verify Code'}
                 </button>
@@ -374,18 +386,32 @@ export default function VerifyAccountPage() {
           Want to try a different method? You can verify using {' '}
           <button
             onClick={() => setVerificationMethod(verificationMethod === 'email' ? 'phone' : 'email')}
-            className="text-blue-500 hover:underline"
+            className="text-indigo-600 hover:underline"
           >
             {verificationMethod === 'email' ? 'phone number' : 'email address'}
           </button>
           .
         </p>
         <p className="mt-2">
-          <Link href="/dashboard" className="text-blue-500 hover:underline">
+          <Link href="/dashboard" className="text-indigo-600 hover:underline">
             Skip for now
           </Link>
           {' '} (some features may be limited)
         </p>
+
+        <p className="mt-6 text-xs text-gray-500">
+          By continuing, you agree to our{' '}
+          <Link href="/terms&condition" className="font-medium text-gray-600 hover:text-gray-900">
+            Terms
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacypolicy" className="font-medium text-gray-600 hover:text-gray-900">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      </div>
+        </div>
       </div>
     </div>
   );

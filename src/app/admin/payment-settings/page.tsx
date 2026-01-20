@@ -61,8 +61,12 @@ export default function PaymentSettingsPage() {
     secretKey: '',
     planCodePro: '',
     planCodeBusiness: '',
+    planCodeProYearly: '',
+    planCodeBusinessYearly: '',
     planCodeProKes: '',
     planCodeBusinessKes: '',
+    planCodeProYearlyKes: '',
+    planCodeBusinessYearlyKes: '',
     allowedCountries: ''
   });
   
@@ -1567,6 +1571,24 @@ export default function PaymentSettingsPage() {
                         Create subscription plans in Paystack Dashboard → Products → Plans
                       </p>
                     </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeProYearly" className="block text-sm font-medium text-gray-700">
+                        Pro Plan Code (Yearly)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeProYearly"
+                          id="planCodeProYearly"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeProYearly || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">Annual plan (interval: annually) for Pro</p>
+                    </div>
                     
                     <div className="sm:col-span-3">
                       <label htmlFor="planCodeBusiness" className="block text-sm font-medium text-gray-700">
@@ -1579,6 +1601,93 @@ export default function PaymentSettingsPage() {
                           id="planCodeBusiness"
                           placeholder="PLN_..."
                           value={paystackCredentials.planCodeBusiness}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeBusinessYearly" className="block text-sm font-medium text-gray-700">
+                        Business Plan Code (Yearly)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeBusinessYearly"
+                          id="planCodeBusinessYearly"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeBusinessYearly || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">Annual plan (interval: annually) for Business</p>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeProKes" className="block text-sm font-medium text-gray-700">
+                        Pro Plan Code (KES)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeProKes"
+                          id="planCodeProKes"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeProKes || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">Optional: only needed if you run Paystack in Kenya (KES)</p>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeBusinessKes" className="block text-sm font-medium text-gray-700">
+                        Business Plan Code (KES)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeBusinessKes"
+                          id="planCodeBusinessKes"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeBusinessKes || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeProYearlyKes" className="block text-sm font-medium text-gray-700">
+                        Pro Plan Code (KES, Yearly)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeProYearlyKes"
+                          id="planCodeProYearlyKes"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeProYearlyKes || ''}
+                          onChange={handlePaystackChange}
+                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-3">
+                      <label htmlFor="planCodeBusinessYearlyKes" className="block text-sm font-medium text-gray-700">
+                        Business Plan Code (KES, Yearly)
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="text"
+                          name="planCodeBusinessYearlyKes"
+                          id="planCodeBusinessYearlyKes"
+                          placeholder="PLN_..."
+                          value={(paystackCredentials as any).planCodeBusinessYearlyKes || ''}
                           onChange={handlePaystackChange}
                           className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                         />

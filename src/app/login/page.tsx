@@ -94,7 +94,7 @@ export default function LoginPage() {
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 sm:p-8">
           <div className="text-center">
             <Link href="/" className="inline-flex items-center justify-center">
-              <span className="text-lg font-semibold text-gray-900">SmartQRCode</span>
+              <span className="text-lg font-semibold text-gray-900">ScanMagic</span>
             </Link>
             <h1 className="mt-3 text-2xl font-bold text-gray-900">Welcome back</h1>
             <p className="mt-1 text-sm text-gray-600">
@@ -229,6 +229,18 @@ export default function LoginPage() {
                 Sign in with Phone (SMS)
               </Link>
             </div>
+
+            <p className="mt-6 text-center text-xs text-gray-500">
+              By continuing, you agree to our{' '}
+              <Link href="/terms&condition" className="font-medium text-gray-600 hover:text-gray-900">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacypolicy" className="font-medium text-gray-600 hover:text-gray-900">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </div>
         </div>
       </div>

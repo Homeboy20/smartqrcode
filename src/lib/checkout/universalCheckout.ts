@@ -107,6 +107,27 @@ export function providerSupportsCountry(provider: PaymentProvider, countryCode: 
 
 export type CheckoutPlanId = 'pro' | 'business';
 
+export type BillingInterval = 'monthly' | 'yearly' | 'trial';
+
+function getPaidTrialConfig(): { days: number; multiplier: number } {
+  const daysRaw = Number(process.env.PAID_TRIAL_DAYS ?? 7);
+  const multiplierRaw = Number(process.env.PAID_TRIAL_MULTIPLIER ?? 0.3);
+
+  const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(31, Math.floor(daysRaw))) : 7;
+  const multiplier = Number.isFinite(multiplierRaw)
+    ? Math.max(0.05, Math.min(1, multiplierRaw))
+    : 0.3;
+
+  return { days, multiplier };
+}
+
+function normalizeBillingInterval(value: unknown): BillingInterval {
+  const s = String(value || '').toLowerCase().trim();
+  if (s === 'yearly') return 'yearly';
+  if (s === 'trial') return 'trial';
+  return 'monthly';
+}
+
 export type CheckoutSessionResult = {
   provider: PaymentProvider;
   reference: string;
@@ -133,6 +154,7 @@ export type CheckoutSessionResult = {
 
 export type CheckoutSessionInput = {
   planId: CheckoutPlanId;
+  billingInterval?: BillingInterval;
   currency: CurrencyCode;
   countryCode: string;
   successUrl: string;
@@ -175,8 +197,22 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
     async createSession({ input, amount, reference, userId }) {
       const paystackRuntime = await getProviderRuntimeConfig('paystack');
 
-      const planCodeForCurrency = (planId: CheckoutPlanId, currency: CurrencyCode): string => {
+      const interval: BillingInterval =
+        input.billingInterval === 'yearly' ? 'yearly' : input.billingInterval === 'trial' ? 'trial' : 'monthly';
+
+      const planCodeForCurrency = (planId: CheckoutPlanId, currency: CurrencyCode, interval: BillingInterval): string => {
         const creds: any = (paystackRuntime as any)?.credentials || {};
+
+        if (interval === 'yearly') {
+          // Optional KES-specific yearly plan codes.
+          if (currency === 'KES') {
+            const kes = planId === 'pro' ? creds.planCodeProYearlyKes : creds.planCodeBusinessYearlyKes;
+            if (typeof kes === 'string' && kes.trim()) return kes.trim();
+          }
+
+          const fallback = planId === 'pro' ? creds.planCodeProYearly : creds.planCodeBusinessYearly;
+          return typeof fallback === 'string' ? fallback.trim() : '';
+        }
 
         // Optional KES-specific plan codes.
         if (currency === 'KES') {
@@ -188,13 +224,17 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         return typeof fallback === 'string' ? fallback.trim() : '';
       };
 
-      const planCode = planCodeForCurrency(input.planId, input.currency);
+      const planCode = interval === 'trial' ? '' : planCodeForCurrency(input.planId, input.currency, interval);
 
-      if (!planCode) {
+      if (interval !== 'trial' && !planCode) {
         throw new Error(
-          input.currency === 'KES'
-            ? 'Missing Paystack plan code for KES. Configure Pro/Business Plan Code (KES) in admin payment settings.'
-            : 'Invalid plan ID for Paystack. Available plans: pro, business'
+          interval === 'yearly'
+            ? input.currency === 'KES'
+              ? 'Missing Paystack yearly plan code for KES. Configure Pro/Business Plan Code (KES, Yearly) in admin payment settings.'
+              : 'Missing Paystack yearly plan code. Configure Pro/Business Plan Code (Yearly) in admin payment settings.'
+            : input.currency === 'KES'
+              ? 'Missing Paystack plan code for KES. Configure Pro/Business Plan Code (KES) in admin payment settings.'
+              : 'Invalid plan ID for Paystack. Available plans: pro, business'
         );
       }
 
@@ -231,12 +271,13 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
         email: input.email,
         amount,
         currency: input.currency,
-        plan: planCode,
+        plan: planCode || undefined,
         reference,
         callbackUrl: appendQueryParam(input.successUrl, 'reference', reference),
         metadata: {
           userId,
           planId: input.planId,
+          billingInterval: interval,
           userEmail: input.email,
           provider: 'paystack',
           paymentMethod: input.paymentMethod || 'card',
@@ -283,6 +324,8 @@ const ADAPTERS: Record<PaymentProvider, CheckoutAdapter> = {
       const meta = {
         userId,
         planId: input.planId,
+        billingInterval:
+          input.billingInterval === 'yearly' ? 'yearly' : input.billingInterval === 'trial' ? 'trial' : 'monthly',
         userEmail: input.email,
         provider: 'flutterwave',
         paymentMethod: input.paymentMethod || 'card',
@@ -533,7 +576,11 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     throw new Error('Invalid plan ID or free plan selected');
   }
 
-  const amount = await (async () => {
+  const billingInterval: BillingInterval = normalizeBillingInterval(input.billingInterval);
+  const YEARLY_MULTIPLIER = 10;
+  const { multiplier: TRIAL_MULTIPLIER } = getPaidTrialConfig();
+
+  const monthlyAmount = await (async () => {
     // Keep charged amount consistent with /api/pricing:
     // - support app_settings.general.pricing overrides
     // - support optional pricing.fxRates conversion from USD
@@ -602,6 +649,22 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
       return getLocalPrice(input.planId, input.currency);
     }
   })();
+
+  const amount = (() => {
+    const cfg: any = (CURRENCY_CONFIGS as any)[input.currency];
+    const minorUnit = Number(cfg?.minorUnit || 100);
+
+    const round = (raw: number) => {
+      if (minorUnit === 1) return Math.round(raw);
+      if (minorUnit === 1000) return Math.round(raw * 1000) / 1000;
+      return Math.round(raw * 100) / 100;
+    };
+
+    if (billingInterval === 'yearly') return round(monthlyAmount * YEARLY_MULTIPLIER);
+    if (billingInterval === 'trial') return round(monthlyAmount * TRIAL_MULTIPLIER);
+    return monthlyAmount;
+  })();
+
   if (!amount || amount <= 0) {
     throw new Error('Invalid plan ID or free plan selected');
   }
@@ -614,6 +677,10 @@ export async function createUniversalCheckoutSession(input: CheckoutSessionInput
     if (input.provider) return input.provider;
     return chooseDefaultProvider({ currency: input.currency, availableProviders });
   })();
+
+  if (billingInterval === 'trial' && selectedProvider !== 'paystack' && selectedProvider !== 'flutterwave') {
+    throw new Error('Paid trial is currently supported only with Paystack or Flutterwave.');
+  }
 
   if (!(await providerSupportsCountryWithAdmin(selectedProvider, input.countryCode))) {
     throw new Error(

@@ -62,7 +62,9 @@ export default function ContactPage() {
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">Contact</h1>
-          <p className="mt-2 text-sm text-gray-600">Need help? Send us a message and we’ll get back to you.</p>
+          <p className="mt-2 text-sm text-gray-600">
+            Need help or have a question about pricing, billing, or setup? Send us a message and we’ll get back to you.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -188,6 +190,20 @@ export default function ContactPage() {
               <div className="mt-4 text-sm text-gray-700">
                 <div className="font-medium">Email</div>
                 <div>support@scanmagic.online</div>
+              </div>
+
+              <div className="mt-5 text-xs text-gray-500">
+                <a className="text-indigo-700 hover:text-indigo-800" href="/refunds">
+                  Refund policy
+                </a>
+                <span className="mx-2">•</span>
+                <a className="text-indigo-700 hover:text-indigo-800" href="/privacypolicy">
+                  Privacy
+                </a>
+                <span className="mx-2">•</span>
+                <a className="text-indigo-700 hover:text-indigo-800" href="/terms&condition">
+                  Terms
+                </a>
               </div>
             </div>
           </div>

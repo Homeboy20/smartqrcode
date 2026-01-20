@@ -16,6 +16,18 @@ const supabaseAdmin = createClient(
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function getPaidTrialConfig(): { days: number; multiplier: number } {
+  const daysRaw = Number(process.env.PAID_TRIAL_DAYS ?? 7);
+  const multiplierRaw = Number(process.env.PAID_TRIAL_MULTIPLIER ?? 0.3);
+
+  const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(31, Math.floor(daysRaw))) : 7;
+  const multiplier = Number.isFinite(multiplierRaw)
+    ? Math.max(0.05, Math.min(1, multiplierRaw))
+    : 0.3;
+
+  return { days, multiplier };
+}
+
 function isSuccessfulStatus(status: unknown): boolean {
   const s = String(status || '').toLowerCase();
   return s === 'successful' || s === 'succeeded' || s === 'success';
@@ -26,6 +38,26 @@ function normalizePlanId(planId: unknown): 'pro' | 'business' | null {
   if (s === 'pro') return 'pro';
   if (s === 'business') return 'business';
   return null;
+}
+
+function normalizeBillingInterval(value: unknown): 'monthly' | 'yearly' | 'trial' {
+  const s = String(value || '').toLowerCase().trim();
+  if (s === 'yearly') return 'yearly';
+  if (s === 'trial') return 'trial';
+  return 'monthly';
+}
+
+function computePeriodEnd(interval: 'monthly' | 'yearly' | 'trial'): Date {
+  const endDate = new Date();
+  if (interval === 'yearly') {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  } else if (interval === 'trial') {
+    const { days } = getPaidTrialConfig();
+    endDate.setDate(endDate.getDate() + days);
+  } else {
+    endDate.setMonth(endDate.getMonth() + 1);
+  }
+  return endDate;
 }
 
 function isUuid(value: unknown): boolean {
@@ -139,6 +171,7 @@ export async function POST(request: NextRequest) {
     const meta = (verified.metadata || {}) as Record<string, any>;
     const userId = meta?.userId || meta?.user_id || null;
     const planId = normalizePlanId(meta?.planId || meta?.plan || null);
+    const billingInterval = normalizeBillingInterval(meta?.billingInterval);
 
     if (!verifiedReference || String(verifiedReference).trim().length === 0) {
       logError('flutterwave-webhook', new Error('Missing tx_ref in verified transaction'), {
@@ -191,7 +224,10 @@ export async function POST(request: NextRequest) {
     try {
       const currency =
         normalizeCurrencyCode(meta?.currency || verified.currency || data?.currency) || 'USD';
-      const expected = getLocalPrice(planId, currency);
+      const YEARLY_MULTIPLIER = 10;
+      const { multiplier: TRIAL_MULTIPLIER } = getPaidTrialConfig();
+      const expected = getLocalPrice(planId, currency) *
+        (billingInterval === 'yearly' ? YEARLY_MULTIPLIER : billingInterval === 'trial' ? TRIAL_MULTIPLIER : 1);
       const receivedAmount = Number(verified.amount || 0);
       const hasExplicitLocalPrice =
         currency === 'USD' ||
@@ -211,21 +247,23 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
+    const endDate = computePeriodEnd(billingInterval);
+    const statusForSubscription = billingInterval === 'trial' ? 'trialing' : 'active';
 
     // Update or create subscription for the user.
     const { data: existingSub } = await supabaseAdmin
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (existingSub) {
       await supabaseAdmin
         .from('subscriptions')
         .update({
-          status: 'active',
+          status: statusForSubscription,
           plan: planId,
           current_period_end: endDate.toISOString(),
           updated_at: now,
@@ -235,7 +273,7 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.from('subscriptions').insert({
         user_id: userId,
         plan: planId,
-        status: 'active',
+        status: statusForSubscription,
         current_period_start: now,
         current_period_end: endDate.toISOString(),
         cancel_at_period_end: false,
