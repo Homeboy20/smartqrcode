@@ -1,16 +1,36 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import SubscriptionInfo from '@/components/SubscriptionInfo';
 import { useSubscription } from '@/hooks/useSubscription';
 
+type RecentCode = {
+  id: string;
+  name: string;
+  type: 'qrcode' | 'barcode' | string;
+  scans: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+function formatShortDate(value?: string) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useSupabaseAuth();
-  const { subscriptionTier, loading } = useSubscription();
+  const { user, getAccessToken } = useSupabaseAuth();
+  const { subscriptionTier, loading, featuresUsage, limits } = useSubscription();
+
+  const [recentCodes, setRecentCodes] = useState<RecentCode[] | null>(null);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [recentError, setRecentError] = useState<string | null>(null);
 
   useEffect(() => {
     // Backward compatibility: old links used /dashboard#generator.
@@ -18,6 +38,65 @@ export default function DashboardPage() {
       router.replace('/generator');
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!user) {
+      setRecentCodes(null);
+      setRecentError(null);
+      setRecentLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setRecentLoading(true);
+      setRecentError(null);
+      try {
+        let token: string | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          token = await getAccessToken();
+          if (token) break;
+          await new Promise((r) => setTimeout(r, 150));
+        }
+        if (!token) {
+          throw new Error('Missing access token');
+        }
+
+        const res = await fetch('/api/codes/recent?limit=5', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const json = await res.json().catch(() => ({} as any));
+
+        if (!res.ok) {
+          throw new Error(json?.error || `Failed to load recent codes (${res.status})`);
+        }
+
+        const codes = Array.isArray((json as any)?.codes) ? ((json as any).codes as RecentCode[]) : [];
+        if (!cancelled) setRecentCodes(codes);
+      } catch (err: any) {
+        if (!cancelled) {
+          setRecentError(err?.message || 'Failed to load recent codes');
+          setRecentCodes([]);
+        }
+      } finally {
+        if (!cancelled) setRecentLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, getAccessToken]);
+
+  const greetingName = useMemo(() => {
+    const meta = (user?.user_metadata as any) || {};
+    return meta.display_name || meta.full_name || user?.email || 'there';
+  }, [user]);
 
   if (!user) {
     return (
@@ -36,99 +115,180 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="grid gap-8">
-        <div className="h-32 bg-gray-200 animate-pulse rounded-lg"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="h-48 bg-gray-200 animate-pulse rounded-lg"></div>
-          <div className="h-48 bg-gray-200 animate-pulse rounded-lg"></div>
-          <div className="h-48 bg-gray-200 animate-pulse rounded-lg"></div>
+      <div className="grid gap-6">
+        <div className="h-24 bg-gray-200 animate-pulse rounded-lg"></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg"></div>
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg"></div>
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg"></div>
         </div>
+        <div className="h-64 bg-gray-200 animate-pulse rounded-lg"></div>
       </div>
     );
   }
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+      <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome, {greetingName}</h1>
+            <p className="text-sm text-gray-600">Manage your generators, dynamic codes, and account.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/generator#qrcode"
+              className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              New QR
+            </Link>
+            <Link
+              href="/generator#barcode"
+              className="inline-flex items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+            >
+              New Barcode
+            </Link>
+            <Link
+              href="/profile"
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+            >
+              Account
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">QR codes generated</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.qrCodesGenerated}</div>
+          <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.qrGenerationLimit.daily}</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">Barcodes generated</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.barcodesGenerated}</div>
+          <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.barcodeGenerationLimit.daily}</div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="text-sm text-gray-500">Bulk generations</div>
+          <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.bulkGenerations}</div>
+          <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.bulkGenerationLimit.daily}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row justify-between items-start gap-6">
         <div className="w-full md:w-1/3">
           <SubscriptionInfo />
-          
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Tools</h2>
             <div className="space-y-2">
-              <Link 
-                href="/generator#qrcode" 
-                className="flex items-center p-3 bg-blue-50 hover:bg-blue-100 rounded-md transition"
+              <Link
+                href="/generator#qrcode"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
               >
-                <span className="p-2 bg-blue-500 rounded-md mr-3">
-                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </span>
-                <span>Generate QR Code</span>
+                <span className="font-medium text-gray-900">QR Generator</span>
+                <span className="text-xs text-gray-500">Static & Dynamic</span>
               </Link>
-              
-              <Link 
-                href="/generator#barcode" 
-                className="flex items-center p-3 bg-purple-50 hover:bg-purple-100 rounded-md transition"
+
+              <Link
+                href="/generator#barcode"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
               >
-                <span className="p-2 bg-purple-500 rounded-md mr-3">
-                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </span>
-                <span>Generate Barcode</span>
+                <span className="font-medium text-gray-900">Barcode Generator</span>
+                <span className="text-xs text-gray-500">Multiple formats</span>
               </Link>
-              
-              {subscriptionTier !== 'free' && (
-                <Link 
-                  href="/generator#bulk" 
-                  className="flex items-center p-3 bg-green-50 hover:bg-green-100 rounded-md transition"
-                >
-                  <span className="p-2 bg-green-500 rounded-md mr-3">
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z M9 17v-6 M12 17v-10 M15 17v-2" />
-                    </svg>
-                  </span>
-                  <span>Bulk Generation</span>
-                </Link>
-              )}
+
+              <Link
+                href="/sequence"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <span className="font-medium text-gray-900">Sequence Generator</span>
+                <span className="text-xs text-gray-500">Numbered batches</span>
+              </Link>
+
+              <Link
+                href={subscriptionTier === 'free' ? '/pricing' : '/generator#bulk'}
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <span className="font-medium text-gray-900">Bulk Generator</span>
+                <span className="text-xs text-gray-500">ZIP download</span>
+              </Link>
             </div>
           </div>
         </div>
-        
+
         <div className="w-full md:w-2/3">
-          <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Recent Activity</h2>
-              <Link href="/qrcode" className="text-blue-600 hover:text-blue-800 text-sm">
-                View All
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Recent dynamic codes</h2>
+              <Link href="/generator#qrcode" className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+                Create a dynamic code
               </Link>
             </div>
-            
-            {/* Placeholder for recent activity - would be populated from backend */}
-            <div className="border border-gray-200 rounded-md p-8 flex flex-col items-center justify-center">
-              <svg className="h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-gray-600">No recent activity to display</p>
-              <Link href="/qrcode" className="mt-4 text-blue-600 hover:underline">
-                Generate your first QR code
-              </Link>
-            </div>
-          </div>
-          
-          {subscriptionTier !== 'free' && (
-            <div className="bg-white shadow-md rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Analytics Overview</h2>
-              <div className="border border-gray-200 rounded-md p-8 flex flex-col items-center justify-center">
-                <svg className="h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <p className="text-gray-600">No analytics data available yet</p>
+
+            {recentLoading ? (
+              <div className="space-y-3">
+                <div className="h-12 bg-gray-100 animate-pulse rounded-md"></div>
+                <div className="h-12 bg-gray-100 animate-pulse rounded-md"></div>
+                <div className="h-12 bg-gray-100 animate-pulse rounded-md"></div>
               </div>
-            </div>
-          )}
+            ) : recentError ? (
+              <div className="border border-red-200 bg-red-50 text-red-800 rounded-md p-4 text-sm">
+                {recentError}
+              </div>
+            ) : (recentCodes && recentCodes.length > 0) ? (
+              <div className="divide-y divide-gray-100">
+                {recentCodes.map((code) => (
+                  <div key={code.id} className="py-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900 truncate">{code.name}</span>
+                        <span className={
+                          `text-xs font-semibold px-2 py-0.5 rounded-full ${code.type === 'barcode' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`
+                        }>
+                          {code.type === 'barcode' ? 'Barcode' : 'QR'}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500">
+                        {formatShortDate(code.created_at)}{typeof code.scans === 'number' ? ` • ${code.scans} scans` : ''}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Link
+                        href={`/c/${code.id}`}
+                        className="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-md p-6 text-center">
+                <div className="text-sm text-gray-700 font-semibold">No dynamic codes yet</div>
+                <p className="mt-1 text-sm text-gray-600">
+                  Create a dynamic QR code to get a short link you can update later.
+                </p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Link
+                    href="/generator#qrcode"
+                    className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  >
+                    Create QR
+                  </Link>
+                  <Link
+                    href={subscriptionTier === 'free' ? '/pricing' : '/generator#barcode'}
+                    className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    {subscriptionTier === 'free' ? 'Upgrade' : 'Create Barcode'}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
