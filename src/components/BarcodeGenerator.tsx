@@ -35,6 +35,7 @@ export default function BarcodeGenerator({ onDownload }: BarcodeGeneratorProps) 
   
   const [text, setText] = useState<string>("");
   const [suffix, setSuffix] = useState<string>("");
+  const [generatedDynamicUrl, setGeneratedDynamicUrl] = useState<string | null>(null);
   const [barcodeType, setBarcodeType] = useState<string>("CODE128");
   const [width, setWidth] = useState<number>(2);
   const [height, setHeight] = useState<number>(100);
@@ -84,24 +85,28 @@ export default function BarcodeGenerator({ onDownload }: BarcodeGeneratorProps) 
 
   // Validate the barcode text based on the selected format
   useEffect(() => {
-    if (!text) {
+    const effectiveValue = (generatedDynamicUrl ?? (text + suffix).trim());
+
+    if (!effectiveValue) {
       setErrorMessage("");
       return;
     }
 
     const selectedFormat = barcodeFormats.find(f => f.value === barcodeType);
-    if (selectedFormat && !selectedFormat.regex.test(text)) {
+      if (selectedFormat && !selectedFormat.regex.test(effectiveValue)) {
       setErrorMessage(`Invalid format for ${selectedFormat.label}`);
     } else {
       setErrorMessage("");
     }
-  }, [text, barcodeType, barcodeFormats]);
+    }, [text, suffix, generatedDynamicUrl, barcodeType, barcodeFormats]);
 
   // Generate the barcode when inputs change
   const generateBarcode = useCallback(() => {
-    if (canvasRef.current && text && !errorMessage) {
+    const effectiveValue = (generatedDynamicUrl ?? (text + suffix).trim());
+
+    if (canvasRef.current && effectiveValue && !errorMessage) {
       try {
-        JsBarcode(canvasRef.current, text, {
+        JsBarcode(canvasRef.current, effectiveValue, {
           format: barcodeType,
           displayValue,
           width,
@@ -117,17 +122,19 @@ export default function BarcodeGenerator({ onDownload }: BarcodeGeneratorProps) 
         alert("Failed to generate barcode. Please check your input.");
       }
     }
-  }, [text, barcodeType, width, height, displayValue, foregroundColor, backgroundColor, marginTop, marginBottom, errorMessage]);
+  }, [text, suffix, generatedDynamicUrl, barcodeType, width, height, displayValue, foregroundColor, backgroundColor, marginTop, marginBottom, errorMessage]);
 
   useEffect(() => {
-    if (text && !errorMessage && canvasRef.current) {
+    if ((generatedDynamicUrl || text || suffix) && !errorMessage && canvasRef.current) {
       generateBarcode();
     }
-  }, [text, errorMessage, canvasRef, generateBarcode]);
+  }, [text, suffix, generatedDynamicUrl, errorMessage, canvasRef, generateBarcode]);
 
   const downloadBarcode = async () => {
     if (canvasRef.current) {
       try {
+        // Reset previously generated short link for this run.
+        setGeneratedDynamicUrl(null);
         // Check if user can generate barcode
         const remainingBarcodes = getRemainingUsage('barcodesGenerated');
         
@@ -201,10 +208,8 @@ export default function BarcodeGenerator({ onDownload }: BarcodeGeneratorProps) 
           }
 
           valueToEncode = dynamicUrl;
-
-          // Update preview to match what we download.
-          setText(dynamicUrl);
-          setSuffix('');
+          // Update preview to match what we download, without mutating the original input.
+          setGeneratedDynamicUrl(dynamicUrl);
         }
 
         // Ensure canvas renders the final value.

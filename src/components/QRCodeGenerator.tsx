@@ -90,6 +90,7 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
   const [menuUploadError, setMenuUploadError] = useState<string | null>(null);
 
   const [qrValue, setQrValue] = useState<string>('');
+  const [generatedDynamicUrl, setGeneratedDynamicUrl] = useState<string | null>(null);
   const [size] = useState<number>(200);
   const [backgroundColor] = useState<string>('#FFFFFF');
   const [foregroundColor] = useState<string>('#000000');
@@ -331,6 +332,9 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
     try {
       if (qrValue.trim() === "") return;
       
+      // If the user edited input, clear any previously generated short link.
+      setGeneratedDynamicUrl(null);
+      
       // Check if user can generate QR code (use calculated remaining)
       if (qrCodesRemaining <= 0) {
         alert(`You've reached your QR code generation limit for your ${subscriptionTier} plan. Please upgrade to continue.`);
@@ -402,7 +406,7 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
         }
 
         valueToEncode = dynamicUrl;
-        setQrValue(dynamicUrl);
+        setGeneratedDynamicUrl(dynamicUrl);
       }
       
       if (imageFormat === 'svg') {
@@ -776,10 +780,10 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
       <div className="flex-1">
         <div className="relative bg-white p-8 rounded-lg shadow-sm border border-neutral-200 flex flex-col items-center justify-center min-h-[300px]">
           <div className="relative">
-            {qrValue ? (
+            {(generatedDynamicUrl || qrValue) ? (
               <div className="qr-container" ref={qrRef}>
                 <QRCode 
-                  value={qrValue} 
+                  value={generatedDynamicUrl || qrValue} 
                   size={224} 
                   level="H" 
                   className={`
@@ -810,7 +814,7 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
           </div>
           
           <p className="text-xs text-neutral-500 mt-3 h-4">
-            {qrValue && `Type: ${qrTypes.find(t => t.value === qrType)?.label}`}
+            {(generatedDynamicUrl || qrValue) && `Type: ${qrTypes.find(t => t.value === qrType)?.label}`}
           </p>
         </div>
         

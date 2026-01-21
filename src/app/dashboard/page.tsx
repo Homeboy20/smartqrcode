@@ -266,6 +266,13 @@ export default function DashboardPage() {
                       >
                         Open
                       </Link>
+
+                      <Link
+                        href={`/dashboard/codes/${code.id}/analytics`}
+                        className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        Analytics
+                      </Link>
                     </div>
                   </div>
                 ))}
