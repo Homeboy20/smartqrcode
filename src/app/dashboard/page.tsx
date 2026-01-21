@@ -53,22 +53,26 @@ export default function DashboardPage() {
       setRecentLoading(true);
       setRecentError(null);
       try {
-        let token: string | null = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          token = await getAccessToken();
-          if (token) break;
-          await new Promise((r) => setTimeout(r, 150));
-        }
-        if (!token) {
-          throw new Error('Missing access token');
-        }
+        // Preferred: cookie auth (httpOnly, managed by Supabase SSR).
+        // If cookie auth isn't available yet, we fall back to a Bearer token.
+        let res = await fetch('/api/codes/recent?limit=5', { method: 'GET' });
+        if (res.status === 401) {
+          let token: string | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            token = await getAccessToken();
+            if (token) break;
+            await new Promise((r) => setTimeout(r, 150));
+          }
 
-        const res = await fetch('/api/codes/recent?limit=5', {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+          if (token) {
+            res = await fetch('/api/codes/recent?limit=5', {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          }
+        }
 
         const json = await res.json().catch(() => ({} as any));
 

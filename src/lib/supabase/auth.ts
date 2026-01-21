@@ -1,4 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import type { NextRequest } from 'next/server';
+
+import { createSupabaseReadonlyServerClient } from '@/lib/supabase/ssr';
 
 /**
  * Verify Supabase access token and check admin status
@@ -70,10 +73,32 @@ export async function verifySupabaseAuth(accessToken: string) {
 export async function verifyUserAccess(request: Request) {
   const authHeader = request.headers.get('authorization');
 
+  // Preferred: cookie-based SSR auth (httpOnly cookies managed by Supabase SSR).
+  // If there is no Bearer token header, attempt to authenticate using cookies.
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const nextReq = request as unknown as NextRequest;
+    if (typeof (nextReq as any)?.cookies?.getAll === 'function') {
+      const supabase = createSupabaseReadonlyServerClient(nextReq);
+      if (!supabase) {
+        throw new Error('Supabase configuration missing');
+      }
+
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        throw new Error('Unauthorized');
+      }
+
+      return {
+        token: null,
+        userId: user.id,
+        email: user.email || '',
+      };
+    }
+
     throw new Error('No authentication token provided');
   }
 
+  // Compatibility: Bearer token auth.
   const token = authHeader.slice('Bearer '.length).trim();
   if (!token) {
     throw new Error('Invalid authentication token');

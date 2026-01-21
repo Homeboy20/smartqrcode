@@ -1,13 +1,25 @@
+import { createBrowserClient } from '@supabase/ssr';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Client-side Supabase client - only create if env vars are present
+// Client-side Supabase client.
+// Prefer cookie-based sessions via createBrowserClient (SSR-safe) so server can authenticate via cookies.
 let supabase: SupabaseClient;
 
 if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  if (typeof window !== 'undefined') {
+    supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+  } else {
+    // Server import fallback (should be rare). Avoid persisting sessions on the server.
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
 } else {
   console.warn('Supabase client: Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
   // Create a dummy client that will fail gracefully
