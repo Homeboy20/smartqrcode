@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "next-themes";
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useAppSettings } from '@/hooks/useAppSettings';
 // Removed unused Lucide icons
 // import { Menu, X } from "lucide-react";
@@ -25,9 +25,20 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, isAdmin } = useSupabaseAuth();
   const pathname = usePathname();
   const { settings: appSettings } = useAppSettings();
+
+  const displayName =
+    (user?.user_metadata as any)?.display_name ||
+    (user?.user_metadata as any)?.full_name ||
+    user?.email ||
+    'User';
+
+  const avatarUrl =
+    (user?.user_metadata as any)?.avatar_url ||
+    (user?.user_metadata as any)?.picture ||
+    '';
 
   const siteName = appSettings?.branding?.siteName || 'ScanMagic';
   const logoUrl = appSettings?.branding?.logoUrl || appSettings?.branding?.logoSvgUrl || '';
@@ -116,15 +127,15 @@ export default function Navbar() {
                     onClick={toggleMenu}
                   >
                     <span className="sr-only">Open user menu</span>
-                    {user && 'photoURL' in user && user.photoURL ? (
+                    {avatarUrl ? (
                       <img
                         className="h-8 w-8 rounded-full"
-                        src={user.photoURL}
-                        alt={user.displayName || "User"}
+                        src={avatarUrl}
+                        alt={displayName}
                       />
                     ) : (
                       <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white">
-                        {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                        {String(displayName).charAt(0).toUpperCase()}
                       </div>
                     )}
                   </button>
@@ -147,14 +158,14 @@ export default function Navbar() {
                       role="menuitem">
                       Dashboard
                     </Link>
-                    {user && 'role' in user && user.role === 'admin' && (
+                    {isAdmin && (
                       <Link href="/admin" 
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" 
                         role="menuitem">
                         Admin Panel
                       </Link>
                     )}
-                    {user && 'role' in user && user.role === 'admin' && (
+                    {isAdmin && (
                       <Link href="/admin?public=true" 
                         className="block px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100" 
                         role="menuitem">
@@ -250,20 +261,20 @@ export default function Navbar() {
                     <div className="py-6 border-t border-gray-200">
                       <div className="flex items-center px-5">
                         <div className="flex-shrink-0">
-                          {user && 'photoURL' in user && user.photoURL ? (
+                          {avatarUrl ? (
                             <img
                               className="h-10 w-10 rounded-full"
-                              src={user.photoURL}
+                              src={avatarUrl}
                               alt="User"
                             />
                           ) : (
                             <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white">
-                              {user.displayName ? user.displayName.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase()}
+                              {String(displayName).charAt(0).toUpperCase()}
                             </div>
                           )}
                         </div>
                         <div className="ml-3">
-                          <div className="text-base font-medium text-gray-800">{user.displayName || 'User'}</div>
+                          <div className="text-base font-medium text-gray-800">{displayName}</div>
                           <div className="text-sm font-medium text-gray-500">{user.email}</div>
                         </div>
                       </div>
@@ -280,7 +291,7 @@ export default function Navbar() {
                         >
                           Dashboard
                         </Link>
-                        {user && 'role' in user && user.role === 'admin' && (
+                        {isAdmin && (
                           <Link
                             href="/admin"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-100"
@@ -288,7 +299,7 @@ export default function Navbar() {
                             Admin Panel
                           </Link>
                         )}
-                        {user && 'role' in user && user.role === 'admin' && (
+                        {isAdmin && (
                           <Link
                             href="/admin?public=true"
                             className="block px-3 py-2 rounded-md text-base font-medium text-indigo-600 hover:bg-gray-100"

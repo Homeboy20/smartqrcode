@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import { useAuth } from '@/context/FirebaseAuthContext';
 
 // Example StatCard component for dashboard metrics
 function StatCard({ title, value, description, icon, color = 'indigo' }: { 
@@ -64,8 +63,7 @@ interface DashboardStats {
 }
 
 export default function AdminDashboardPage() {
-  const { user: supabaseUser } = useSupabaseAuth();
-  const { user: firebaseUser, getIdToken } = useAuth();
+  const { user: supabaseUser, getAccessToken } = useSupabaseAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -82,8 +80,11 @@ export default function AdminDashboardPage() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
-        const token = await getIdToken();
+
+        const token = await getAccessToken();
+        if (!token) {
+          throw new Error('Authentication required');
+        }
         
         const response = await fetch('/api/admin/analytics', {
           cache: 'no-store',
@@ -116,7 +117,7 @@ export default function AdminDashboardPage() {
     };
 
     fetchDashboardData();
-  }, [getIdToken]);
+  }, [getAccessToken]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -136,9 +137,9 @@ export default function AdminDashboardPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        {(supabaseUser || firebaseUser) && (
+        {supabaseUser && (
           <p className="mt-1 text-sm text-gray-600">
-            Welcome back, {supabaseUser?.email || firebaseUser?.email}
+            Welcome back, {supabaseUser.email}
           </p>
         )}
       </div>

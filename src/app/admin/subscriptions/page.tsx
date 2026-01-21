@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
-import { useAuth } from '@/context/FirebaseAuthContext';
 
 interface Subscription {
   id: string;
@@ -22,8 +21,7 @@ interface Subscription {
 }
 
 export default function AdminSubscriptionsPage() {
-  const { user } = useSupabaseAuth();
-  const { getIdToken } = useAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +35,10 @@ export default function AdminSubscriptionsPage() {
       setLoading(true);
       setError(null);
       
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch('/api/admin/subscriptions', {
         cache: 'no-store',
@@ -107,7 +108,10 @@ export default function AdminSubscriptionsPage() {
     }
     
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch(`/api/admin/subscriptions/${id}/cancel`, {
         method: 'POST',

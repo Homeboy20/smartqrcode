@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface FlutterwaveCustomer {
   id: string;
@@ -28,7 +28,7 @@ interface FlutterwaveCustomer {
 }
 
 export default function FlutterwaveCustomersPage() {
-  const { user, getIdToken } = useAuth();
+  const { getAccessToken } = useSupabaseAuth();
   const [customers, setCustomers] = useState<FlutterwaveCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function FlutterwaveCustomersPage() {
       setLoading(true);
       setError(null);
 
-      const token = await getIdToken();
+      const token = await getAccessToken();
       if (!token) {
         throw new Error('Authentication required');
       }
@@ -92,7 +92,7 @@ export default function FlutterwaveCustomersPage() {
 
   const viewCustomer = async (customerId: string) => {
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
       if (!token) return;
 
       const response = await fetch(`/api/admin/flutterwave/customers/${customerId}`, {

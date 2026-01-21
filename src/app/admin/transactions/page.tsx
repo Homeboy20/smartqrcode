@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Transaction {
   id: string;
@@ -19,7 +19,7 @@ interface Transaction {
 }
 
 export default function AdminTransactionsPage() {
-  const { user, getIdToken } = useAuth();
+  const { getAccessToken } = useSupabaseAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,10 @@ export default function AdminTransactionsPage() {
       setLoading(true);
       setError(null);
       
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch('/api/admin/transactions', {
         cache: 'no-store',
@@ -81,7 +84,10 @@ export default function AdminTransactionsPage() {
     }
     
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch(`/api/admin/transactions/${id}`, {
         method: 'DELETE',
@@ -135,7 +141,10 @@ export default function AdminTransactionsPage() {
 
   const handleSaveTransaction = async () => {
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       if (editingTransaction) {
         const response = await fetch(`/api/admin/transactions/${editingTransaction.id}`, {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Payment {
   id: string;
@@ -26,7 +26,7 @@ interface Payment {
 }
 
 export default function AdminPaymentsPage() {
-  const { user, getIdToken } = useAuth();
+  const { getAccessToken } = useSupabaseAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,10 @@ export default function AdminPaymentsPage() {
       setLoading(true);
       setError(null);
       
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch(`/api/admin/transactions`, {
         cache: 'no-store',
@@ -130,7 +133,10 @@ export default function AdminPaymentsPage() {
     }
     
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       // Update transaction status to refunded
       const response = await fetch(`/api/admin/transactions/${id}`, {

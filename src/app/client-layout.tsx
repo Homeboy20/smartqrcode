@@ -54,9 +54,7 @@ export default function ClientLayout({
   if (isAdminPage) {
     return (
       <SupabaseAuthProvider>
-        <FirebaseAuthProvider>
-          {children}
-        </FirebaseAuthProvider>
+        {children}
       </SupabaseAuthProvider>
     );
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, ReactNode } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -14,7 +14,7 @@ const VerificationGuard: React.FC<VerificationGuardProps> = ({
   children, 
   redirectTo = '/verify-account'
 }) => {
-  const { user, loading } = useAuth();
+  const { user, loading } = useSupabaseAuth();
   const router = useRouter();
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
 
@@ -27,7 +27,10 @@ const VerificationGuard: React.FC<VerificationGuardProps> = ({
       }
 
       // Check verification status
-      const verified = Boolean(user.emailVerified) || Boolean(user.phoneNumber);
+      const verified =
+        Boolean((user as any)?.email_confirmed_at) ||
+        Boolean((user as any)?.confirmed_at) ||
+        Boolean((user as any)?.phone);
       setIsVerified(verified);
       if (!verified) router.push(redirectTo);
     }

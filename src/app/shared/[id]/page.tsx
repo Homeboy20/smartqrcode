@@ -1,4 +1,16 @@
-'use client';
+export default function SharedLinkUnavailable() {
+  return (
+    <main className="mx-auto max-w-2xl px-6 py-16">
+      <h1 className="text-2xl font-semibold text-gray-900">Shared link unavailable</h1>
+      <p className="mt-3 text-sm text-gray-600">
+        This legacy sharing link has been retired during the Supabase migration.
+      </p>
+    </main>
+  );
+}
+
+/*
+LEGACY IMPLEMENTATION (Firebase-based) — intentionally disabled.
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
@@ -246,3 +258,5 @@ export default function SharedFilePage({ params }: SharedFilePageProps) {
     </Box>
   );
 }
+
+*/

@@ -1,48 +1,15 @@
 import { NextRequest } from 'next/server';
-import { adminAuth, adminDb } from './firebase-admin';
-import { DecodedIdToken } from 'firebase-admin/auth';
+
+export type DecodedIdToken = unknown;
 
 /**
  * Utility to check if a request is from an admin user
  * @param request NextRequest object
  * @returns DecodedIdToken if admin, null otherwise
  */
-export async function checkAdminAuth(request: NextRequest): Promise<DecodedIdToken | null> {
-  try {
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null;
-    }
-    
-    // Extract the token
-    const token = authHeader.split('Bearer ')[1];
-    if (!token) {
-      return null;
-    }
-    
-    // Verify the token
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    if (!decodedToken.uid) {
-      return null;
-    }
-    
-    // Check if the user has admin role in Firestore
-    const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
-    if (!userDoc.exists) {
-      return null;
-    }
-    
-    const userData = userDoc.data();
-    if (!userData || userData.role !== 'admin') {
-      return null;
-    }
-    
-    return decodedToken;
-  } catch (error) {
-    console.error('Error in admin authentication:', error);
-    return null;
-  }
+export async function checkAdminAuth(_request: NextRequest): Promise<DecodedIdToken | null> {
+  // Disabled: legacy Firebase Admin auth; all admin flows use Supabase now.
+  return null;
 }
 
 /**
@@ -50,34 +17,6 @@ export async function checkAdminAuth(request: NextRequest): Promise<DecodedIdTok
  * @param request NextRequest object
  * @returns DecodedIdToken if admin, null otherwise
  */
-export async function checkAdminAuthFromCookie(request: NextRequest): Promise<DecodedIdToken | null> {
-  try {
-    // Try to get token from cookie
-    const sessionCookie = request.cookies.get('session')?.value;
-    if (!sessionCookie) {
-      return null;
-    }
-    
-    // Verify the session cookie
-    const decodedToken = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decodedToken.uid) {
-      return null;
-    }
-    
-    // Check if the user has admin role in Firestore
-    const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
-    if (!userDoc.exists) {
-      return null;
-    }
-    
-    const userData = userDoc.data();
-    if (!userData || userData.role !== 'admin') {
-      return null;
-    }
-    
-    return decodedToken;
-  } catch (error) {
-    console.error('Error in admin authentication from cookie:', error);
-    return null;
-  }
-} 
+export async function checkAdminAuthFromCookie(_request: NextRequest): Promise<DecodedIdToken | null> {
+  return null;
+}

@@ -1,12 +1,19 @@
 "use client";
 
 import React, { useState } from 'react';
-import { UserData } from '@/lib/firestore';
+
+type AdminUserRecord = {
+  id: string;
+  email: string;
+  displayName: string | null;
+  role: 'admin' | 'user';
+  subscriptionTier: string;
+};
 
 interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (userData: Partial<UserData> & { password?: string }) => Promise<void>;
+  onCreate: (userData: Partial<AdminUserRecord> & { password?: string }) => Promise<void>;
 }
 
 export default function CreateUserModal({ isOpen, onClose, onCreate }: CreateUserModalProps) {

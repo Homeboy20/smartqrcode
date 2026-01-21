@@ -1,75 +1,38 @@
-import { 
-  GoogleAuthProvider, 
-  GithubAuthProvider, 
-  FacebookAuthProvider, 
-  TwitterAuthProvider, 
-  getAuth,
-  AuthProvider // Import base AuthProvider type
-} from "firebase/auth";
-import { app, auth, isFirebaseAvailable } from "./firebase/config"; // Import isFirebaseAvailable and auth
+// This module previously provided Firebase OAuth providers.
+// During the Supabase migration, OAuth sign-in is handled by Supabase.
+// These exports are retained only to preserve import paths.
 
-// Initialize Firebase Authentication - ONLY if available
-// const auth = getAuth(app); // We already get auth from config.ts
+export type AuthProvider = unknown;
 
-// --- Conditional Provider Initialization ---
-
-let googleProvider: AuthProvider | null = null;
-let githubProvider: AuthProvider | null = null;
-let facebookProvider: AuthProvider | null = null;
-let twitterProvider: AuthProvider | null = null;
-
-if (isFirebaseAvailable()) {
-  console.log("Firebase is available, initializing real auth providers.");
-  try {
-    googleProvider = new GoogleAuthProvider();
-    // Set custom parameters if needed
-    // googleProvider.setCustomParameters({ prompt: 'select_account' });
-
-    githubProvider = new GithubAuthProvider();
-    // githubProvider.addScope('repo'); // Example scope
-
-    facebookProvider = new FacebookAuthProvider();
-    // facebookProvider.addScope('email'); // Example scope
-
-    twitterProvider = new TwitterAuthProvider();
-    // Note: TwitterAuthProvider might have issues depending on Firebase/Twitter API changes.
-  } catch (error) {
-    console.error("Error initializing real auth providers:", error);
-    // Keep providers as null if initialization fails
-  }
-} else {
-  console.warn("Firebase not available (likely build time), auth providers will be null/stubs.");
-  // We could create more detailed stubs if needed, but null might suffice
-  // depending on how AVAILABLE_PROVIDERS is used.
-}
+export const googleProvider: AuthProvider | null = null;
+export const githubProvider: AuthProvider | null = null;
+export const facebookProvider: AuthProvider | null = null;
+export const twitterProvider: AuthProvider | null = null;
 
 // Export available providers - ONLY include providers that are configured in Firebase console
 export const AVAILABLE_PROVIDERS = {
   google: {
     name: 'Google',
-    enabled: true, // Set to true since you've enabled this in Firebase console
-    provider: googleProvider // Use the conditionally initialized provider
+    enabled: false,
+    provider: googleProvider,
   },
   // Explicitly set these to false since they're not configured
   twitter: {
     name: 'Twitter',
     enabled: false,
-    provider: twitterProvider // Use the conditionally initialized provider
+    provider: twitterProvider,
   },
   github: {
     name: 'GitHub',
     enabled: false,
-    provider: githubProvider // Use the conditionally initialized provider
+    provider: githubProvider,
   },
   facebook: {
     name: 'Facebook',
     enabled: false,
-    provider: facebookProvider // Use the conditionally initialized provider
+    provider: facebookProvider,
   }
 };
-
-// Export the initialized providers directly if needed elsewhere, but prefer AVAILABLE_PROVIDERS
-export { googleProvider, githubProvider, facebookProvider, twitterProvider };
 
 // Define available auth providers
 export const AUTH_PROVIDERS = [

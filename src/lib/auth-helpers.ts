@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/firebase/admin';
+import { verifyUserAccess } from '@/lib/supabase/auth';
 
 export interface AuthResult {
   success: boolean;
@@ -12,26 +12,8 @@ export interface AuthResult {
  * Returns userId if valid, throws error if invalid
  */
 export async function verifyAuth(request: NextRequest): Promise<string> {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('No authentication token provided');
-  }
-
-  const token = authHeader.split('Bearer ')[1];
-  
-  const authInstance = auth();
-  if (!authInstance) {
-    throw new Error('Firebase Admin not configured');
-  }
-
-  try {
-    const decodedToken = await authInstance.verifyIdToken(token);
-    return decodedToken.uid;
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    throw new Error('Invalid or expired token');
-  }
+  const result = await verifyUserAccess(request);
+  return result.userId;
 }
 
 /**

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 
 interface Integration {
@@ -17,7 +17,7 @@ interface Integration {
 }
 
 export default function IntegrationsPage() {
-  const { user, getIdToken } = useAuth();
+  const { getAccessToken } = useSupabaseAuth();
   const [integrations, setIntegrations] = useState<Integration[]>([
     {
       id: 'paystack',
@@ -95,7 +95,7 @@ export default function IntegrationsPage() {
   const fetchIntegrationStatus = async () => {
     try {
       setLoading(true);
-      const token = await getIdToken();
+      const token = await getAccessToken();
       if (!token) return;
 
       // Fetch payment settings status

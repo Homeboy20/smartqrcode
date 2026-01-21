@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 // Define types for integration settings
 interface FlutterwaveSettings {
@@ -63,7 +63,7 @@ const emptyStatus: ProviderStatus = {
 const isSaveableProvider = (tab: ActiveTab): tab is Exclude<ActiveTab, 'googlePay'> => tab !== 'googlePay';
 
 export default function IntegrationsForm() {
-  const { user } = useAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('flutterwave');
   const [settings, setSettings] = useState<IntegrationSettings>(emptySettings);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus>(emptyStatus);
@@ -81,8 +81,8 @@ export default function IntegrationsForm() {
       setSuccess(null);
 
       try {
-        const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
-        if (!idToken) {
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
           throw new Error('Authentication required');
         }
 
@@ -90,7 +90,7 @@ export default function IntegrationsForm() {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         });
 
@@ -153,14 +153,14 @@ export default function IntegrationsForm() {
     }
 
     try {
-      const idToken = user && 'getIdToken' in user ? await user.getIdToken() : null;
-      if (!idToken) {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
         throw new Error('Authentication required');
       }
 
       const response = await fetch('/api/admin/payment-settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           provider: activeTab,
           isActive: providerStatus[activeTab],

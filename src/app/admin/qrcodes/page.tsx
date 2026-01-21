@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface QrCode {
   id: string;
@@ -25,7 +25,7 @@ interface QrCode {
 }
 
 export default function AdminQrCodesPage() {
-  const { user, getIdToken } = useAuth();
+  const { user: supabaseUser, getAccessToken } = useSupabaseAuth();
   const [qrCodes, setQrCodes] = useState<QrCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,10 @@ export default function AdminQrCodesPage() {
       setLoading(true);
       setError(null);
       
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch('/api/admin/qrcodes', {
         cache: 'no-store',
@@ -115,7 +118,10 @@ export default function AdminQrCodesPage() {
     }
     
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch(`/api/admin/qrcodes/${id}`, {
         method: 'DELETE',
@@ -155,14 +161,17 @@ export default function AdminQrCodesPage() {
       content: '',
       type: 'qrcode',
       format: 'png',
-      userId: user?.uid || ''
+      userId: supabaseUser?.id || ''
     });
     setShowCreateModal(true);
   };
 
   const handleSaveQrCode = async () => {
     try {
-      const token = await getIdToken();
+      const token = await getAccessToken();
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       if (editingQrCode) {
         // Update existing QR code

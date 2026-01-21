@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/context/FirebaseAuthContext';
+import React, { useState } from 'react';
 
 interface Webhook {
   id: string;
@@ -15,7 +14,6 @@ interface Webhook {
 }
 
 export default function WebhooksPage() {
-  const { user, getIdToken } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([
     {
       id: '1',
