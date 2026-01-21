@@ -3,10 +3,15 @@
 import { useEffect, useState } from 'react';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { AuthProvider } from '@/context/FirebaseAuthContext';
+import dynamic from 'next/dynamic';
 import { SupabaseAuthProvider } from '@/context/SupabaseAuthContext';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { usePathname } from 'next/navigation';
+
+const FirebaseAuthProvider = dynamic(
+  () => import('@/context/FirebaseAuthContext').then((mod) => mod.AuthProvider),
+  { ssr: false }
+);
 
 export default function ClientLayout({
   children,
@@ -49,14 +54,14 @@ export default function ClientLayout({
   if (isAdminPage) {
     return (
       <SupabaseAuthProvider>
-        <AuthProvider>
+        <FirebaseAuthProvider>
           {children}
-        </AuthProvider>
+        </FirebaseAuthProvider>
       </SupabaseAuthProvider>
     );
   }
 
-  const page = needsFirebaseAuth ? <AuthProvider>{children}</AuthProvider> : children;
+  const page = needsFirebaseAuth ? <FirebaseAuthProvider>{children}</FirebaseAuthProvider> : children;
 
   // For regular pages, include header and footer
   return (
