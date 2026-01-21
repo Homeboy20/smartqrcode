@@ -92,12 +92,17 @@ export async function POST(request: NextRequest) {
 
       // Common case: schema drift in existing Supabase project.
       if (String(message).toLowerCase().includes('features_usage')) {
+        // Degrade gracefully (no-op) so users aren't blocked by a missing column.
+        // Client-side guards still enforce limits; server-side tracking resumes once schema is fixed.
         return NextResponse.json(
           {
-            error:
-              'Database schema missing users.features_usage. Apply supabase migration supabase_migrations/01_CREATE_USERS_TABLE.sql (or add the features_usage jsonb column) and retry.',
+            ok: true,
+            skipped: true,
+            reason: 'missing_features_usage',
+            warning:
+              'Database schema missing users.features_usage. Apply supabase_migrations/01_CREATE_USERS_TABLE.sql (or add the features_usage jsonb column) to enable usage tracking.',
           },
-          { status: 500 }
+          { status: 200 }
         );
       }
 
@@ -136,6 +141,25 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id);
 
     if (updateError) {
+      const message =
+        (updateError as any)?.message ||
+        (updateError as any)?.details ||
+        (updateError as any)?.hint ||
+        '';
+
+      if (String(message).toLowerCase().includes('features_usage')) {
+        return NextResponse.json(
+          {
+            ok: true,
+            skipped: true,
+            reason: 'missing_features_usage',
+            warning:
+              'Database schema missing users.features_usage. Apply supabase_migrations/01_CREATE_USERS_TABLE.sql (or add the features_usage jsonb column) to enable usage tracking.',
+          },
+          { status: 200 }
+        );
+      }
+
       return NextResponse.json({ error: 'Failed to track usage' }, { status: 500 });
     }
 
