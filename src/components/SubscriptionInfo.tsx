@@ -48,6 +48,15 @@ export default function SubscriptionInfo({ variant = 'default' }: SubscriptionIn
 
     async function fetchInterval() {
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const sessionUserId = sessionData.session?.user?.id;
+
+        // If there's no session, don't hit the subscriptions table (avoids noisy 4xxs under misconfigured auth/RLS).
+        if (!sessionUserId) {
+          if (mounted) setBillingInterval('unknown');
+          return;
+        }
+
         // Only attempt to read subscription rows when the user is not on free tier.
         // RLS should allow users to read their own subscription row; if not, we just keep "unknown".
         if (subscriptionTier === 'free') {
@@ -55,15 +64,39 @@ export default function SubscriptionInfo({ variant = 'default' }: SubscriptionIn
           return;
         }
 
-        const { data, error } = await supabase
+        // Explicitly filter by user_id for compatibility with stricter RLS and older schemas.
+        // Also tolerate schemas that may not have updated_at by falling back to created_at ordering.
+        const queryBase = supabase
           .from('subscriptions')
-          .select('current_period_start,current_period_end,updated_at')
-          .order('updated_at', { ascending: false })
+          .select('current_period_start,current_period_end,updated_at,created_at')
+          .eq('user_id', sessionUserId)
           .limit(1);
 
-        if (error) return;
-        const row = (data as any)?.[0];
-        const interval = computeBillingIntervalFromDates(row?.current_period_start, row?.current_period_end);
+        const primary = await queryBase.order('updated_at', { ascending: false }).maybeSingle();
+        if (primary.error) {
+          // In some deployments, older schemas might not include updated_at.
+          const fallback = await queryBase.order('created_at', { ascending: false }).maybeSingle();
+          if (fallback.error) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('SubscriptionInfo: failed to load subscription interval', {
+                error: fallback.error,
+              });
+            }
+            return;
+          }
+
+          const interval = computeBillingIntervalFromDates(
+            (fallback.data as any)?.current_period_start,
+            (fallback.data as any)?.current_period_end
+          );
+          if (mounted) setBillingInterval(interval);
+          return;
+        }
+
+        const interval = computeBillingIntervalFromDates(
+          (primary.data as any)?.current_period_start,
+          (primary.data as any)?.current_period_end
+        );
         if (mounted) setBillingInterval(interval);
       } catch {
         // ignore

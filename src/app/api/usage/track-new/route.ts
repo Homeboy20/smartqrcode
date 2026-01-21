@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@supabase/supabase-js';
 import type { FeatureType } from '@/lib/subscription';
+import { createServerClient } from '@/lib/supabase/server';
 
 const ALLOWED_FEATURES: readonly FeatureType[] = [
   'qrCodesGenerated',
@@ -55,21 +56,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid feature' }, { status: 400 });
     }
 
-    const amount = Number.isFinite(amountRaw) ? Math.floor(Number(amountRaw)) : 1;
+    const parsedAmount = typeof amountRaw === 'number' || typeof amountRaw === 'string' ? Number(amountRaw) : NaN;
+    const amount = Number.isFinite(parsedAmount) ? Math.floor(parsedAmount) : 1;
     const safeAmount = Math.min(Math.max(amount, 1), 100);
 
-    // Use a client scoped to the user's JWT so RLS can allow updating their own row.
-    const authed = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    // Prefer service-role updates (server-only) to avoid RLS misconfig causing noisy 500s.
+    // Still enforce that the request is authenticated and only updates the requesting user's row.
+    const admin = createServerClient();
+    const authed =
+      admin ??
+      createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
 
     const { data: existingRow, error: rowError } = await authed
       .from('users')
@@ -78,6 +84,23 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (rowError) {
+      const message =
+        (rowError as any)?.message ||
+        (rowError as any)?.details ||
+        (rowError as any)?.hint ||
+        'Failed to load usage';
+
+      // Common case: schema drift in existing Supabase project.
+      if (String(message).toLowerCase().includes('features_usage')) {
+        return NextResponse.json(
+          {
+            error:
+              'Database schema missing users.features_usage. Apply supabase migration supabase_migrations/01_CREATE_USERS_TABLE.sql (or add the features_usage jsonb column) and retry.',
+          },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({ error: 'Failed to load usage' }, { status: 500 });
     }
 
