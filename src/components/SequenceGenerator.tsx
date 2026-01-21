@@ -35,8 +35,12 @@ export default function SequenceGenerator() {
     isWithinUsageLimit
   } = useTrackUsage();
   
-  const { user } = useSupabaseAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const isVisitor = !user;
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [useDynamicLink, setUseDynamicLink] = useState(false);
+  const [encryptDestination, setEncryptDestination] = useState(false);
   
   const [prefix, setPrefix] = useState<string>("");
   const [startNumber, setStartNumber] = useState<number>(1);
@@ -72,57 +76,47 @@ export default function SequenceGenerator() {
     { value: "pharmacode", label: "Pharmacode" },
   ];
 
-  // Generate preview whenever input values change
-  useEffect(() => {
-    const generatePreview = () => {
-      const paddedNumber = String(startNumber).padStart(padding, '0');
-      const code = `${prefix}${paddedNumber}${suffix}`;
-      setPreviewCode(code);
-      
-      if (format === "barcode" && barcodeCanvasRef.current) {
-        try {
-          JsBarcode(barcodeCanvasRef.current, code, {
-            format: barcodeType,
-            width: 2,
-            height: 100,
-            displayValue: true,
-            lineColor: "#000000",
-            background: "#FFFFFF",
-          });
-        } catch (err) {
-          console.error("Error generating barcode", err);
-        }
-      }
-      
-      return code;
-    };
-
-    if (prefix !== '' || startNumber > 0) {
-      generatePreview();
+  const isValidHttpUrl = (value: string) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
     }
-  }, [prefix, startNumber, padding, format, barcodeType, barcodeCanvasRef, suffix]);
+  };
 
-  const generateSequence = () => {
+  // Generate preview whenever input values change (only when not browsing a generated sequence)
+  useEffect(() => {
+    if (generatedCodes.length > 0) return;
+
+    const paddedNumber = String(startNumber).padStart(padding, '0');
+    const code = `${prefix}${paddedNumber}${suffix}`;
+    setPreviewCode(code);
+  }, [prefix, startNumber, padding, suffix, generatedCodes.length]);
+
+  // Render barcode preview whenever previewCode changes
+  useEffect(() => {
+    if (format !== 'barcode' || !barcodeCanvasRef.current) return;
+    if (!previewCode) return;
+    try {
+      JsBarcode(barcodeCanvasRef.current, previewCode, {
+        format: barcodeType,
+        width: 2,
+        height: 100,
+        displayValue: true,
+        lineColor: '#000000',
+        background: '#FFFFFF',
+      });
+    } catch (err) {
+      console.error('Error generating barcode', err);
+    }
+  }, [format, barcodeType, previewCode]);
+
+  const buildSequenceCodes = () => {
     // Validate input
     if (!count || count <= 0) {
       alert("Please enter a valid count greater than 0");
       return [];
-    }
-
-    const feature = format === "qrcode" ? "qrCodesGenerated" : "barcodesGenerated";
-    
-    // Check if user can generate this many codes
-    if (!isWithinUsageLimit(feature, count)) {
-      setLockedFeatureName(`${format === "qrcode" ? "QR Code" : "Barcode"} Generation Limit`);
-      setShowLoginModal(true);
-      return [];
-    }
-
-    // If user can proceed, track the usage
-    if (format === "qrcode") {
-      trackUsage('qrCodesGenerated', count);
-    } else {
-      trackUsage('barcodesGenerated', count);
     }
 
     const newCodes = [];
@@ -134,9 +128,111 @@ export default function SequenceGenerator() {
       newCodes.push(code);
       currentNumber += increment;
     }
-    
-    setGeneratedCodes(newCodes);
     return newCodes;
+  };
+
+  const createDynamicUrl = async (destination: string, name: string) => {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Please log in again.');
+    }
+
+    const res = await fetch('/api/codes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: format,
+        destination,
+        encrypt: encryptDestination,
+        name,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((json as any)?.error || 'Failed to create dynamic code');
+    }
+
+    const dynamicUrl = (json as any)?.url;
+    if (!dynamicUrl) {
+      throw new Error('Failed to create dynamic code');
+    }
+
+    return String(dynamicUrl);
+  };
+
+  const handleGenerateSequence = async () => {
+    try {
+      const feature = format === 'qrcode' ? 'qrCodesGenerated' : 'barcodesGenerated';
+
+      const newCodes = buildSequenceCodes();
+      if (newCodes.length === 0) return;
+
+      // Check if user can generate this many codes
+      if (!isWithinUsageLimit(feature, count)) {
+        setLockedFeatureName(`${format === 'qrcode' ? 'QR Code' : 'Barcode'} Generation Limit`);
+        setShowLoginModal(true);
+        return;
+      }
+
+      setIsGenerating(true);
+
+      // Track usage
+      const trackOk = await trackUsage(feature, count);
+      if (!trackOk) {
+        if (trackingError) alert(trackingError);
+        return;
+      }
+
+      let finalCodes = newCodes;
+
+      if (useDynamicLink) {
+        if (!user) {
+          setLockedFeatureName(format === 'qrcode' ? 'Dynamic QR Codes' : 'Dynamic Barcodes');
+          setShowLoginModal(true);
+          return;
+        }
+
+        const hasDynamicAccess =
+          format === 'qrcode' ? canUseFeature('qrCodeTracking') : canUseFeature('enhancedBarcodes');
+        if (!hasDynamicAccess) {
+          setLockedFeatureName(
+            format === 'qrcode' ? 'Dynamic QR Codes (Pro+)' : 'Dynamic Barcodes (Pro+)'
+          );
+          setShowLoginModal(true);
+          router.push('/pricing');
+          return;
+        }
+
+        const invalid = finalCodes.find((c) => !isValidHttpUrl(c));
+        if (invalid) {
+          alert('Dynamic codes only support http(s) URLs.');
+          return;
+        }
+
+        const created: string[] = [];
+        for (let i = 0; i < finalCodes.length; i++) {
+          const dynamicUrl = await createDynamicUrl(
+            finalCodes[i],
+            `Dynamic ${format === 'qrcode' ? 'QR' : 'Barcode'} (Sequence ${i + 1})`
+          );
+          created.push(dynamicUrl);
+        }
+
+        finalCodes = created;
+      }
+
+      setGeneratedCodes(finalCodes);
+      setPreviewCode(finalCodes[0] || '');
+    } catch (err: any) {
+      console.error('Failed to generate sequence:', err);
+      alert(err?.message || 'Failed to generate sequence');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // For a specific feature check
@@ -293,7 +389,7 @@ export default function SequenceGenerator() {
   };
 
   const downloadAll = async () => {
-    const codes = generatedCodes.length > 0 ? generatedCodes : generateSequence();
+    const codes = generatedCodes.length > 0 ? generatedCodes : buildSequenceCodes();
     
     for (let i = 0; i < codes.length; i++) {
       await downloadCode(codes[i], i);
@@ -301,7 +397,7 @@ export default function SequenceGenerator() {
   };
 
   const copyToClipboard = () => {
-    const codes = generatedCodes.length > 0 ? generatedCodes : generateSequence();
+    const codes = generatedCodes.length > 0 ? generatedCodes : buildSequenceCodes();
     navigator.clipboard.writeText(codes.join('\n'))
       .then(() => alert('Codes copied to clipboard!'))
       .catch(err => console.error('Failed to copy: ', err));
@@ -509,6 +605,68 @@ export default function SequenceGenerator() {
                 />
               </div>
             </div>
+
+            <div className="mb-4">
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900">Dynamic link</div>
+                  <div className="text-xs text-gray-600">
+                    Creates a short link you can edit later and track.
+                  </div>
+                </div>
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={useDynamicLink}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+
+                      // Soft gate: require login and plan access before enabling.
+                      if (next) {
+                        if (!user) {
+                          setLockedFeatureName(format === 'qrcode' ? 'Dynamic QR Codes' : 'Dynamic Barcodes');
+                          setShowLoginModal(true);
+                          return;
+                        }
+                        const hasDynamicAccess =
+                          format === 'qrcode'
+                            ? canUseFeature('qrCodeTracking')
+                            : canUseFeature('enhancedBarcodes');
+                        if (!hasDynamicAccess) {
+                          setLockedFeatureName(
+                            format === 'qrcode' ? 'Dynamic QR Codes (Pro+)' : 'Dynamic Barcodes (Pro+)'
+                          );
+                          setShowLoginModal(true);
+                          router.push('/pricing');
+                          return;
+                        }
+                      }
+
+                      setUseDynamicLink(next);
+                      if (!next) setEncryptDestination(false);
+                    }}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </div>
+
+              {useDynamicLink && (
+                <div className="mt-3 flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">Encrypt destination</div>
+                    <div className="text-xs text-gray-600">Stores the destination encrypted in the database.</div>
+                  </div>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={encryptDestination}
+                      onChange={(e) => setEncryptDestination(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
@@ -681,12 +839,14 @@ export default function SequenceGenerator() {
             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
               <button
                 className="bg-primary hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                onClick={generateSequence}
-                disabled={isTracking || (format === "qrcode" ? 
+                onClick={handleGenerateSequence}
+                disabled={isTracking || isGenerating || (format === "qrcode" ? 
                   getRemainingUsage('qrCodesGenerated') < count : 
                   getRemainingUsage('barcodesGenerated') < count)}
               >
-                {isTracking ? 'Generating...' : `Generate ${count} ${format === "qrcode" ? "QR Codes" : "Barcodes"}`}
+                {isTracking || isGenerating
+                  ? 'Generating...'
+                  : `Generate ${count} ${format === "qrcode" ? "QR Codes" : "Barcodes"}`}
               </button>
               <div className="relative">
                 <button

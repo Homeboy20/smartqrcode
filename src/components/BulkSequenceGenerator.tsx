@@ -16,7 +16,7 @@ export default function BulkSequenceGenerator() {
   const subscriptionData = useSubscription();
   const subscriptionTier = subscriptionData?.subscriptionTier || 'free';
   
-  const { user } = useSupabaseAuth();
+  const { user, getAccessToken } = useSupabaseAuth();
   const isVisitor = !user;
   
   // Use tracking hook
@@ -41,6 +41,9 @@ export default function BulkSequenceGenerator() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [outputType, setOutputType] = useState<'zip' | 'pdf' | 'pdf-tile'>('zip');
+
+  const [useDynamicLink, setUseDynamicLink] = useState(false);
+  const [encryptDestination, setEncryptDestination] = useState(false);
 
   // Tiling State (for PDF Tile download)
   const [tileColumns, /* setTileColumns */] = useState<number>(4);
@@ -76,6 +79,48 @@ export default function BulkSequenceGenerator() {
     { value: "MSI", label: "MSI" },
     { value: "pharmacode", label: "Pharmacode" },
   ];
+
+  const isValidHttpUrl = (value: string) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  const createDynamicUrl = async (destination: string, name: string) => {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Please log in again.');
+    }
+
+    const res = await fetch('/api/codes', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: format,
+        destination,
+        encrypt: encryptDestination,
+        name,
+      }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((json as any)?.error || 'Failed to create dynamic code');
+    }
+
+    const dynamicUrl = (json as any)?.url;
+    if (!dynamicUrl) {
+      throw new Error('Failed to create dynamic code');
+    }
+
+    return String(dynamicUrl);
+  };
 
   // Conversion Factors
   const PX_PER_CM = 37.7953;
@@ -150,7 +195,46 @@ export default function BulkSequenceGenerator() {
       // Track usage for bulk generation
       await trackUsage('bulkGenerations');
       
-      const codes = generateSequence();
+      let codes = generateSequence();
+
+      if (useDynamicLink) {
+        if (!user) {
+          setLockedFeatureName(format === 'qrcode' ? 'Dynamic QR Codes' : 'Dynamic Barcodes');
+          setShowLoginModal(true);
+          return;
+        }
+
+        const hasDynamicAccess =
+          format === 'qrcode' ? canUseFeature('qrCodeTracking') : canUseFeature('enhancedBarcodes');
+        if (!hasDynamicAccess) {
+          setLockedFeatureName(
+            format === 'qrcode' ? 'Dynamic QR Codes (Pro+)' : 'Dynamic Barcodes (Pro+)'
+          );
+          setShowLoginModal(true);
+          router.push('/pricing');
+          return;
+        }
+
+        const invalid = codes.find((c) => !isValidHttpUrl(c));
+        if (invalid) {
+          alert('Dynamic codes only support http(s) URLs.');
+          return;
+        }
+
+        const created: string[] = [];
+        for (let i = 0; i < codes.length; i++) {
+          const dynamicUrl = await createDynamicUrl(
+            codes[i],
+            `Dynamic ${format === 'qrcode' ? 'QR' : 'Barcode'} (Bulk ${i + 1})`
+          );
+          created.push(dynamicUrl);
+
+          const totalProgress = ((i + 1) / codes.length) * 100;
+          setProgress(Math.round(totalProgress));
+        }
+        codes = created;
+      }
+
       setCodes(codes);
       
       if (outputType === 'zip') {
@@ -881,6 +965,68 @@ export default function BulkSequenceGenerator() {
                   </div>
                 </div>
               </>
+            )}
+          </div>
+
+          <div className="mb-6">
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Dynamic link</div>
+                <div className="text-xs text-gray-600">
+                  Creates a short link you can edit later and track.
+                </div>
+              </div>
+              <label className="inline-flex items-center">
+                <input
+                  type="checkbox"
+                  checked={useDynamicLink}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+
+                    if (next) {
+                      if (!user) {
+                        setLockedFeatureName(format === 'qrcode' ? 'Dynamic QR Codes' : 'Dynamic Barcodes');
+                        setShowLoginModal(true);
+                        return;
+                      }
+
+                      const hasDynamicAccess =
+                        format === 'qrcode'
+                          ? canUseFeature('qrCodeTracking')
+                          : canUseFeature('enhancedBarcodes');
+                      if (!hasDynamicAccess) {
+                        setLockedFeatureName(
+                          format === 'qrcode' ? 'Dynamic QR Codes (Pro+)' : 'Dynamic Barcodes (Pro+)'
+                        );
+                        setShowLoginModal(true);
+                        router.push('/pricing');
+                        return;
+                      }
+                    }
+
+                    setUseDynamicLink(next);
+                    if (!next) setEncryptDestination(false);
+                  }}
+                  className="h-4 w-4"
+                />
+              </label>
+            </div>
+
+            {useDynamicLink && (
+              <div className="mt-3 flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Encrypt destination</div>
+                  <div className="text-xs text-gray-600">Stores the destination encrypted in the database.</div>
+                </div>
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={encryptDestination}
+                    onChange={(e) => setEncryptDestination(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </div>
             )}
           </div>
           

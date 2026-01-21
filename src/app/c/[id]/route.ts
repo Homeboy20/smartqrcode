@@ -26,7 +26,7 @@ export async function GET(
 
     const { data: code, error } = await supabase
       .from('qrcodes')
-      .select('id, content, scans')
+      .select('id, content, scans, customizations')
       .eq('id', params.id)
       .single();
 
@@ -34,11 +34,42 @@ export async function GET(
       return NextResponse.json({ error: 'Code not found' }, { status: 404 });
     }
 
-    let destination: string;
-    try {
-      destination = decryptString(String(code.content || ''));
-    } catch {
-      return NextResponse.json({ error: 'Invalid encrypted destination' }, { status: 400 });
+    const rawContent = String(code.content || '').trim();
+    const encryptedFlag = (code as any)?.customizations?.encrypted;
+    const shouldDecrypt =
+      encryptedFlag === true ||
+      encryptedFlag === 'true' ||
+      encryptedFlag === 1 ||
+      encryptedFlag === '1';
+
+    let destination: string | null = null;
+
+    if (shouldDecrypt) {
+      try {
+        destination = decryptString(rawContent);
+      } catch {
+        return NextResponse.json({ error: 'Invalid encrypted destination' }, { status: 400 });
+      }
+    } else {
+      // Backward/forward compatible behavior:
+      // - If content is already a safe URL, use it.
+      // - Otherwise, attempt decrypt as a fallback (older rows might not have the flag).
+      if (isSafeRedirectUrl(rawContent)) {
+        destination = rawContent;
+      } else {
+        try {
+          const maybeDecrypted = decryptString(rawContent);
+          if (isSafeRedirectUrl(maybeDecrypted)) {
+            destination = maybeDecrypted;
+          }
+        } catch {
+          // Ignore; we'll validate below.
+        }
+      }
+    }
+
+    if (!destination) {
+      return NextResponse.json({ error: 'Invalid destination URL' }, { status: 400 });
     }
 
     if (!isSafeRedirectUrl(destination)) {
@@ -50,7 +81,7 @@ export async function GET(
       const nextScans = Number(code.scans || 0) + 1;
       await supabase
         .from('qrcodes')
-        .update({ scans: nextScans, updated_at: new Date().toISOString() })
+        .update({ scans: nextScans })
         .eq('id', params.id);
     } catch (e) {
       console.warn('Failed to increment scans:', e);
