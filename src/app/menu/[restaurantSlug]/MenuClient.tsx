@@ -47,16 +47,32 @@ function buildWhatsappMessage(opts: {
   restaurantName: string;
   items: Array<{ name: string; qty: number; price: number }>;
   acceptedPayments: string[];
+  orderType: 'dine_in' | 'delivery';
   table?: string;
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  deliveryNotes?: string;
 }) {
   const lines: string[] = [];
 
   lines.push(`Hello ${opts.restaurantName}`);
   lines.push('');
 
-  if (opts.table) {
-    lines.push(`Table: ${opts.table}`);
-    lines.push('');
+  lines.push(`Order type: ${opts.orderType === 'dine_in' ? 'Dine-in' : 'Delivery'}`);
+  lines.push('');
+
+  if (opts.orderType === 'dine_in') {
+    if (opts.table) {
+      lines.push(`Table: ${opts.table}`);
+      lines.push('');
+    }
+  } else {
+    if (opts.customerName) lines.push(`Name: ${opts.customerName}`);
+    if (opts.customerPhone) lines.push(`Phone: ${opts.customerPhone}`);
+    if (opts.deliveryAddress) lines.push(`Address: ${opts.deliveryAddress}`);
+    if (opts.deliveryNotes) lines.push(`Notes: ${opts.deliveryNotes}`);
+    if (opts.customerName || opts.customerPhone || opts.deliveryAddress || opts.deliveryNotes) lines.push('');
   }
 
   lines.push('New Order:');
@@ -95,6 +111,25 @@ export default function MenuClient({
     return v === 'grid' || v === 'list' ? v : 'list';
   });
   const [cart, setCart] = useState<Record<string, number>>({});
+
+  const [orderType, setOrderType] = useState<'dine_in' | 'delivery'>(() => {
+    const hasTable = Boolean(table?.trim());
+    return hasTable ? 'dine_in' : 'delivery';
+  });
+
+  const [tableNumber, setTableNumber] = useState<string>(() => (table?.trim() ? table.trim() : ''));
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+
+  // If the scanned QR includes ?table=, keep dine-in table locked to that identity.
+  useEffect(() => {
+    if (table?.trim()) {
+      setOrderType('dine_in');
+      setTableNumber(table.trim());
+    }
+  }, [table]);
 
   useEffect(() => {
     try {
@@ -141,7 +176,16 @@ export default function MenuClient({
   const totalQty = useMemo(() => cartItems.reduce((sum, r) => sum + r.qty, 0), [cartItems]);
 
   const waNumber = sanitizeWaNumber(restaurant.whatsapp_number || '');
-  const canOrder = waNumber.length >= 7 && cartItems.length > 0;
+
+  const effectiveTable = table?.trim() ? table.trim() : tableNumber.trim();
+  const dineInReady = orderType !== 'dine_in' || Boolean(effectiveTable);
+  const deliveryReady =
+    orderType !== 'delivery' ||
+    Boolean(deliveryAddress.trim()) ||
+    Boolean(customerPhone.trim()) ||
+    Boolean(customerName.trim());
+
+  const canOrder = waNumber.length >= 7 && cartItems.length > 0 && dineInReady && deliveryReady;
 
   const waUrl = useMemo(() => {
     if (!canOrder) return '#';
@@ -150,11 +194,16 @@ export default function MenuClient({
       restaurantName: restaurant.name,
       items: cartItems,
       acceptedPayments: restaurant.accepted_payments || [],
-      table: table?.trim() ? table.trim() : undefined,
+      orderType,
+      table: orderType === 'dine_in' && effectiveTable ? effectiveTable : undefined,
+      customerName: orderType === 'delivery' ? customerName.trim() || undefined : undefined,
+      customerPhone: orderType === 'delivery' ? customerPhone.trim() || undefined : undefined,
+      deliveryAddress: orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
+      deliveryNotes: orderType === 'delivery' ? deliveryNotes.trim() || undefined : undefined,
     });
 
     return `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
-  }, [canOrder, restaurant.name, restaurant.accepted_payments, cartItems, table, waNumber]);
+  }, [canOrder, restaurant.name, restaurant.accepted_payments, cartItems, orderType, effectiveTable, customerName, customerPhone, deliveryAddress, deliveryNotes, waNumber]);
 
   function add(id: string) {
     setCart((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
@@ -258,6 +307,107 @@ export default function MenuClient({
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 pb-28">
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm font-bold text-gray-900">Order options</div>
+            {table?.trim() ? (
+              <div className="text-xs text-gray-600">Table QR detected</div>
+            ) : null}
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (table?.trim()) return;
+                setOrderType('dine_in');
+              }}
+              disabled={Boolean(table?.trim())}
+              className={
+                orderType === 'dine_in'
+                  ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
+                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
+              }
+            >
+              Dine-in
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderType('delivery')}
+              className={
+                orderType === 'delivery'
+                  ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
+                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
+              }
+            >
+              Delivery
+            </button>
+          </div>
+
+          {orderType === 'dine_in' ? (
+            <div className="mt-4">
+              <label className="block text-xs font-semibold text-gray-700">Table number</label>
+              <p className="mt-1 text-xs text-gray-500">If you scanned a table QR, this is set automatically.</p>
+              <input
+                value={effectiveTable}
+                onChange={(e) => setTableNumber(e.target.value)}
+                readOnly={Boolean(table?.trim())}
+                inputMode="numeric"
+                placeholder="e.g. 5"
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 read-only:bg-gray-50"
+              />
+              {!dineInReady ? (
+                <div className="mt-2 text-xs text-red-700">Table number is required for dine-in orders.</div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700">Name (optional)</label>
+                <input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700">Phone (optional)</label>
+                <input
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="e.g. 07xxxxxxxx"
+                  inputMode="tel"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700">Delivery address (optional)</label>
+                <textarea
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Street, landmark, area"
+                  rows={2}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-gray-700">Notes (optional)</label>
+                <textarea
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Any special instructions"
+                  rows={2}
+                />
+              </div>
+              {!deliveryReady ? (
+                <div className="md:col-span-2 text-xs text-red-700">Add at least one delivery detail to help the restaurant.</div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
         {availableItems.length === 0 ? (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
             <div className="text-sm font-semibold text-gray-900">Menu not available</div>
@@ -453,6 +603,10 @@ export default function MenuClient({
 
           {cartItems.length === 0 ? (
             <div className="mt-2 text-xs text-gray-600">Add items to your cart to order.</div>
+          ) : null}
+
+          {!dineInReady ? (
+            <div className="mt-2 text-xs text-gray-600">Select dine-in table number to order.</div>
           ) : null}
 
           {restaurant.accepted_payments?.length ? (

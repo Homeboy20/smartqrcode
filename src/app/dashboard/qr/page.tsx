@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import QRCode from 'react-qr-code';
 
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
@@ -41,6 +42,9 @@ export default function DashboardQrPage() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [table, setTable] = useState('');
 
+  const [tableStart, setTableStart] = useState('1');
+  const [tableEnd, setTableEnd] = useState('20');
+
   useEffect(() => {
     let cancelled = false;
 
@@ -77,6 +81,27 @@ export default function DashboardQrPage() {
 
     return `${base}?table=${encodeURIComponent(String(n))}`;
   }, [restaurant?.slug, table]);
+
+  const tableUrls = useMemo(() => {
+    if (!restaurant?.slug) return [] as Array<{ table: number; url: string }>;
+    if (typeof window === 'undefined') return [];
+
+    const start = Number(tableStart.trim());
+    const end = Number(tableEnd.trim());
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return [];
+
+    const a = Math.max(1, Math.min(start, end));
+    const b = Math.max(1, Math.max(start, end));
+    const max = Math.min(200, b - a + 1);
+
+    const base = `${window.location.origin}/menu/${restaurant.slug}`;
+    const rows: Array<{ table: number; url: string }> = [];
+    for (let i = 0; i < max; i++) {
+      const n = a + i;
+      rows.push({ table: n, url: `${base}?table=${encodeURIComponent(String(n))}` });
+    }
+    return rows;
+  }, [restaurant?.slug, tableStart, tableEnd]);
 
   async function copyLink() {
     try {
@@ -176,6 +201,66 @@ export default function DashboardQrPage() {
           <div>
             <div className="text-sm font-semibold text-gray-900 mb-2">Generate QR (reuse existing generator)</div>
             <QRCodeGenerator initialUrl={menuUrl} />
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Dine-in table QRs</div>
+                <p className="mt-1 text-xs text-gray-600">Generate one QR per table. Each QR includes the table number identity.</p>
+              </div>
+              <div className="text-xs text-gray-500">Up to 200 tables per batch</div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700">Start</label>
+                <input
+                  value={tableStart}
+                  onChange={(e) => setTableStart(e.target.value)}
+                  inputMode="numeric"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700">End</label>
+                <input
+                  value={tableEnd}
+                  onChange={(e) => setTableEnd(e.target.value)}
+                  inputMode="numeric"
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="20"
+                />
+              </div>
+              <div className="sm:col-span-2 md:col-span-1">
+                <label className="block text-xs font-semibold text-gray-700">Tip</label>
+                <div className="mt-2 text-xs text-gray-600">Print and place on each table.</div>
+              </div>
+            </div>
+
+            {tableUrls.length ? (
+              <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {tableUrls.map((t) => (
+                  <div key={t.table} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div className="text-xs font-bold text-gray-900">Table {t.table}</div>
+                    <div className="mt-2 bg-white rounded-md border border-gray-200 p-2 flex items-center justify-center">
+                      <QRCode value={t.url} size={140} />
+                    </div>
+                    <a
+                      href={t.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block text-center text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      Open link
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 text-xs text-gray-500">Set a valid start/end to generate table QRs.</div>
+            )}
           </div>
         </div>
       ) : null}
