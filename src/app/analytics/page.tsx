@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Bar } from "react-chartjs-2";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
@@ -29,18 +29,19 @@ export default function AnalyticsPage() {
   const { user, loading: authLoading, getAccessToken } = useSupabaseAuth();
   const { canUseFeature, loading: subscriptionLoading } = useSubscription();
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<Record<string, ChartData>>({});
 
-  const fetchSummary = useCallback(async () => {
-    if (!user) return;
+  const analyticsEnabled = !!user && canUseFeature('analytics');
+  const getAccessTokenRef = useRef(getAccessToken);
 
-    if (!canUseFeature('analytics')) {
-      setError('Analytics feature is not available for your current subscription tier.');
-      setSummary(null);
-      return;
-    }
+  useEffect(() => {
+    getAccessTokenRef.current = getAccessToken;
+  }, [getAccessToken]);
+
+  const fetchSummary = useCallback(async () => {
+    if (!user || !analyticsEnabled) return;
 
     setLoading(true);
     setError(null);
@@ -48,7 +49,7 @@ export default function AnalyticsPage() {
       const res = await fetch('/api/analytics/summary', { cache: 'no-store' });
 
       if (res.status === 401) {
-        const token = await getAccessToken();
+        const token = await getAccessTokenRef.current();
         const retry = await fetch('/api/analytics/summary', {
           cache: 'no-store',
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -70,11 +71,28 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, canUseFeature, getAccessToken]);
+  }, [user, analyticsEnabled]);
 
   useEffect(() => {
+    if (authLoading || subscriptionLoading) return;
+
+    // If we can't/shouldn't load analytics, stop showing the initial loader.
+    if (!user) {
+      setLoading(false);
+      setSummary(null);
+      setError(null);
+      return;
+    }
+
+    if (!analyticsEnabled) {
+      setLoading(false);
+      setSummary(null);
+      setError(null);
+      return;
+    }
+
     fetchSummary();
-  }, [fetchSummary]);
+  }, [authLoading, subscriptionLoading, user, analyticsEnabled, fetchSummary]);
 
   const typeChart = useMemo<ChartData | null>(() => {
     if (!summary) return null;
@@ -124,7 +142,7 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!canUseFeature('analytics')) {
+  if (!analyticsEnabled) {
     return (
       <div className="text-center py-10">
         <h2 className="text-2xl font-semibold mb-4">Analytics Unavailable</h2>
