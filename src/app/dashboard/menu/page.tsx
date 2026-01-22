@@ -159,6 +159,12 @@ export default function DashboardMenuPage() {
     }
   }
 
+  function clearImage() {
+    setImageUrl('');
+    setImageFile(null);
+    setStatus({ kind: 'idle' });
+  }
+
   async function submit() {
     setStatus({ kind: 'loading' });
 
@@ -337,31 +343,36 @@ export default function DashboardMenuPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-gray-700">Image URL (optional)</label>
-              <p className="mt-1 text-xs text-gray-600">Paste a public image URL or upload one (Pro/Business required for uploads).</p>
-              <div className="mt-2 flex flex-col md:flex-row gap-3">
+              <label className="block text-xs font-semibold text-gray-700">Item image (optional)</label>
+              <p className="mt-1 text-xs text-gray-600">Upload an image for this item (Pro/Business required for uploads).</p>
+
+              <div className="mt-2 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="https://..."
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  className="text-sm"
                 />
 
                 <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                    className="text-sm"
-                  />
                   <button
                     type="button"
                     onClick={uploadImage}
                     disabled={!imageFile || uploadingImage}
                     className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                   >
-                    {uploadingImage ? 'Uploading…' : 'Upload'}
+                    {uploadingImage ? 'Uploading…' : 'Upload image'}
                   </button>
+
+                  {imageUrl.trim() ? (
+                    <button
+                      type="button"
+                      onClick={clearImage}
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -371,12 +382,14 @@ export default function DashboardMenuPage() {
                   <img
                     src={imageUrl}
                     alt="Menu item"
-                    className="mt-2 h-24 w-24 rounded-md object-cover border border-gray-200"
+                    className="mt-2 h-24 w-24 rounded-md object-cover border border-gray-200 bg-white"
                     loading="lazy"
-                    onError={() => setStatus({ kind: 'error', message: 'Image preview failed to load (check URL)' })}
+                    onError={() => setStatus({ kind: 'error', message: 'Image preview failed to load' })}
                   />
                 </div>
-              ) : null}
+              ) : (
+                <div className="mt-2 text-xs text-gray-500">No image uploaded yet.</div>
+              )}
             </div>
             <div className="flex items-end gap-3">
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">

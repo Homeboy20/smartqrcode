@@ -34,6 +34,15 @@ function formatTzs(n: number) {
   return `TZS ${Math.round(n).toLocaleString()}`;
 }
 
+function slugifyCategory(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function buildWhatsappMessage(opts: {
   restaurantName: string;
   items: Array<{ name: string; qty: number; price: number }>;
@@ -94,6 +103,13 @@ export default function MenuClient({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [availableItems]);
 
+  function scrollToCategory(category: string) {
+    const id = `cat-${slugifyCategory(category || 'Other')}`;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   const cartItems = useMemo(() => {
     const byId = new Map(items.map((i) => [i.id, i] as const));
     const rows: Array<{ id: string; name: string; qty: number; price: number }> = [];
@@ -147,12 +163,13 @@ export default function MenuClient({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-xl font-extrabold text-gray-900 truncate">{restaurant.name}</h1>
-              <p className="mt-1 text-xs text-gray-600">Digital menu · Order via WhatsApp</p>
+              <p className="mt-1 text-xs text-gray-600">Tap items to add to cart · WhatsApp ordering</p>
+              {table?.trim() ? <div className="mt-1 text-[11px] text-gray-500">Table: {table.trim()}</div> : null}
             </div>
             {totalQty > 0 ? (
               <div className="text-right">
@@ -162,6 +179,23 @@ export default function MenuClient({
             ) : null}
           </div>
         </div>
+
+        {grouped.length > 1 ? (
+          <div className="max-w-3xl mx-auto px-4 pb-3">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {grouped.map(([category]) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => scrollToCategory(category)}
+                  className="flex-shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 pb-28">
@@ -173,7 +207,11 @@ export default function MenuClient({
         ) : (
           <div className="space-y-6">
             {grouped.map(([category, catItems]) => (
-              <section key={category} className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+              <section
+                key={category}
+                id={`cat-${slugifyCategory(category)}`}
+                className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm"
+              >
                 <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                   <h2 className="text-sm font-bold text-gray-900">{category}</h2>
                 </div>
@@ -189,21 +227,23 @@ export default function MenuClient({
                             <img
                               src={item.image_url}
                               alt={item.name}
-                              className="h-16 w-16 rounded-md object-cover border border-gray-200 bg-white flex-shrink-0"
+                              className="h-16 w-16 rounded-lg object-cover border border-gray-200 bg-white flex-shrink-0"
                               loading="lazy"
                             />
                           ) : null}
 
                           <div className="min-w-0">
-                          <div className="font-semibold text-gray-900">{item.name}</div>
-                          {item.description ? <div className="mt-1 text-sm text-gray-600">{item.description}</div> : null}
-                          <div className="mt-2 text-sm font-bold text-gray-900">{formatTzs(price)}</div>
+                            <div className="font-semibold text-gray-900 leading-snug">{item.name}</div>
+                            {item.description ? (
+                              <div className="mt-1 text-sm text-gray-600 leading-snug">{item.description}</div>
+                            ) : null}
+                            <div className="mt-2 text-sm font-extrabold text-gray-900">{formatTzs(price)}</div>
                           </div>
                         </div>
 
                         <div className="flex flex-col items-end gap-2 flex-shrink-0">
                           {qty > 0 ? (
-                            <div className="inline-flex items-center rounded-md border border-gray-200 bg-white">
+                            <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
                               <button
                                 type="button"
                                 onClick={() => dec(item.id)}
@@ -224,7 +264,7 @@ export default function MenuClient({
                             <button
                               type="button"
                               onClick={() => add(item.id)}
-                              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                             >
                               Add
                             </button>
@@ -253,7 +293,7 @@ export default function MenuClient({
                 <button
                   type="button"
                   onClick={clearCart}
-                  className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                 >
                   Clear
                 </button>
@@ -266,8 +306,8 @@ export default function MenuClient({
                 aria-disabled={!canOrder}
                 className={
                   canOrder
-                    ? 'inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700'
-                    : 'inline-flex items-center justify-center rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 cursor-not-allowed'
+                    ? 'inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700'
+                    : 'inline-flex items-center justify-center rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 cursor-not-allowed'
                 }
                 onClick={(e) => {
                   if (!canOrder) e.preventDefault();
