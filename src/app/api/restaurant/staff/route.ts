@@ -93,12 +93,18 @@ export async function POST(request: Request) {
     const email = String(body?.email || '').trim().toLowerCase();
     const displayName = String(body?.displayName || '').trim();
     const role = normalizeRole(body?.role);
+    const password = typeof body?.password === 'string' ? body.password : '';
+    const passwordTrimmed = password.trim();
 
     if (!email || !email.includes('@')) {
       return json(400, { error: 'Valid email is required' });
     }
     if (!role) {
       return json(400, { error: 'Valid role is required (manager|kitchen|waiter)' });
+    }
+
+    if (passwordTrimmed && passwordTrimmed.length < 8) {
+      return json(400, { error: 'Password must be at least 8 characters' });
     }
 
     // Only the owner can create/promote managers.
@@ -117,21 +123,41 @@ export async function POST(request: Request) {
 
     let userId: string | null = existingUser?.id || null;
     let invited = false;
+    let createdWithPassword = false;
 
     if (!userId) {
-      // Invite user (creates auth user; public.users trigger should provision row)
-      const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          display_name: displayName || '',
-        },
-      });
+      if (passwordTrimmed) {
+        // Create a password-based user so they can sign in via /login immediately.
+        const { data: created, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password: passwordTrimmed,
+          email_confirm: true,
+          user_metadata: {
+            display_name: displayName || '',
+          },
+        });
 
-      if (inviteErr || !inviteData?.user?.id) {
-        return json(500, { error: inviteErr?.message || 'Failed to invite user' });
+        if (createErr || !created?.user?.id) {
+          return json(500, { error: createErr?.message || 'Failed to create user' });
+        }
+
+        userId = created.user.id;
+        createdWithPassword = true;
+      } else {
+        // Invite user (email link). They can set a password later.
+        const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+          data: {
+            display_name: displayName || '',
+          },
+        });
+
+        if (inviteErr || !inviteData?.user?.id) {
+          return json(500, { error: inviteErr?.message || 'Failed to invite user' });
+        }
+
+        userId = inviteData.user.id;
+        invited = true;
       }
-
-      userId = inviteData.user.id;
-      invited = true;
     }
 
     const { data: staffRow, error: staffErr } = await admin
@@ -155,6 +181,7 @@ export async function POST(request: Request) {
     return json(200, {
       ok: true,
       invited,
+      createdWithPassword,
       staff: {
         id: staffRow.id,
         userId: staffRow.user_id,

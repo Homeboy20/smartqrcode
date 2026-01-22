@@ -36,6 +36,8 @@ export default function DashboardStaffPage() {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<StaffRole>('waiter');
+  const [usePassword, setUsePassword] = useState(true);
+  const [password, setPassword] = useState('');
 
   const roleOptions = useMemo(() => {
     const base: Array<{ value: StaffRole; label: string }> = [
@@ -102,6 +104,7 @@ export default function DashboardStaffPage() {
           email,
           displayName,
           role,
+          password: usePassword ? password : '',
         }),
       });
 
@@ -117,16 +120,31 @@ export default function DashboardStaffPage() {
 
       setEmail('');
       setDisplayName('');
+      setPassword('');
       setRole(isOwner ? 'waiter' : 'waiter');
       setStatus({
         kind: 'success',
-        message: body?.invited
-          ? 'Invite sent and staff added.'
-          : 'Staff added (existing user).',
+        message: body?.createdWithPassword
+          ? 'Staff user created with password. They can log in at /login.'
+          : body?.invited
+            ? 'Invite email sent and staff added.'
+            : 'Staff added (existing user).',
       });
     } catch (e: any) {
       setStatus({ kind: 'error', message: String(e?.message || 'Failed to add staff') });
     }
+  }
+
+  function generatePassword() {
+    // Simple client-side generator (12+ chars). Manager can copy once.
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    const length = 14;
+    let out = '';
+    for (let i = 0; i < length; i++) {
+      out += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    setPassword(out);
+    setUsePassword(true);
   }
 
   return (
@@ -197,7 +215,7 @@ export default function DashboardStaffPage() {
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-sm font-semibold text-gray-900">Add staff</div>
           <p className="mt-1 text-sm text-gray-600">
-            Invite by email. The user will be added to your restaurant.
+            Create a staff account so they can sign in to this app.
           </p>
 
           {!canManageStaff ? (
@@ -245,10 +263,49 @@ export default function DashboardStaffPage() {
               ) : null}
             </div>
 
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <input
+                  type="checkbox"
+                  checked={usePassword}
+                  onChange={(e) => setUsePassword(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Set a password (recommended)
+              </label>
+              <div className="mt-2 text-xs text-gray-600">
+                Your login page uses email + password. If you don’t set a password, we’ll send an invite email instead.
+              </div>
+
+              {usePassword ? (
+                <div className="mt-3">
+                  <label className="block text-sm font-semibold text-gray-900">Temporary password</label>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Min 8 characters"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={generatePassword}
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-600">
+                    Share this password securely. Staff can change it later using password reset.
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <button
               type="button"
               onClick={inviteStaff}
-              disabled={!canManageStaff || status.kind === 'loading'}
+              disabled={!canManageStaff || status.kind === 'loading' || (usePassword && password.trim().length > 0 && password.trim().length < 8)}
               className="inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {status.kind === 'loading' ? 'Working…' : 'Invite / Add'}
