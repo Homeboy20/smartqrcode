@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 import { createServerClient } from '@/lib/supabase/server';
 import { hasFeatureAccess } from '@/lib/subscription';
 import type { SubscriptionTier } from '@/lib/subscription';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function json(status: number, body: any) {
   return NextResponse.json(body, { status });
@@ -16,6 +20,14 @@ function sanitizeFilename(name: string) {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 120);
+}
+
+function safeRandomId() {
+  try {
+    return typeof randomUUID === 'function' ? randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -65,11 +77,14 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const file = form.get('file');
 
-    if (!(file instanceof File)) {
+    if (!file || typeof (file as any).arrayBuffer !== 'function') {
       return json(400, { error: 'Missing file' });
     }
 
-    const contentType = file.type || '';
+    const fileAny: any = file;
+    const originalName = typeof fileAny?.name === 'string' ? fileAny.name : '';
+    const size = typeof fileAny?.size === 'number' ? fileAny.size : 0;
+    const contentType = typeof fileAny?.type === 'string' ? fileAny.type : '';
     const isPdf = contentType === 'application/pdf';
     const isImage = contentType.startsWith('image/');
 
@@ -78,16 +93,16 @@ export async function POST(req: NextRequest) {
     }
 
     const maxBytes = 15 * 1024 * 1024; // 15MB
-    if (file.size > maxBytes) {
+    if (size > maxBytes) {
       return json(400, { error: 'File is too large (max 15MB).' });
     }
 
     const bucket = process.env.NEXT_PUBLIC_MENU_UPLOADS_BUCKET || 'menu-uploads';
 
-    const safeName = sanitizeFilename(file.name || (isPdf ? 'menu.pdf' : 'image'));
-    const objectPath = `menus/${user.id}/${crypto.randomUUID()}-${safeName}`;
+    const safeName = sanitizeFilename(originalName || (isPdf ? 'menu.pdf' : 'image'));
+    const objectPath = `menus/${user.id}/${safeRandomId()}-${safeName}`;
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    const bytes = Buffer.from(await fileAny.arrayBuffer());
 
     const { error: uploadError } = await adminClient.storage
       .from(bucket)
@@ -113,6 +128,14 @@ export async function POST(req: NextRequest) {
       contentType,
     });
   } catch (e: any) {
-    return json(500, { error: e?.message || 'Upload failed' });
+    console.error('Upload /api/uploads/menu failed', {
+      message: e?.message,
+      name: e?.name,
+      stack: e?.stack,
+    });
+    return json(500, {
+      error: 'Upload failed',
+      details: String(e?.message || 'Internal Server Error'),
+    });
   }
 }
