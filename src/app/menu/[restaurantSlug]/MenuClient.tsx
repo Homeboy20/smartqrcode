@@ -105,6 +105,7 @@ export default function MenuClient({
   items: MenuItem[];
   table?: string;
 }) {
+  const tableFromQr = Boolean(table?.trim());
   const [layout, setLayout] = useState<'list' | 'grid'>(() => {
     if (typeof window === 'undefined') return 'list';
     const v = window.localStorage.getItem('smartqrcode_menu_layout');
@@ -113,11 +114,10 @@ export default function MenuClient({
   const [cart, setCart] = useState<Record<string, number>>({});
 
   const [orderType, setOrderType] = useState<'dine_in' | 'delivery'>(() => {
-    const hasTable = Boolean(table?.trim());
-    return hasTable ? 'dine_in' : 'delivery';
+    return tableFromQr ? 'dine_in' : 'delivery';
   });
 
-  const [tableNumber, setTableNumber] = useState<string>(() => (table?.trim() ? table.trim() : ''));
+  const [tableNumber, setTableNumber] = useState<string>(() => (tableFromQr ? table!.trim() : ''));
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -125,11 +125,11 @@ export default function MenuClient({
 
   // If the scanned QR includes ?table=, keep dine-in table locked to that identity.
   useEffect(() => {
-    if (table?.trim()) {
+    if (tableFromQr) {
       setOrderType('dine_in');
       setTableNumber(table.trim());
     }
-  }, [table]);
+  }, [table, tableFromQr]);
 
   useEffect(() => {
     try {
@@ -177,7 +177,7 @@ export default function MenuClient({
 
   const waNumber = sanitizeWaNumber(restaurant.whatsapp_number || '');
 
-  const effectiveTable = table?.trim() ? table.trim() : tableNumber.trim();
+  const effectiveTable = tableFromQr ? table!.trim() : tableNumber.trim();
   const dineInReady = orderType !== 'dine_in' || Boolean(effectiveTable);
   const deliveryReady =
     orderType !== 'delivery' ||
@@ -310,7 +310,7 @@ export default function MenuClient({
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-sm font-bold text-gray-900">Order options</div>
-            {table?.trim() ? (
+            {tableFromQr ? (
               <div className="text-xs text-gray-600">Table QR detected</div>
             ) : null}
           </div>
@@ -319,10 +319,10 @@ export default function MenuClient({
             <button
               type="button"
               onClick={() => {
-                if (table?.trim()) return;
+                if (tableFromQr) return;
                 setOrderType('dine_in');
               }}
-              disabled={Boolean(table?.trim())}
+              disabled={tableFromQr}
               className={
                 orderType === 'dine_in'
                   ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
@@ -348,14 +348,20 @@ export default function MenuClient({
             <div className="mt-4">
               <label className="block text-xs font-semibold text-gray-700">Table number</label>
               <p className="mt-1 text-xs text-gray-500">If you scanned a table QR, this is set automatically.</p>
-              <input
-                value={effectiveTable}
-                onChange={(e) => setTableNumber(e.target.value)}
-                readOnly={Boolean(table?.trim())}
-                inputMode="numeric"
-                placeholder="e.g. 5"
-                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 read-only:bg-gray-50"
-              />
+              {tableFromQr ? (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900">
+                  Table {table!.trim()}
+                  <span className="text-xs font-medium text-gray-500">(from QR)</span>
+                </div>
+              ) : (
+                <input
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  inputMode="numeric"
+                  placeholder="e.g. 5"
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              )}
               {!dineInReady ? (
                 <div className="mt-2 text-xs text-red-700">Table number is required for dine-in orders.</div>
               ) : null}
