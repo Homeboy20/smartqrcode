@@ -78,6 +78,7 @@ export default function DashboardShell({
           <NavLink href="/dashboard" label="Overview" />
           <NavLink href="/dashboard/menu" label="Menu" />
           <NavLink href="/dashboard/qr" label="QR" />
+          <NavLink href="/dashboard/staff" label="Staff" />
           <NavLink href="/dashboard/settings" label="Settings" />
         </div>
       </div>
