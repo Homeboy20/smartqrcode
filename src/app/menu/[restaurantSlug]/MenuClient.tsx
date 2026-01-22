@@ -8,6 +8,9 @@ type Restaurant = {
   slug: string;
   whatsapp_number: string;
   accepted_payments: string[];
+  logo_url?: string | null;
+  brand_primary_color?: string;
+  whatsapp_order_note?: string | null;
 };
 
 type MenuItem = {
@@ -53,44 +56,55 @@ function buildWhatsappMessage(opts: {
   customerPhone?: string;
   deliveryAddress?: string;
   deliveryNotes?: string;
+  note?: string;
 }) {
   const lines: string[] = [];
 
-  lines.push(`Hello ${opts.restaurantName}`);
-  lines.push('');
+  const ts = new Date();
+  const ref = `${ts.getFullYear()}${String(ts.getMonth() + 1).padStart(2, '0')}${String(ts.getDate()).padStart(2, '0')}-${String(
+    ts.getHours()
+  ).padStart(2, '0')}${String(ts.getMinutes()).padStart(2, '0')}`;
 
+  lines.push(`Hello ${opts.restaurantName}`);
+  lines.push(`Order ref: ${ref}`);
   lines.push(`Order type: ${opts.orderType === 'dine_in' ? 'Dine-in' : 'Delivery'}`);
-  lines.push('');
+  lines.push('---');
 
   if (opts.orderType === 'dine_in') {
     if (opts.table) {
       lines.push(`Table: ${opts.table}`);
-      lines.push('');
+      lines.push('---');
     }
   } else {
-    if (opts.customerName) lines.push(`Name: ${opts.customerName}`);
+    if (opts.customerName) lines.push(`Customer: ${opts.customerName}`);
     if (opts.customerPhone) lines.push(`Phone: ${opts.customerPhone}`);
     if (opts.deliveryAddress) lines.push(`Address: ${opts.deliveryAddress}`);
     if (opts.deliveryNotes) lines.push(`Notes: ${opts.deliveryNotes}`);
-    if (opts.customerName || opts.customerPhone || opts.deliveryAddress || opts.deliveryNotes) lines.push('');
+    if (opts.customerName || opts.customerPhone || opts.deliveryAddress || opts.deliveryNotes) lines.push('---');
   }
 
-  lines.push('New Order:');
+  lines.push('Items:');
 
   let total = 0;
   for (const item of opts.items) {
     const rowTotal = item.price * item.qty;
     total += rowTotal;
-    lines.push(`• ${item.qty}x ${item.name} – ${formatTzs(rowTotal)}`);
+    lines.push(`• ${item.qty}x ${item.name} @ ${formatTzs(item.price)} = ${formatTzs(rowTotal)}`);
   }
 
-  lines.push('');
+  lines.push('---');
   lines.push(`Total: ${formatTzs(total)}`);
 
   const payments = (opts.acceptedPayments || []).filter(Boolean);
   if (payments.length) {
-    lines.push('Accepted Payments:');
+    lines.push('Accepted payment methods:');
     for (const p of payments) lines.push(`• ${p}`);
+  }
+
+  const note = (opts.note || '').trim();
+  if (note) {
+    lines.push('---');
+    lines.push(note);
   }
 
   return lines.join('\n');
@@ -123,11 +137,16 @@ export default function MenuClient({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
 
+  const brandColor = useMemo(() => {
+    const raw = String(restaurant.brand_primary_color || '').trim();
+    return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(raw) ? raw : '#111827';
+  }, [restaurant.brand_primary_color]);
+
   // If the scanned QR includes ?table=, keep dine-in table locked to that identity.
   useEffect(() => {
     if (tableFromQr) {
       setOrderType('dine_in');
-      setTableNumber(table.trim());
+      setTableNumber((table || '').trim());
     }
   }, [table, tableFromQr]);
 
@@ -200,6 +219,7 @@ export default function MenuClient({
       customerPhone: orderType === 'delivery' ? customerPhone.trim() || undefined : undefined,
       deliveryAddress: orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
       deliveryNotes: orderType === 'delivery' ? deliveryNotes.trim() || undefined : undefined,
+      note: restaurant.whatsapp_order_note ? String(restaurant.whatsapp_order_note) : undefined,
     });
 
     return `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
@@ -229,7 +249,17 @@ export default function MenuClient({
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="text-xl font-extrabold text-gray-900 truncate">{restaurant.name}</h1>
+              <div className="flex items-center gap-3">
+                {restaurant.logo_url ? (
+                  <img
+                    src={restaurant.logo_url}
+                    alt={`${restaurant.name} logo`}
+                    className="h-10 w-10 rounded-lg border border-gray-200 object-cover bg-white flex-shrink-0"
+                    loading="lazy"
+                  />
+                ) : null}
+                <h1 className="text-xl font-extrabold text-gray-900 truncate">{restaurant.name}</h1>
+              </div>
               <p className="mt-1 text-xs text-gray-600">Tap items to add to cart · WhatsApp ordering</p>
               {table?.trim() ? <div className="mt-1 text-[11px] text-gray-500">Table: {table.trim()}</div> : null}
             </div>
@@ -270,6 +300,7 @@ export default function MenuClient({
                     ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
                     : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
                 }
+                style={layout === 'list' ? { backgroundColor: brandColor } : undefined}
               >
                 List
               </button>
@@ -281,6 +312,7 @@ export default function MenuClient({
                     ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
                     : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
                 }
+                style={layout === 'grid' ? { backgroundColor: brandColor } : undefined}
               >
                 Grid
               </button>
@@ -328,6 +360,7 @@ export default function MenuClient({
                   ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
                   : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
               }
+                style={orderType === 'dine_in' ? { backgroundColor: brandColor } : undefined}
             >
               Dine-in
             </button>
@@ -343,6 +376,7 @@ export default function MenuClient({
                   ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
                   : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
               }
+                style={orderType === 'delivery' ? { backgroundColor: brandColor } : undefined}
             >
               Delivery
             </button>
@@ -488,7 +522,8 @@ export default function MenuClient({
                               <button
                                 type="button"
                                 onClick={() => add(item.id)}
-                                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                                style={{ backgroundColor: brandColor }}
                               >
                                 Add
                               </button>
@@ -554,7 +589,8 @@ export default function MenuClient({
                                   <button
                                     type="button"
                                     onClick={() => add(item.id)}
-                                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                                    className="inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                                    style={{ backgroundColor: brandColor }}
                                   >
                                     Add
                                   </button>

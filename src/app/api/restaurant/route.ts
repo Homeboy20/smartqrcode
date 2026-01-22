@@ -15,9 +15,19 @@ type RestaurantRow = {
   whatsapp_number: string;
   accepted_payments: string[];
   enable_table_qr: boolean;
+  logo_url: string | null;
+  brand_primary_color: string;
+  whatsapp_order_note: string | null;
   created_at: string;
   updated_at: string;
 };
+
+function normalizeHexColor(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (!v) return null;
+  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(v) ? v : null;
+}
 
 function normalizePayments(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -49,7 +59,9 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('restaurants')
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
+      .select(
+        'id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,logo_url,brand_primary_color,whatsapp_order_note,created_at,updated_at'
+      )
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -73,6 +85,13 @@ export async function POST(request: NextRequest) {
     const whatsappNumber = typeof body?.whatsappNumber === 'string' ? body.whatsappNumber.trim() : '';
     const acceptedPayments = normalizePayments(body?.acceptedPayments);
     const enableTableQr = typeof body?.enableTableQr === 'boolean' ? body.enableTableQr : false;
+    const logoUrl = typeof body?.logoUrl === 'string' ? body.logoUrl.trim() : '';
+    const brandPrimaryColor = normalizeHexColor(body?.brandPrimaryColor) ?? '#111827';
+    const whatsappOrderNote = typeof body?.whatsappOrderNote === 'string' ? body.whatsappOrderNote.trim() : '';
+
+    if (body?.brandPrimaryColor !== undefined && !normalizeHexColor(body?.brandPrimaryColor)) {
+      return badRequest('Brand color must be a hex value like #111827');
+    }
 
     if (!name) return badRequest('Restaurant name is required');
     if (!whatsappNumber) return badRequest('WhatsApp phone number is required');
@@ -110,8 +129,13 @@ export async function POST(request: NextRequest) {
         whatsapp_number: whatsappNumber,
         accepted_payments: acceptedPayments,
         enable_table_qr: enableTableQr,
+        logo_url: logoUrl || null,
+        brand_primary_color: brandPrimaryColor,
+        whatsapp_order_note: whatsappOrderNote || null,
       })
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
+      .select(
+        'id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,logo_url,brand_primary_color,whatsapp_order_note,created_at,updated_at'
+      )
       .single();
 
     if (error || !created) {
@@ -137,6 +161,14 @@ export async function PATCH(request: NextRequest) {
     const whatsappNumber = typeof body?.whatsappNumber === 'string' ? body.whatsappNumber.trim() : undefined;
     const acceptedPayments = body?.acceptedPayments !== undefined ? normalizePayments(body.acceptedPayments) : undefined;
     const enableTableQr = typeof body?.enableTableQr === 'boolean' ? body.enableTableQr : undefined;
+    const logoUrl = body?.logoUrl !== undefined ? (typeof body.logoUrl === 'string' ? body.logoUrl.trim() : '') : undefined;
+    const brandPrimaryColor = body?.brandPrimaryColor !== undefined ? normalizeHexColor(body.brandPrimaryColor) : undefined;
+    const whatsappOrderNote =
+      body?.whatsappOrderNote !== undefined ? (typeof body.whatsappOrderNote === 'string' ? body.whatsappOrderNote.trim() : '') : undefined;
+
+    if (body?.brandPrimaryColor !== undefined && !brandPrimaryColor) {
+      return badRequest('Brand color must be a hex value like #111827');
+    }
 
     if (name !== undefined && !name) return badRequest('Restaurant name is required');
     if (whatsappNumber !== undefined && !whatsappNumber) return badRequest('WhatsApp phone number is required');
@@ -149,12 +181,17 @@ export async function PATCH(request: NextRequest) {
     if (whatsappNumber !== undefined) patch.whatsapp_number = whatsappNumber;
     if (acceptedPayments !== undefined) patch.accepted_payments = acceptedPayments;
     if (enableTableQr !== undefined) patch.enable_table_qr = enableTableQr;
+    if (logoUrl !== undefined) patch.logo_url = logoUrl || null;
+    if (brandPrimaryColor !== undefined) patch.brand_primary_color = brandPrimaryColor;
+    if (whatsappOrderNote !== undefined) patch.whatsapp_order_note = whatsappOrderNote || null;
 
     const { data: updated, error } = await supabase
       .from('restaurants')
       .update(patch)
       .eq('user_id', userId)
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
+      .select(
+        'id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,logo_url,brand_primary_color,whatsapp_order_note,created_at,updated_at'
+      )
       .maybeSingle();
 
     if (error) {

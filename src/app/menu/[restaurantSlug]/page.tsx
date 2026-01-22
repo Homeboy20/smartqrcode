@@ -31,7 +31,7 @@ export default async function MenuPage({
   searchParams,
 }: {
   params: { restaurantSlug: string };
-  searchParams?: { table?: string };
+  searchParams?: { table?: string | string[] };
 }) {
   const rawSlug = params.restaurantSlug;
   const slug = (rawSlug ? decodeURIComponent(rawSlug) : '').trim().toLowerCase();
@@ -60,7 +60,7 @@ export default async function MenuPage({
 
   const { data: restaurant, error: rErr } = await supabase
     .from('restaurants')
-    .select('id,name,slug,whatsapp_number,accepted_payments,enable_table_qr')
+    .select('id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,logo_url,brand_primary_color,whatsapp_order_note')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -94,8 +94,21 @@ export default async function MenuPage({
     );
   }
 
-  const tableParam = typeof searchParams?.table === 'string' ? searchParams?.table : '';
-  const table = restaurant?.enable_table_qr ? tableParam : '';
+  const rawTableParam = Array.isArray(searchParams?.table)
+    ? searchParams?.table[0]
+    : typeof searchParams?.table === 'string'
+      ? searchParams.table
+      : '';
+
+  const normalizedTable = (() => {
+    const v = String(rawTableParam || '').trim();
+    if (!v) return '';
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    return String(Math.trunc(n));
+  })();
+
+  const table = restaurant?.enable_table_qr ? normalizedTable : '';
 
   return (
     <MenuClient

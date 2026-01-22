@@ -12,6 +12,9 @@ type Restaurant = {
   whatsapp_number: string;
   accepted_payments: string[];
   enable_table_qr?: boolean;
+  logo_url?: string | null;
+  brand_primary_color?: string;
+  whatsapp_order_note?: string | null;
 };
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'success'; message: string };
@@ -57,6 +60,12 @@ export default function DashboardSettingsPage() {
   const [acceptedPaymentsText, setAcceptedPaymentsText] = useState('');
   const [enableTableQr, setEnableTableQr] = useState(false);
 
+  const [logoUrl, setLogoUrl] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState('#111827');
+  const [whatsappOrderNote, setWhatsappOrderNote] = useState('');
+
   useEffect(() => {
     let cancelled = false;
 
@@ -79,6 +88,9 @@ export default function DashboardSettingsPage() {
           setWhatsappNumber(r.whatsapp_number);
           setAcceptedPaymentsText(paymentsToString(r.accepted_payments || []));
           setEnableTableQr(Boolean(r.enable_table_qr));
+          setLogoUrl(String(r.logo_url || ''));
+          setBrandPrimaryColor(String(r.brand_primary_color || '#111827'));
+          setWhatsappOrderNote(String(r.whatsapp_order_note || ''));
         }
       } catch (e: any) {
         if (!cancelled) setStatus({ kind: 'error', message: e?.message || 'Failed to load restaurant' });
@@ -100,6 +112,47 @@ export default function DashboardSettingsPage() {
     return `${window.location.origin}/menu/${slug}`;
   }, [slug]);
 
+  async function uploadLogo() {
+    if (!logoFile) {
+      setStatus({ kind: 'error', message: 'Choose a logo image first' });
+      return;
+    }
+
+    setUploadingLogo(true);
+    setStatus({ kind: 'loading' });
+
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Please log in again');
+
+      const fd = new FormData();
+      fd.append('file', logoFile);
+
+      const res = await fetch('/api/uploads/menu', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || json?.details || `Upload failed (${res.status})`);
+
+      const url = String((json as any)?.url || '').trim();
+      if (!url) throw new Error('Upload succeeded but URL is missing');
+
+      setLogoUrl(url);
+      setLogoFile(null);
+      setStatus({ kind: 'success', message: 'Logo uploaded (remember to Save changes)' });
+      setTimeout(() => setStatus({ kind: 'idle' }), 1500);
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Upload failed' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
   async function save() {
     setStatus({ kind: 'loading' });
 
@@ -109,6 +162,9 @@ export default function DashboardSettingsPage() {
         whatsappNumber,
         acceptedPayments: parsePayments(acceptedPaymentsText),
         enableTableQr,
+        logoUrl: logoUrl.trim() ? logoUrl.trim() : null,
+        brandPrimaryColor,
+        whatsappOrderNote: whatsappOrderNote.trim() ? whatsappOrderNote.trim() : null,
       };
 
       const res = await fetchWithAuthFallback(getAccessToken, '/api/restaurant', {
@@ -131,6 +187,9 @@ export default function DashboardSettingsPage() {
         setWhatsappNumber(r.whatsapp_number);
         setAcceptedPaymentsText(paymentsToString(r.accepted_payments || []));
         setEnableTableQr(Boolean(r.enable_table_qr));
+        setLogoUrl(String(r.logo_url || ''));
+        setBrandPrimaryColor(String(r.brand_primary_color || '#111827'));
+        setWhatsappOrderNote(String(r.whatsapp_order_note || ''));
       }
     } catch (e: any) {
       setStatus({ kind: 'error', message: e?.message || 'Save failed' });
@@ -172,6 +231,10 @@ export default function DashboardSettingsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5">
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+            Tip: Changes apply after you click <span className="font-semibold">{restaurant ? 'Save changes' : 'Create restaurant'}</span>.
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-gray-900">Restaurant name</label>
             <input
@@ -234,6 +297,80 @@ export default function DashboardSettingsPage() {
             {!restaurant ? (
               <div className="mt-2 text-xs text-amber-800">Create your restaurant first to enable table QRs.</div>
             ) : null}
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">Branding</div>
+                <p className="mt-1 text-xs text-gray-600">Customize how your public menu looks.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={brandPrimaryColor}
+                  onChange={(e) => setBrandPrimaryColor(e.target.value)}
+                  className="h-9 w-10 rounded border border-gray-300 bg-white"
+                  title="Brand primary color"
+                />
+                <input
+                  value={brandPrimaryColor}
+                  onChange={(e) => setBrandPrimaryColor(e.target.value)}
+                  className="h-9 w-28 rounded-md border border-gray-300 px-3 text-sm"
+                  placeholder="#111827"
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900">Logo</label>
+                <p className="mt-1 text-xs text-gray-600">Optional. Upload a square logo (PNG/JPG).</p>
+
+                {logoUrl ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <img src={logoUrl} alt="Restaurant logo" className="h-12 w-12 rounded-lg border border-gray-200 object-cover bg-white" />
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl('')}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                    className="block w-full text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={uploadLogo}
+                    disabled={!restaurant || uploadingLogo || !logoFile}
+                    className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {uploadingLogo ? 'Uploading…' : 'Upload'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900">WhatsApp order note</label>
+                <p className="mt-1 text-xs text-gray-600">Optional. This will be appended to every order message.</p>
+                <textarea
+                  value={whatsappOrderNote}
+                  onChange={(e) => setWhatsappOrderNote(e.target.value)}
+                  rows={4}
+                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="e.g. Please confirm total and estimated time before preparing."
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
