@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import SubscriptionInfo from '@/components/SubscriptionInfo';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
 
 type RecentCode = {
   id: string;
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, getAccessToken } = useSupabaseAuth();
   const { subscriptionTier, loading, featuresUsage, limits } = useSubscription();
+  const { loading: accessLoading, access } = useRestaurantAccess();
 
   const [recentCodes, setRecentCodes] = useState<RecentCode[] | null>(null);
   const [recentLoading, setRecentLoading] = useState(false);
@@ -38,6 +40,13 @@ export default function DashboardPage() {
       router.replace('/generator');
     }
   }, [router]);
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (access && !access.isOwner) {
+      router.replace('/dashboard/orders');
+    }
+  }, [accessLoading, access, router]);
 
   useEffect(() => {
     if (!user) {

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
 
-type StaffRole = 'manager' | 'kitchen' | 'waiter';
+type StaffRole = 'manager' | 'kitchen' | 'waiter' | 'delivery';
 
 type StaffRow = {
   id: string;
@@ -23,7 +25,9 @@ type Status =
   | { kind: 'error'; message: string };
 
 export default function DashboardStaffPage() {
+  const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
+  const { loading: accessLoading, access } = useRestaurantAccess();
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -43,6 +47,7 @@ export default function DashboardStaffPage() {
     const base: Array<{ value: StaffRole; label: string }> = [
       { value: 'waiter', label: 'Waiter' },
       { value: 'kitchen', label: 'Kitchen' },
+      { value: 'delivery', label: 'Delivery' },
     ];
 
     if (isOwner) {
@@ -51,6 +56,16 @@ export default function DashboardStaffPage() {
 
     return base;
   }, [isOwner]);
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (!access) return;
+
+    // Owner and managers can see Staff management.
+    if (!access.isOwner && access.staffRole !== 'manager') {
+      router.replace('/dashboard/orders');
+    }
+  }, [accessLoading, access, router]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server';
 import { verifyUserAccess } from '@/lib/supabase/auth';
 
-export type RestaurantStaffRole = 'manager' | 'kitchen' | 'waiter';
+export type RestaurantStaffRole = 'manager' | 'kitchen' | 'waiter' | 'delivery';
 
 export type RestaurantAccess = {
   userId: string;

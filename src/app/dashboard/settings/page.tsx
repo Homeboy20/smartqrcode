@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
 
 type Restaurant = {
   id: string;
@@ -49,7 +51,9 @@ function parsePayments(value: string) {
 }
 
 export default function DashboardSettingsPage() {
+  const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
+  const { loading: accessLoading, access } = useRestaurantAccess();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +69,13 @@ export default function DashboardSettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [brandPrimaryColor, setBrandPrimaryColor] = useState('#111827');
   const [whatsappOrderNote, setWhatsappOrderNote] = useState('');
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (access && !access.isOwner) {
+      router.replace('/dashboard/orders');
+    }
+  }, [accessLoading, access, router]);
 
   useEffect(() => {
     let cancelled = false;

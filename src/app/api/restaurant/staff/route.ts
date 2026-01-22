@@ -10,7 +10,7 @@ function json(status: number, body: any) {
 }
 
 function normalizeRole(value: any): RestaurantStaffRole | null {
-  if (value === 'manager' || value === 'kitchen' || value === 'waiter') return value;
+  if (value === 'manager' || value === 'kitchen' || value === 'waiter' || value === 'delivery') return value;
   return null;
 }
 
@@ -21,15 +21,29 @@ export async function GET(request: Request) {
     const admin = createServerClient();
     if (!admin) return json(500, { error: 'Database not configured' });
 
+    const url = new URL(request.url);
+    const assignableOnly = url.searchParams.get('assignable') === '1';
+
     const staffQuery = admin
       .from('restaurant_staff')
       .select('id, user_id, role, created_at')
       .eq('restaurant_id', access.restaurantId)
       .order('created_at', { ascending: false });
 
-    const { data: staff, error: staffErr } = access.canManageStaff
-      ? await staffQuery
-      : await staffQuery.eq('user_id', access.userId);
+    let staff: any[] | null = null;
+    let staffErr: any = null;
+
+    // Managers/owners can see all staff, or only assignable staff when requested.
+    if (access.canManageStaff) {
+      const q = assignableOnly ? staffQuery.in('role', ['waiter', 'delivery']) : staffQuery;
+      ({ data: staff, error: staffErr } = await q);
+    } else if (access.staffRole === 'kitchen') {
+      // Kitchen can see assignable staff list to assign orders.
+      ({ data: staff, error: staffErr } = await staffQuery.in('role', ['waiter', 'delivery']));
+    } else {
+      // Default: only see own row.
+      ({ data: staff, error: staffErr } = await staffQuery.eq('user_id', access.userId));
+    }
 
     if (staffErr) return json(500, { error: staffErr.message });
 
@@ -65,6 +79,7 @@ export async function GET(request: Request) {
       isOwner: access.isOwner,
       myRole: access.staffRole,
       canManageStaff: access.canManageStaff,
+      assignableOnly,
       staff: mapped,
     });
   } catch (e: any) {
@@ -100,7 +115,7 @@ export async function POST(request: Request) {
       return json(400, { error: 'Valid email is required' });
     }
     if (!role) {
-      return json(400, { error: 'Valid role is required (manager|kitchen|waiter)' });
+      return json(400, { error: 'Valid role is required (manager|kitchen|waiter|delivery)' });
     }
 
     if (passwordTrimmed && passwordTrimmed.length < 8) {

@@ -29,11 +29,13 @@ export default function DashboardShell({
   subtitle,
   children,
   actions,
+  navItems,
 }: {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
+  navItems?: Array<{ href: string; label: string }>;
 }) {
   const { user, loading } = useSupabaseAuth();
 
@@ -75,11 +77,16 @@ export default function DashboardShell({
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <NavLink href="/dashboard" label="Overview" />
-          <NavLink href="/dashboard/menu" label="Menu" />
-          <NavLink href="/dashboard/qr" label="QR" />
-          <NavLink href="/dashboard/staff" label="Staff" />
-          <NavLink href="/dashboard/settings" label="Settings" />
+          {(navItems || [
+            { href: '/dashboard', label: 'Overview' },
+            { href: '/dashboard/orders', label: 'Orders' },
+            { href: '/dashboard/menu', label: 'Menu' },
+            { href: '/dashboard/qr', label: 'QR' },
+            { href: '/dashboard/staff', label: 'Staff' },
+            { href: '/dashboard/settings', label: 'Settings' },
+          ]).map((item) => (
+            <NavLink key={item.href} href={item.href} label={item.label} />
+          ))}
         </div>
       </div>
 

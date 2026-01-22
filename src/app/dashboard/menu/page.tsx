@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
 
 type Restaurant = {
   id: string;
@@ -48,7 +50,16 @@ function toNumber(value: string | number) {
 }
 
 export default function DashboardMenuPage() {
+  const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
+  const { loading: accessLoading, access } = useRestaurantAccess();
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (access && !access.isOwner) {
+      router.replace('/dashboard/orders');
+    }
+  }, [accessLoading, access, router]);
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);

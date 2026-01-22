@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import QRCode from 'react-qr-code';
+import { useRouter } from 'next/navigation';
 
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
 
 type Restaurant = {
   id: string;
@@ -36,7 +38,9 @@ async function fetchWithAuthFallback(
 }
 
 export default function DashboardQrPage() {
+  const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
+  const { loading: accessLoading, access } = useRestaurantAccess();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +49,13 @@ export default function DashboardQrPage() {
 
   const [tableStart, setTableStart] = useState('1');
   const [tableEnd, setTableEnd] = useState('20');
+
+  useEffect(() => {
+    if (accessLoading) return;
+    if (access && !access.isOwner) {
+      router.replace('/dashboard/orders');
+    }
+  }, [accessLoading, access, router]);
 
   useEffect(() => {
     let cancelled = false;

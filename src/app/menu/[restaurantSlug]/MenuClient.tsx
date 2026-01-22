@@ -63,6 +63,7 @@ function buildWhatsappMessage(opts: {
   items: Array<{ name: string; qty: number; price: number }>;
   acceptedPayments: string[];
   orderType: 'dine_in' | 'delivery';
+  orderId?: string;
   table?: string;
   customerName?: string;
   customerPhone?: string;
@@ -79,6 +80,7 @@ function buildWhatsappMessage(opts: {
 
   lines.push(`Hello ${opts.restaurantName}`);
   lines.push(`Order ref: ${ref}`);
+  if (opts.orderId) lines.push(`Order ID: ${opts.orderId}`);
   lines.push(`Order type: ${opts.orderType === 'dine_in' ? 'Dine-in' : 'Delivery'}`);
   lines.push('---');
 
@@ -139,15 +141,14 @@ export default function MenuClient({
   });
   const [cart, setCart] = useState<Record<string, number>>({});
 
-  const [orderType, setOrderType] = useState<'dine_in' | 'delivery'>(() => {
-    return tableFromQr ? 'dine_in' : 'delivery';
-  });
-
-  const [tableNumber, setTableNumber] = useState<string>(() => (tableFromQr ? table!.trim() : ''));
+  const orderType: 'delivery' = 'delivery';
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryNotes, setDeliveryNotes] = useState('');
+
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
 
   const brandColor = useMemo(() => {
     const raw = String(restaurant.brand_primary_color || '').trim();
@@ -158,14 +159,6 @@ export default function MenuClient({
   const brandChipBg = useMemo(() => hexToRgba(brandColor, 0.12), [brandColor]);
   const brandChipBorder = useMemo(() => hexToRgba(brandColor, 0.25), [brandColor]);
   const [activeCategory, setActiveCategory] = useState<string>('');
-
-  // If the scanned QR includes ?table=, keep dine-in table locked to that identity.
-  useEffect(() => {
-    if (tableFromQr) {
-      setOrderType('dine_in');
-      setTableNumber((table || '').trim());
-    }
-  }, [table, tableFromQr]);
 
   useEffect(() => {
     try {
@@ -214,34 +207,67 @@ export default function MenuClient({
 
   const waNumber = sanitizeWaNumber(restaurant.whatsapp_number || '');
 
-  const effectiveTable = tableFromQr ? table!.trim() : tableNumber.trim();
-  const dineInReady = orderType !== 'dine_in' || Boolean(effectiveTable);
   const deliveryReady =
     orderType !== 'delivery' ||
     Boolean(deliveryAddress.trim()) ||
     Boolean(customerPhone.trim()) ||
     Boolean(customerName.trim());
 
-  const canOrder = waNumber.length >= 7 && cartItems.length > 0 && dineInReady && deliveryReady;
+  const canOrder = waNumber.length >= 7 && cartItems.length > 0 && deliveryReady;
+  const canWhatsAppOrder = canOrder && !placingOrder;
 
-  const waUrl = useMemo(() => {
-    if (!canOrder) return '#';
+  async function placeDeliveryOrderAndOpenWhatsApp() {
+    if (!canOrder) return;
+    if (placingOrder) return;
 
-    const msg = buildWhatsappMessage({
-      restaurantName: restaurant.name,
-      items: cartItems,
-      acceptedPayments: restaurant.accepted_payments || [],
-      orderType,
-      table: orderType === 'dine_in' && effectiveTable ? effectiveTable : undefined,
-      customerName: orderType === 'delivery' ? customerName.trim() || undefined : undefined,
-      customerPhone: orderType === 'delivery' ? customerPhone.trim() || undefined : undefined,
-      deliveryAddress: orderType === 'delivery' ? deliveryAddress.trim() || undefined : undefined,
-      deliveryNotes: orderType === 'delivery' ? deliveryNotes.trim() || undefined : undefined,
-      note: restaurant.whatsapp_order_note ? String(restaurant.whatsapp_order_note) : undefined,
-    });
+    setPlacingOrder(true);
+    setPlaceError(null);
 
-    return `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
-  }, [canOrder, restaurant.name, restaurant.accepted_payments, cartItems, orderType, effectiveTable, customerName, customerPhone, deliveryAddress, deliveryNotes, waNumber]);
+    try {
+      const payload = {
+        restaurantId: restaurant.id,
+        orderType: 'delivery',
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        deliveryAddress: deliveryAddress.trim(),
+        deliveryNotes: deliveryNotes.trim(),
+        items: cartItems.map((r) => ({ id: r.id, qty: r.qty })),
+      };
+
+      const res = await fetch('/api/public/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await res.json().catch(() => ({} as any));
+      if (!res.ok) {
+        throw new Error(body?.error || 'Failed to create order');
+      }
+
+      const orderId = String(body?.order?.id || '').trim();
+
+      const msg = buildWhatsappMessage({
+        restaurantName: restaurant.name,
+        items: cartItems,
+        acceptedPayments: restaurant.accepted_payments || [],
+        orderType: 'delivery',
+        orderId: orderId || undefined,
+        customerName: customerName.trim() || undefined,
+        customerPhone: customerPhone.trim() || undefined,
+        deliveryAddress: deliveryAddress.trim() || undefined,
+        deliveryNotes: deliveryNotes.trim() || undefined,
+        note: restaurant.whatsapp_order_note ? String(restaurant.whatsapp_order_note) : undefined,
+      });
+
+      const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank', 'noreferrer');
+    } catch (e: any) {
+      setPlaceError(String(e?.message || 'Failed to create order'));
+    } finally {
+      setPlacingOrder(false);
+    }
+  }
 
   function add(id: string) {
     setCart((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
@@ -384,116 +410,64 @@ export default function MenuClient({
             ) : null}
           </div>
 
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (tableFromQr) return;
-                setOrderType('dine_in');
-              }}
-              disabled={tableFromQr}
-              className={
-                orderType === 'dine_in'
-                  ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
-              }
-                style={orderType === 'dine_in' ? { backgroundColor: brandColor } : undefined}
+          <div className="mt-3">
+            <span
+              className="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+              style={{ backgroundColor: brandColor }}
             >
-              Dine-in
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (tableFromQr) return;
-                setOrderType('delivery');
-              }}
-              disabled={tableFromQr}
-              className={
-                orderType === 'delivery'
-                  ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
-              }
-                style={orderType === 'delivery' ? { backgroundColor: brandColor } : undefined}
-            >
-              Delivery
-            </button>
+              Delivery (WhatsApp)
+            </span>
+            {tableFromQr ? (
+              <div className="mt-2 text-xs text-gray-600">
+                You scanned a table QR (Table {table!.trim()}). WhatsApp ordering is delivery-only.
+              </div>
+            ) : null}
           </div>
 
-          {tableFromQr ? (
-            <div className="mt-2 text-xs text-gray-500">Delivery is disabled for table QRs.</div>
-          ) : null}
-
-          {orderType === 'dine_in' ? (
-            <div className="mt-4">
-              <label className="block text-xs font-semibold text-gray-700">Table number</label>
-              <p className="mt-1 text-xs text-gray-500">If you scanned a table QR, this is set automatically.</p>
-              {tableFromQr ? (
-                <div
-                  className="mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold text-gray-900"
-                  style={{ borderColor: brandChipBorder, backgroundColor: brandChipBg }}
-                >
-                  Table {table!.trim()}
-                  <span className="text-xs font-medium text-gray-500">(from QR)</span>
-                </div>
-              ) : (
-                <input
-                  value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
-                  inputMode="numeric"
-                  placeholder="e.g. 5"
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
-              )}
-              {!dineInReady ? (
-                <div className="mt-2 text-xs text-red-700">Table number is required for dine-in orders.</div>
-              ) : null}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700">Name (optional)</label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Your name"
+              />
             </div>
-          ) : (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Name (optional)</label>
-                <input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="Your name"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-700">Phone (optional)</label>
-                <input
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="e.g. 07xxxxxxxx"
-                  inputMode="tel"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-gray-700">Delivery address (optional)</label>
-                <textarea
-                  value={deliveryAddress}
-                  onChange={(e) => setDeliveryAddress(e.target.value)}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="Street, landmark, area"
-                  rows={2}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-gray-700">Notes (optional)</label>
-                <textarea
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  placeholder="Any special instructions"
-                  rows={2}
-                />
-              </div>
-              {!deliveryReady ? (
-                <div className="md:col-span-2 text-xs text-red-700">Add at least one delivery detail to help the restaurant.</div>
-              ) : null}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700">Phone (optional)</label>
+              <input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="e.g. 07xxxxxxxx"
+                inputMode="tel"
+              />
             </div>
-          )}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700">Delivery address (optional)</label>
+              <textarea
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Street, landmark, area"
+                rows={2}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700">Notes (optional)</label>
+              <textarea
+                value={deliveryNotes}
+                onChange={(e) => setDeliveryNotes(e.target.value)}
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Any special instructions"
+                rows={2}
+              />
+            </div>
+            {!deliveryReady ? (
+              <div className="md:col-span-2 text-xs text-red-700">Add at least one delivery detail to help the restaurant.</div>
+            ) : null}
+          </div>
         </div>
 
         {availableItems.length === 0 ? (
@@ -673,6 +647,10 @@ export default function MenuClient({
 
       <div className="fixed bottom-0 left-0 right-0 border-t border-gray-200 bg-white">
         <div className="max-w-3xl mx-auto px-4 py-3">
+          {placeError ? (
+            <div className="mb-2 rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">{placeError}</div>
+          ) : null}
+
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold text-gray-700">Total</div>
@@ -690,22 +668,21 @@ export default function MenuClient({
                 </button>
               ) : null}
 
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-disabled={!canOrder}
+              <button
+                type="button"
+                aria-disabled={!canWhatsAppOrder}
+                disabled={!canWhatsAppOrder}
                 className={
-                  canOrder
+                  canWhatsAppOrder
                     ? 'inline-flex items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700'
                     : 'inline-flex items-center justify-center rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 cursor-not-allowed'
                 }
-                onClick={(e) => {
-                  if (!canOrder) e.preventDefault();
+                onClick={() => {
+                  void placeDeliveryOrderAndOpenWhatsApp();
                 }}
               >
-                Order via WhatsApp
-              </a>
+                {placingOrder ? 'Creating order…' : 'Order via WhatsApp'}
+              </button>
             </div>
           </div>
 
@@ -717,9 +694,7 @@ export default function MenuClient({
             <div className="mt-2 text-xs text-gray-600">Add items to your cart to order.</div>
           ) : null}
 
-          {!dineInReady ? (
-            <div className="mt-2 text-xs text-gray-600">Select dine-in table number to order.</div>
-          ) : null}
+          <div className="mt-2 text-xs text-gray-600">WhatsApp ordering is available for delivery orders only.</div>
 
           {restaurant.accepted_payments?.length ? (
             <div className="mt-2 text-xs text-gray-600">Accepted payments: {restaurant.accepted_payments.join(', ')}</div>
