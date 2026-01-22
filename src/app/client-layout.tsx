@@ -22,6 +22,7 @@ export default function ClientLayout({
   const pathname = usePathname();
   const { settings: appSettings } = useAppSettings();
   const isAdminPage = pathname?.startsWith('/admin');
+  const isMenuPage = pathname?.startsWith('/menu');
   const needsFirebaseAuth =
     pathname?.startsWith('/phone-auth') ||
     pathname?.startsWith('/verify-account');
@@ -60,6 +61,11 @@ export default function ClientLayout({
   }
 
   const page = needsFirebaseAuth ? <FirebaseAuthProvider>{children}</FirebaseAuthProvider> : children;
+
+  // For public restaurant menus, remove global ScanMagic header/footer and spacing.
+  if (isMenuPage) {
+    return <SupabaseAuthProvider>{page}</SupabaseAuthProvider>;
+  }
 
   // For regular pages, include header and footer
   return (
