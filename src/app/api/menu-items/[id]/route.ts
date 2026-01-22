@@ -36,6 +36,7 @@ export async function PATCH(
     const category = typeof body?.category === 'string' ? body.category.trim() : undefined;
     const name = typeof body?.name === 'string' ? body.name.trim() : undefined;
     const description = typeof body?.description === 'string' ? body.description.trim() : undefined;
+    const imageUrl = typeof body?.imageUrl === 'string' ? body.imageUrl.trim() : undefined;
     const available = body?.available === undefined ? undefined : Boolean(body.available);
 
     const priceRaw = body?.price;
@@ -51,6 +52,7 @@ export async function PATCH(
     if (category !== undefined && !category) return badRequest('Category is required');
     if (name !== undefined && !name) return badRequest('Name is required');
     if (price !== undefined && (!Number.isFinite(price) || price < 0)) return badRequest('Price must be a valid number');
+    if (imageUrl !== undefined && imageUrl && !/^https?:\/\//i.test(imageUrl)) return badRequest('Image URL must be a valid http(s) URL');
 
     const { supabase, restaurantId, error } = await getRestaurantIdForUser(userId);
     if (error) return NextResponse.json({ error }, { status: 500 });
@@ -60,6 +62,7 @@ export async function PATCH(
     if (category !== undefined) patch.category = category;
     if (name !== undefined) patch.name = name;
     if (description !== undefined) patch.description = description || null;
+    if (imageUrl !== undefined) patch.image_url = imageUrl || null;
     if (price !== undefined) patch.price = price;
     if (available !== undefined) patch.available = available;
 
@@ -68,7 +71,7 @@ export async function PATCH(
       .update(patch)
       .eq('id', params.id)
       .eq('restaurant_id', restaurantId)
-      .select('id,restaurant_id,category,name,description,price,available,created_at,updated_at')
+      .select('id,restaurant_id,category,name,description,image_url,price,available,created_at,updated_at')
       .maybeSingle();
 
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });

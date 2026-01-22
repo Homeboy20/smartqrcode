@@ -12,6 +12,7 @@ type MenuItemRow = {
   category: string;
   name: string;
   description: string | null;
+  image_url?: string | null;
   price: string | number;
   available: boolean;
   created_at: string;
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error: itemsError } = await supabase
       .from('menu_items')
-      .select('id,restaurant_id,category,name,description,price,available,created_at,updated_at')
+      .select('id,restaurant_id,category,name,description,image_url,price,available,created_at,updated_at')
       .eq('restaurant_id', restaurantId)
       .order('category', { ascending: true })
       .order('name', { ascending: true });
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
     const category = typeof body?.category === 'string' ? body.category.trim() : '';
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const description = typeof body?.description === 'string' ? body.description.trim() : null;
+    const imageUrl = typeof body?.imageUrl === 'string' ? body.imageUrl.trim() : null;
     const priceRaw = body?.price;
     const available = body?.available === undefined ? true : Boolean(body.available);
 
@@ -78,6 +80,7 @@ export async function POST(request: NextRequest) {
     if (!category) return badRequest('Category is required');
     if (!name) return badRequest('Name is required');
     if (!Number.isFinite(price) || price < 0) return badRequest('Price must be a valid number');
+    if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return badRequest('Image URL must be a valid http(s) URL');
 
     const { supabase, restaurantId, error } = await getRestaurantIdForUser(userId);
     if (error) return NextResponse.json({ error }, { status: 500 });
@@ -90,10 +93,11 @@ export async function POST(request: NextRequest) {
         category,
         name,
         description: description || null,
+        image_url: imageUrl || null,
         price,
         available,
       })
-      .select('id,restaurant_id,category,name,description,price,available,created_at,updated_at')
+      .select('id,restaurant_id,category,name,description,image_url,price,available,created_at,updated_at')
       .single();
 
     if (createError || !created) {

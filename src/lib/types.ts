@@ -208,6 +208,7 @@ export interface MenuItem {
   category: string;
   name: string;
   description?: string | null;
+  image_url?: string | null;
   price: number;
   available: boolean;
   createdAt?: any;

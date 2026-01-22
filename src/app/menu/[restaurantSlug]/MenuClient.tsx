@@ -16,6 +16,7 @@ type MenuItem = {
   category: string;
   name: string;
   description: string | null;
+  image_url?: string | null;
   price: string | number;
   available: boolean;
 };
@@ -183,10 +184,21 @@ export default function MenuClient({
                     const price = toNumber(item.price);
                     return (
                       <div key={item.id} className="p-4 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex items-start gap-3">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className="h-16 w-16 rounded-md object-cover border border-gray-200 bg-white flex-shrink-0"
+                              loading="lazy"
+                            />
+                          ) : null}
+
+                          <div className="min-w-0">
                           <div className="font-semibold text-gray-900">{item.name}</div>
                           {item.description ? <div className="mt-1 text-sm text-gray-600">{item.description}</div> : null}
                           <div className="mt-2 text-sm font-bold text-gray-900">{formatTzs(price)}</div>
+                          </div>
                         </div>
 
                         <div className="flex flex-col items-end gap-2 flex-shrink-0">

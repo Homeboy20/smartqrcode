@@ -17,6 +17,7 @@ type MenuItem = {
   category: string;
   name: string;
   description: string | null;
+  image_url?: string | null;
   price: string | number;
   available: boolean;
 };
@@ -58,6 +59,9 @@ export default function DashboardMenuPage() {
   const [category, setCategory] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(true);
 
@@ -109,8 +113,50 @@ export default function DashboardMenuPage() {
     setCategory('');
     setName('');
     setDescription('');
+    setImageUrl('');
+    setImageFile(null);
     setPrice('');
     setAvailable(true);
+  }
+
+  async function uploadImage() {
+    if (!imageFile) {
+      setStatus({ kind: 'error', message: 'Choose an image file first' });
+      return;
+    }
+
+    setUploadingImage(true);
+    setStatus({ kind: 'loading' });
+
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Please log in again');
+
+      const fd = new FormData();
+      fd.append('file', imageFile);
+
+      const res = await fetch('/api/uploads/menu', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: fd,
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || json?.details || `Upload failed (${res.status})`);
+
+      const url = String((json as any)?.url || '').trim();
+      if (!url) throw new Error('Upload succeeded but URL is missing');
+
+      setImageUrl(url);
+      setStatus({ kind: 'success', message: 'Image uploaded' });
+      setTimeout(() => setStatus({ kind: 'idle' }), 1200);
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Upload failed' });
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   async function submit() {
@@ -121,6 +167,7 @@ export default function DashboardMenuPage() {
         category,
         name,
         description: description.trim() ? description.trim() : null,
+        imageUrl: imageUrl.trim() ? imageUrl.trim() : null,
         price,
         available,
       };
@@ -187,6 +234,8 @@ export default function DashboardMenuPage() {
     setCategory(item.category);
     setName(item.name);
     setDescription(item.description || '');
+    setImageUrl(item.image_url || '');
+    setImageFile(null);
     setPrice(String(toNumber(item.price)));
     setAvailable(Boolean(item.available));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -285,6 +334,49 @@ export default function DashboardMenuPage() {
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 placeholder="e.g. 14000"
               />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700">Image URL (optional)</label>
+              <p className="mt-1 text-xs text-gray-600">Paste a public image URL or upload one (Pro/Business required for uploads).</p>
+              <div className="mt-2 flex flex-col md:flex-row gap-3">
+                <input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="https://..."
+                />
+
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    className="text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={uploadImage}
+                    disabled={!imageFile || uploadingImage}
+                    className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {uploadingImage ? 'Uploading…' : 'Upload'}
+                  </button>
+                </div>
+              </div>
+
+              {imageUrl.trim() ? (
+                <div className="mt-3">
+                  <div className="text-xs font-semibold text-gray-700">Preview</div>
+                  <img
+                    src={imageUrl}
+                    alt="Menu item"
+                    className="mt-2 h-24 w-24 rounded-md object-cover border border-gray-200"
+                    loading="lazy"
+                    onError={() => setStatus({ kind: 'error', message: 'Image preview failed to load (check URL)' })}
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="flex items-end gap-3">
               <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
