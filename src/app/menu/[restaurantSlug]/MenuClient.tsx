@@ -537,6 +537,10 @@ export default function MenuClient({
                                 className="h-16 w-16 rounded-xl object-cover border bg-white flex-shrink-0"
                                 style={{ borderColor: hexToRgba(brandColor, 0.18) }}
                                 loading="lazy"
+                                onError={(e) => {
+                                  // If storage bucket isn't public or URL is invalid, hide broken image.
+                                  e.currentTarget.style.display = 'none';
+                                }}
                               />
                             ) : null}
 
@@ -607,6 +611,9 @@ export default function MenuClient({
                                   alt={item.name}
                                   className="h-full w-full object-cover"
                                   loading="lazy"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
                                 />
                               </div>
                             ) : (
