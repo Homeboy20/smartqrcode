@@ -190,3 +190,26 @@ export interface PaystackCredentials {
   /** Optional ISO-3166-1 alpha-2 allow-list (comma-separated), e.g. "NG,GH,ZA" */
   allowedCountries?: string;
 } 
+
+// Restaurant digital menu MVP
+export interface Restaurant {
+  id: string;
+  name: string;
+  slug: string;
+  whatsappNumber: string;
+  acceptedPayments: string[];
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface MenuItem {
+  id: string;
+  restaurantId: string;
+  category: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  available: boolean;
+  createdAt?: any;
+  updatedAt?: any;
+}

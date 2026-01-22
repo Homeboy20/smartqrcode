@@ -220,6 +220,35 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-6 mt-4">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Restaurant Menu</h2>
+            <div className="space-y-2">
+              <Link
+                href="/dashboard/settings"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <span className="font-medium text-gray-900">Onboarding & Settings</span>
+                <span className="text-xs text-gray-500">WhatsApp + payments</span>
+              </Link>
+
+              <Link
+                href="/dashboard/menu"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <span className="font-medium text-gray-900">Manage Menu</span>
+                <span className="text-xs text-gray-500">CRUD items</span>
+              </Link>
+
+              <Link
+                href="/dashboard/qr"
+                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+              >
+                <span className="font-medium text-gray-900">Generate Menu QR</span>
+                <span className="text-xs text-gray-500">/menu/slug</span>
+              </Link>
+            </div>
+          </div>
         </div>
 
         <div className="w-full md:w-2/3">

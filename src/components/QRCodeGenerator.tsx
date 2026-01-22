@@ -18,6 +18,11 @@ type ImageFormat = 'png' | 'svg' | 'jpg' | 'jpeg' | 'pdf';
 
 interface QRCodeGeneratorProps {
   onDownload?: (dataUrl: string) => void;
+  /**
+   * Optional prefill for URL-based QR codes.
+   * Used by dashboard flows (e.g. restaurant menu QR) to reuse this generator UI.
+   */
+  initialUrl?: string;
 }
 
 interface FormField {
@@ -39,7 +44,7 @@ const qrTemplates = [
   { id: "logo-overlay", name: "Logo Overlay", premium: true, tier: 'business' },
 ];
 
-export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
+export default function QRCodeGenerator({ onDownload, initialUrl }: QRCodeGeneratorProps) {
   // Use the subscription context
   const { 
     subscriptionTier,
@@ -113,6 +118,14 @@ export default function QRCodeGenerator({ onDownload }: QRCodeGeneratorProps) {
     { value: 'wifi', label: 'WiFi Network' },
     { value: 'menu', label: 'Menu / Brochure (PDF/Image)' },
   ] as const;
+
+  useEffect(() => {
+    const value = (initialUrl || '').trim();
+    if (!value) return;
+
+    setQRType('url');
+    setFormValues((prev) => ({ ...prev, url: value }));
+  }, [initialUrl]);
 
   const formFields: Record<QRCodeType, FormField[]> = {
     url: [

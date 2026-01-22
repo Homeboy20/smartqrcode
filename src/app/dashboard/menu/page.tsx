@@ -1,0 +1,390 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+
+import DashboardShell from '@/components/dashboard/DashboardShell';
+import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+
+type Restaurant = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type MenuItem = {
+  id: string;
+  category: string;
+  name: string;
+  description: string | null;
+  price: string | number;
+  available: boolean;
+};
+
+type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'success'; message: string };
+
+async function fetchWithAuthFallback(
+  getAccessToken: () => Promise<string | null>,
+  input: RequestInfo,
+  init?: RequestInit
+) {
+  let res = await fetch(input, init);
+
+  if (res.status !== 401) return res;
+
+  const token = await getAccessToken();
+  if (!token) return res;
+
+  const headers = new Headers(init?.headers || undefined);
+  headers.set('Authorization', `Bearer ${token}`);
+
+  return fetch(input, { ...init, headers });
+}
+
+function toNumber(value: string | number) {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export default function DashboardMenuPage() {
+  const { getAccessToken } = useSupabaseAuth();
+
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+
+  const [editId, setEditId] = useState<string | null>(null);
+  const [category, setCategory] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState('');
+  const [available, setAvailable] = useState(true);
+
+  async function loadAll() {
+    setLoading(true);
+    setStatus({ kind: 'idle' });
+
+    try {
+      const rRes = await fetchWithAuthFallback(getAccessToken, '/api/restaurant', { method: 'GET' });
+      const rJson = await rRes.json().catch(() => ({} as any));
+      if (!rRes.ok) throw new Error(rJson?.error || `Failed to load restaurant (${rRes.status})`);
+
+      const r = (rJson as any)?.restaurant as Restaurant | null;
+      setRestaurant(r);
+
+      if (!r) {
+        setItems([]);
+        return;
+      }
+
+      const res = await fetchWithAuthFallback(getAccessToken, '/api/menu-items', { method: 'GET' });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || `Failed to load menu (${res.status})`);
+
+      setItems(Array.isArray((json as any)?.items) ? ((json as any).items as MenuItem[]) : []);
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Failed to load menu' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const item of items) {
+      const key = item.category || 'Other';
+      map.set(key, [...(map.get(key) || []), item]);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [items]);
+
+  function resetForm() {
+    setEditId(null);
+    setCategory('');
+    setName('');
+    setDescription('');
+    setPrice('');
+    setAvailable(true);
+  }
+
+  async function submit() {
+    setStatus({ kind: 'loading' });
+
+    try {
+      const payload = {
+        category,
+        name,
+        description: description.trim() ? description.trim() : null,
+        price,
+        available,
+      };
+
+      const url = editId ? `/api/menu-items/${editId}` : '/api/menu-items';
+      const method = editId ? 'PATCH' : 'POST';
+
+      const res = await fetchWithAuthFallback(getAccessToken, url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || `Save failed (${res.status})`);
+
+      setStatus({ kind: 'success', message: editId ? 'Item updated' : 'Item added' });
+      resetForm();
+      await loadAll();
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Save failed' });
+    }
+  }
+
+  async function toggleAvailability(item: MenuItem) {
+    setStatus({ kind: 'loading' });
+
+    try {
+      const res = await fetchWithAuthFallback(getAccessToken, `/api/menu-items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ available: !item.available }),
+      });
+
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || `Update failed (${res.status})`);
+
+      setItems((prev) => prev.map((p) => (p.id === item.id ? { ...p, available: !item.available } : p)));
+      setStatus({ kind: 'idle' });
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Update failed' });
+    }
+  }
+
+  async function removeItem(id: string) {
+    if (!confirm('Delete this menu item?')) return;
+
+    setStatus({ kind: 'loading' });
+
+    try {
+      const res = await fetchWithAuthFallback(getAccessToken, `/api/menu-items/${id}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(json?.error || `Delete failed (${res.status})`);
+
+      setItems((prev) => prev.filter((p) => p.id !== id));
+      setStatus({ kind: 'success', message: 'Item deleted' });
+    } catch (e: any) {
+      setStatus({ kind: 'error', message: e?.message || 'Delete failed' });
+    }
+  }
+
+  function startEdit(item: MenuItem) {
+    setEditId(item.id);
+    setCategory(item.category);
+    setName(item.name);
+    setDescription(item.description || '');
+    setPrice(String(toNumber(item.price)));
+    setAvailable(Boolean(item.available));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  return (
+    <DashboardShell
+      title="Menu"
+      subtitle="Create categories and items. Customers will order via WhatsApp."
+      actions={
+        restaurant ? (
+          <Link
+            href={`/menu/${restaurant.slug}`}
+            target="_blank"
+            className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            View public menu
+          </Link>
+        ) : null
+      }
+    >
+      {status.kind === 'error' ? (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
+      ) : null}
+      {status.kind === 'success' ? (
+        <div className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">{status.message}</div>
+      ) : null}
+
+      {!loading && !restaurant ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+          <div className="text-sm font-semibold text-amber-900">Restaurant not set up yet</div>
+          <p className="mt-1 text-sm text-amber-900/90">Create your restaurant profile first.</p>
+          <div className="mt-3">
+            <Link
+              href="/dashboard/settings"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Go to settings
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {restaurant ? (
+        <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">{editId ? 'Edit item' : 'Add menu item'}</div>
+              <div className="text-xs text-gray-600">Simple MVP: category + name + price + availability</div>
+            </div>
+            {editId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Cancel edit
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700">Category</label>
+              <input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="e.g. Burgers"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700">Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="e.g. Chicken Burger"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-700">Description (optional)</label>
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Short description"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700">Price</label>
+              <input
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                inputMode="decimal"
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="e.g. 14000"
+              />
+            </div>
+            <div className="flex items-end gap-3">
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={available}
+                  onChange={(e) => setAvailable(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Available
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={status.kind === 'loading'}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {editId ? 'Save item' : 'Add item'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {restaurant ? (
+        loading ? (
+          <div className="space-y-3">
+            <div className="h-10 bg-gray-100 animate-pulse rounded" />
+            <div className="h-10 bg-gray-100 animate-pulse rounded" />
+            <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="rounded-md border border-gray-200 p-6 text-center">
+            <div className="text-sm font-semibold text-gray-900">No menu items yet</div>
+            <p className="mt-1 text-sm text-gray-600">Add your first item above.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {grouped.map(([cat, catItems]) => (
+              <div key={cat} className="rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                  <div className="text-sm font-bold text-gray-900">{cat}</div>
+                  <div className="text-xs text-gray-500">{catItems.length} items</div>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {catItems.map((item) => (
+                    <div key={item.id} className="p-4 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="font-semibold text-gray-900 truncate">{item.name}</div>
+                          <span
+                            className={
+                              item.available
+                                ? 'text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800'
+                                : 'text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700'
+                            }
+                          >
+                            {item.available ? 'Available' : 'Unavailable'}
+                          </span>
+                        </div>
+                        {item.description ? <div className="mt-1 text-sm text-gray-600">{item.description}</div> : null}
+                        <div className="mt-1 text-sm font-semibold text-gray-900">TZS {toNumber(item.price).toLocaleString()}</div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleAvailability(item)}
+                          disabled={status.kind === 'loading'}
+                          className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {item.available ? 'Mark unavailable' : 'Mark available'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="inline-flex items-center justify-center rounded-md border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : null}
+    </DashboardShell>
+  );
+}
