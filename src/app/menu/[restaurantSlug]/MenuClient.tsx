@@ -37,6 +37,18 @@ function formatTzs(n: number) {
   return `TZS ${Math.round(n).toLocaleString()}`;
 }
 
+function hexToRgba(hex: string, alpha: number) {
+  const h = hex.replace('#', '').trim();
+  const isShort = h.length === 3;
+  const full = isShort ? h.split('').map((c) => c + c).join('') : h;
+  if (!/^[A-Fa-f0-9]{6}$/.test(full)) return `rgba(17,24,39,${alpha})`;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r},${g},${b},${a})`;
+}
+
 function slugifyCategory(value: string) {
   return value
     .toLowerCase()
@@ -142,6 +154,11 @@ export default function MenuClient({
     return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(raw) ? raw : '#111827';
   }, [restaurant.brand_primary_color]);
 
+  const brandSoftBg = useMemo(() => hexToRgba(brandColor, 0.08), [brandColor]);
+  const brandChipBg = useMemo(() => hexToRgba(brandColor, 0.12), [brandColor]);
+  const brandChipBorder = useMemo(() => hexToRgba(brandColor, 0.25), [brandColor]);
+  const [activeCategory, setActiveCategory] = useState<string>('');
+
   // If the scanned QR includes ?table=, keep dine-in table locked to that identity.
   useEffect(() => {
     if (tableFromQr) {
@@ -171,6 +188,7 @@ export default function MenuClient({
   }, [availableItems]);
 
   function scrollToCategory(category: string) {
+    setActiveCategory(category);
     const id = `cat-${slugifyCategory(category || 'Other')}`;
     const el = document.getElementById(id);
     if (!el) return;
@@ -244,8 +262,14 @@ export default function MenuClient({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200">
+    <div
+      className="min-h-screen"
+      style={{ background: `linear-gradient(180deg, ${brandSoftBg} 0%, #f9fafb 45%, #f9fafb 100%)` }}
+    >
+      <header
+        className="sticky top-0 z-20 backdrop-blur border-b"
+        style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: hexToRgba(brandColor, 0.18) }}
+      >
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -254,7 +278,8 @@ export default function MenuClient({
                   <img
                     src={restaurant.logo_url}
                     alt={`${restaurant.name} logo`}
-                    className="h-10 w-10 rounded-lg border border-gray-200 object-cover bg-white flex-shrink-0"
+                    className="h-11 w-11 rounded-xl border object-cover bg-white flex-shrink-0 shadow-sm"
+                    style={{ borderColor: hexToRgba(brandColor, 0.25) }}
                     loading="lazy"
                   />
                 ) : null}
@@ -281,7 +306,16 @@ export default function MenuClient({
                     key={category}
                     type="button"
                     onClick={() => scrollToCategory(category)}
-                    className="flex-shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+                    className={
+                      activeCategory === category
+                        ? 'flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm'
+                        : 'flex-shrink-0 rounded-full border bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
+                    }
+                    style={
+                      activeCategory === category
+                        ? { backgroundColor: brandColor }
+                        : { borderColor: brandChipBorder, backgroundColor: brandChipBg }
+                    }
                   >
                     {category}
                   </button>
@@ -339,7 +373,10 @@ export default function MenuClient({
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-6 pb-28">
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div
+          className="mb-6 rounded-2xl border bg-white p-4 shadow-sm"
+          style={{ borderColor: hexToRgba(brandColor, 0.18), boxShadow: `0 1px 0 ${hexToRgba(brandColor, 0.08)}` }}
+        >
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="text-sm font-bold text-gray-900">Order options</div>
             {tableFromQr ? (
@@ -391,7 +428,10 @@ export default function MenuClient({
               <label className="block text-xs font-semibold text-gray-700">Table number</label>
               <p className="mt-1 text-xs text-gray-500">If you scanned a table QR, this is set automatically.</p>
               {tableFromQr ? (
-                <div className="mt-2 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-900">
+                <div
+                  className="mt-2 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold text-gray-900"
+                  style={{ borderColor: brandChipBorder, backgroundColor: brandChipBg }}
+                >
                   Table {table!.trim()}
                   <span className="text-xs font-medium text-gray-500">(from QR)</span>
                 </div>
@@ -467,10 +507,19 @@ export default function MenuClient({
               <section
                 key={category}
                 id={`cat-${slugifyCategory(category)}`}
-                className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm"
+                className="rounded-2xl border bg-white overflow-hidden shadow-sm"
+                style={{ borderColor: hexToRgba(brandColor, 0.14) }}
               >
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <h2 className="text-sm font-bold text-gray-900">{category}</h2>
+                <div
+                  className="px-4 py-3 border-b"
+                  style={{ backgroundColor: brandSoftBg, borderColor: hexToRgba(brandColor, 0.14) }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-extrabold text-gray-900">{category}</h2>
+                    <div className="text-xs font-semibold" style={{ color: brandColor }}>
+                      {catItems.length}
+                    </div>
+                  </div>
                 </div>
 
                 {layout === 'list' ? (
@@ -485,7 +534,8 @@ export default function MenuClient({
                               <img
                                 src={item.image_url}
                                 alt={item.name}
-                                className="h-16 w-16 rounded-lg object-cover border border-gray-200 bg-white flex-shrink-0"
+                                className="h-16 w-16 rounded-xl object-cover border bg-white flex-shrink-0"
+                                style={{ borderColor: hexToRgba(brandColor, 0.18) }}
                                 loading="lazy"
                               />
                             ) : null}
@@ -495,7 +545,12 @@ export default function MenuClient({
                               {item.description ? (
                                 <div className="mt-1 text-sm text-gray-600 leading-snug">{item.description}</div>
                               ) : null}
-                              <div className="mt-2 text-sm font-extrabold text-gray-900">{formatTzs(price)}</div>
+                              <div
+                                className="mt-2 inline-flex items-center rounded-full px-3 py-1 text-sm font-extrabold"
+                                style={{ backgroundColor: brandChipBg, color: brandColor }}
+                              >
+                                {formatTzs(price)}
+                              </div>
                             </div>
                           </div>
 
