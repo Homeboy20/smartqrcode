@@ -333,16 +333,24 @@ export default function MenuClient({
             </button>
             <button
               type="button"
-              onClick={() => setOrderType('delivery')}
+              onClick={() => {
+                if (tableFromQr) return;
+                setOrderType('delivery');
+              }}
+              disabled={tableFromQr}
               className={
                 orderType === 'delivery'
                   ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
-                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
+                  : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50'
               }
             >
               Delivery
             </button>
           </div>
+
+          {tableFromQr ? (
+            <div className="mt-2 text-xs text-gray-500">Delivery is disabled for table QRs.</div>
+          ) : null}
 
           {orderType === 'dine_in' ? (
             <div className="mt-4">
