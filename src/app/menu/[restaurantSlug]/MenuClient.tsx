@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Restaurant = {
   id: string;
@@ -89,7 +89,20 @@ export default function MenuClient({
   items: MenuItem[];
   table?: string;
 }) {
+  const [layout, setLayout] = useState<'list' | 'grid'>(() => {
+    if (typeof window === 'undefined') return 'list';
+    const v = window.localStorage.getItem('smartqrcode_menu_layout');
+    return v === 'grid' || v === 'list' ? v : 'list';
+  });
   const [cart, setCart] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('smartqrcode_menu_layout', layout);
+    } catch {
+      // ignore
+    }
+  }, [layout]);
 
   const availableItems = useMemo(() => items.filter((i) => i.available), [items]);
 
@@ -180,7 +193,53 @@ export default function MenuClient({
           </div>
         </div>
 
-        {grouped.length > 1 ? (
+        <div className="max-w-3xl mx-auto px-4 pb-3">
+          <div className="flex items-center justify-between gap-3">
+            {grouped.length > 1 ? (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {grouped.map(([category]) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => scrollToCategory(category)}
+                    className="flex-shrink-0 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-100"
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setLayout('list')}
+                className={
+                  layout === 'list'
+                    ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
+                    : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
+                }
+              >
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayout('grid')}
+                className={
+                  layout === 'grid'
+                    ? 'rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white'
+                    : 'rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50'
+                }
+              >
+                Grid
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {false ? (
           <div className="max-w-3xl mx-auto px-4 pb-3">
             <div className="flex gap-2 overflow-x-auto no-scrollbar">
               {grouped.map(([category]) => (
@@ -216,64 +275,134 @@ export default function MenuClient({
                   <h2 className="text-sm font-bold text-gray-900">{category}</h2>
                 </div>
 
-                <div className="divide-y divide-gray-100">
-                  {catItems.map((item) => {
-                    const qty = cart[item.id] || 0;
-                    const price = toNumber(item.price);
-                    return (
-                      <div key={item.id} className="p-4 flex items-start justify-between gap-4">
-                        <div className="min-w-0 flex items-start gap-3">
-                          {item.image_url ? (
-                            <img
-                              src={item.image_url}
-                              alt={item.name}
-                              className="h-16 w-16 rounded-lg object-cover border border-gray-200 bg-white flex-shrink-0"
-                              loading="lazy"
-                            />
-                          ) : null}
-
-                          <div className="min-w-0">
-                            <div className="font-semibold text-gray-900 leading-snug">{item.name}</div>
-                            {item.description ? (
-                              <div className="mt-1 text-sm text-gray-600 leading-snug">{item.description}</div>
+                {layout === 'list' ? (
+                  <div className="divide-y divide-gray-100">
+                    {catItems.map((item) => {
+                      const qty = cart[item.id] || 0;
+                      const price = toNumber(item.price);
+                      return (
+                        <div key={item.id} className="p-4 flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex items-start gap-3">
+                            {item.image_url ? (
+                              <img
+                                src={item.image_url}
+                                alt={item.name}
+                                className="h-16 w-16 rounded-lg object-cover border border-gray-200 bg-white flex-shrink-0"
+                                loading="lazy"
+                              />
                             ) : null}
-                            <div className="mt-2 text-sm font-extrabold text-gray-900">{formatTzs(price)}</div>
-                          </div>
-                        </div>
 
-                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                          {qty > 0 ? (
-                            <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
-                              <button
-                                type="button"
-                                onClick={() => dec(item.id)}
-                                className="px-3 py-2 text-sm font-bold text-gray-800 hover:bg-gray-50"
-                              >
-                                −
-                              </button>
-                              <div className="px-3 py-2 text-sm font-bold text-gray-900">{qty}</div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-gray-900 leading-snug">{item.name}</div>
+                              {item.description ? (
+                                <div className="mt-1 text-sm text-gray-600 leading-snug">{item.description}</div>
+                              ) : null}
+                              <div className="mt-2 text-sm font-extrabold text-gray-900">{formatTzs(price)}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            {qty > 0 ? (
+                              <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
+                                <button
+                                  type="button"
+                                  onClick={() => dec(item.id)}
+                                  className="px-3 py-2 text-sm font-bold text-gray-800 hover:bg-gray-50"
+                                >
+                                  −
+                                </button>
+                                <div className="px-3 py-2 text-sm font-bold text-gray-900">{qty}</div>
+                                <button
+                                  type="button"
+                                  onClick={() => add(item.id)}
+                                  className="px-3 py-2 text-sm font-bold text-gray-800 hover:bg-gray-50"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => add(item.id)}
-                                className="px-3 py-2 text-sm font-bold text-gray-800 hover:bg-gray-50"
+                                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                               >
-                                +
+                                Add
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => add(item.id)}
-                              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                            >
-                              Add
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {catItems.map((item) => {
+                        const qty = cart[item.id] || 0;
+                        const price = toNumber(item.price);
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm"
+                          >
+                            {item.image_url ? (
+                              <div className="aspect-[4/3] bg-gray-100">
+                                <img
+                                  src={item.image_url}
+                                  alt={item.name}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div className="aspect-[4/3] bg-gray-100" />
+                            )}
+
+                            <div className="p-3">
+                              <div className="font-semibold text-gray-900 leading-snug line-clamp-2">{item.name}</div>
+                              {item.description ? (
+                                <div className="mt-1 text-xs text-gray-600 leading-snug line-clamp-2">{item.description}</div>
+                              ) : null}
+
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <div className="text-sm font-extrabold text-gray-900">{formatTzs(price)}</div>
+
+                                {qty > 0 ? (
+                                  <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white">
+                                    <button
+                                      type="button"
+                                      onClick={() => dec(item.id)}
+                                      className="px-2 py-1.5 text-sm font-bold text-gray-800 hover:bg-gray-50"
+                                    >
+                                      −
+                                    </button>
+                                    <div className="px-2 py-1.5 text-sm font-bold text-gray-900">{qty}</div>
+                                    <button
+                                      type="button"
+                                      onClick={() => add(item.id)}
+                                      className="px-2 py-1.5 text-sm font-bold text-gray-800 hover:bg-gray-50"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => add(item.id)}
+                                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                                  >
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </section>
             ))}
           </div>
