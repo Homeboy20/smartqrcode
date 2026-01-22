@@ -12,6 +12,7 @@ type Restaurant = {
   slug: string;
   whatsapp_number: string;
   accepted_payments: string[];
+  enable_table_qr?: boolean;
 };
 
 type MenuItem = {
@@ -59,7 +60,7 @@ export default async function MenuPage({
 
   const { data: restaurant, error: rErr } = await supabase
     .from('restaurants')
-    .select('id,name,slug,whatsapp_number,accepted_payments')
+    .select('id,name,slug,whatsapp_number,accepted_payments,enable_table_qr')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -93,7 +94,8 @@ export default async function MenuPage({
     );
   }
 
-  const table = typeof searchParams?.table === 'string' ? searchParams?.table : '';
+  const tableParam = typeof searchParams?.table === 'string' ? searchParams?.table : '';
+  const table = restaurant?.enable_table_qr ? tableParam : '';
 
   return (
     <MenuClient

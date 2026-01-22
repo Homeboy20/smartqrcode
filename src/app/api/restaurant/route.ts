@@ -14,6 +14,7 @@ type RestaurantRow = {
   slug: string;
   whatsapp_number: string;
   accepted_payments: string[];
+  enable_table_qr: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('restaurants')
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,created_at,updated_at')
+      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
     const whatsappNumber = typeof body?.whatsappNumber === 'string' ? body.whatsappNumber.trim() : '';
     const acceptedPayments = normalizePayments(body?.acceptedPayments);
+    const enableTableQr = typeof body?.enableTableQr === 'boolean' ? body.enableTableQr : false;
 
     if (!name) return badRequest('Restaurant name is required');
     if (!whatsappNumber) return badRequest('WhatsApp phone number is required');
@@ -107,8 +109,9 @@ export async function POST(request: NextRequest) {
         slug,
         whatsapp_number: whatsappNumber,
         accepted_payments: acceptedPayments,
+        enable_table_qr: enableTableQr,
       })
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,created_at,updated_at')
+      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
       .single();
 
     if (error || !created) {
@@ -133,6 +136,7 @@ export async function PATCH(request: NextRequest) {
     const name = typeof body?.name === 'string' ? body.name.trim() : undefined;
     const whatsappNumber = typeof body?.whatsappNumber === 'string' ? body.whatsappNumber.trim() : undefined;
     const acceptedPayments = body?.acceptedPayments !== undefined ? normalizePayments(body.acceptedPayments) : undefined;
+    const enableTableQr = typeof body?.enableTableQr === 'boolean' ? body.enableTableQr : undefined;
 
     if (name !== undefined && !name) return badRequest('Restaurant name is required');
     if (whatsappNumber !== undefined && !whatsappNumber) return badRequest('WhatsApp phone number is required');
@@ -144,12 +148,13 @@ export async function PATCH(request: NextRequest) {
     if (name !== undefined) patch.name = name;
     if (whatsappNumber !== undefined) patch.whatsapp_number = whatsappNumber;
     if (acceptedPayments !== undefined) patch.accepted_payments = acceptedPayments;
+    if (enableTableQr !== undefined) patch.enable_table_qr = enableTableQr;
 
     const { data: updated, error } = await supabase
       .from('restaurants')
       .update(patch)
       .eq('user_id', userId)
-      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,created_at,updated_at')
+      .select('id,user_id,name,slug,whatsapp_number,accepted_payments,enable_table_qr,created_at,updated_at')
       .maybeSingle();
 
     if (error) {

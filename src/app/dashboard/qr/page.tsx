@@ -12,6 +12,7 @@ type Restaurant = {
   id: string;
   name: string;
   slug: string;
+  enable_table_qr?: boolean;
 };
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'success'; message: string };
@@ -73,6 +74,7 @@ export default function DashboardQrPage() {
     if (typeof window === 'undefined') return '';
 
     const base = `${window.location.origin}/menu/${restaurant.slug}`;
+    if (!restaurant.enable_table_qr) return base;
     const tableTrim = table.trim();
     if (!tableTrim) return base;
 
@@ -85,6 +87,7 @@ export default function DashboardQrPage() {
   const tableUrls = useMemo(() => {
     if (!restaurant?.slug) return [] as Array<{ table: number; url: string }>;
     if (typeof window === 'undefined') return [];
+    if (!restaurant.enable_table_qr) return [];
 
     const start = Number(tableStart.trim());
     const end = Number(tableEnd.trim());
@@ -163,7 +166,9 @@ export default function DashboardQrPage() {
                   className="mt-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800"
                 />
                 <p className="mt-2 text-xs text-gray-600">
-                  Use the optional table number to help identify where the order is coming from.
+                  {restaurant.enable_table_qr
+                    ? 'Use the optional table number to help identify where the order is coming from.'
+                    : 'This is your main menu link (table identity is currently disabled).'}
                 </p>
               </div>
 
@@ -173,9 +178,15 @@ export default function DashboardQrPage() {
                   value={table}
                   onChange={(e) => setTable(e.target.value)}
                   inputMode="numeric"
+                  disabled={!restaurant.enable_table_qr}
                   className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   placeholder="e.g. 5"
                 />
+                {!restaurant.enable_table_qr ? (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Enable table QRs in <Link href="/dashboard/settings" className="text-indigo-600 hover:text-indigo-700 font-semibold">Settings</Link>.
+                  </div>
+                ) : null}
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
@@ -203,6 +214,7 @@ export default function DashboardQrPage() {
             <QRCodeGenerator initialUrl={menuUrl} />
           </div>
 
+          {restaurant.enable_table_qr ? (
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -262,6 +274,22 @@ export default function DashboardQrPage() {
               <div className="mt-4 text-xs text-gray-500">Set a valid start/end to generate table QRs.</div>
             )}
           </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-white p-4">
+              <div className="text-sm font-semibold text-gray-900">Dine-in table QRs</div>
+              <p className="mt-1 text-sm text-gray-600">
+                Enable table QRs in Settings to generate per-table codes with table number identity.
+              </p>
+              <div className="mt-3">
+                <Link
+                  href="/dashboard/settings"
+                  className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                  Go to settings
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </DashboardShell>
