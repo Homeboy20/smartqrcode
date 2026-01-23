@@ -13,7 +13,9 @@ export type FeatureType =
   | 'qrCodeTracking'
   | 'enhancedBarcodes'
   | 'fileUploads'
-  | 'analytics';
+  | 'analytics'
+  | 'restaurant'
+  | 'restaurantTeam';
 
 // Define limits for each subscription tier
 export const subscriptionLimits = {
@@ -86,7 +88,9 @@ export const featureAccess = {
     qrCodeTracking: false,
     enhancedBarcodes: false,
     fileUploads: false,
-    analytics: false
+    analytics: false,
+    restaurant: false,
+    restaurantTeam: false
   },
   pro: {
     qrCodesGenerated: true,
@@ -99,7 +103,9 @@ export const featureAccess = {
     qrCodeTracking: true,
     enhancedBarcodes: true,
     fileUploads: true,
-    analytics: true
+    analytics: true,
+    restaurant: true,
+    restaurantTeam: false
   },
   business: {
     qrCodesGenerated: true,
@@ -112,7 +118,9 @@ export const featureAccess = {
     qrCodeTracking: true,
     enhancedBarcodes: true,
     fileUploads: true,
-    analytics: true
+    analytics: true,
+    restaurant: true,
+    restaurantTeam: true
   },
 };
 
@@ -123,24 +131,7 @@ export function hasFeatureAccess(
   subscriptionTier: SubscriptionTier,
   feature: FeatureType
 ): boolean {
-  console.log(`hasFeatureAccess - Tier: ${subscriptionTier}, Feature: ${feature}`);
-  
-  // Extra check for permission-based features
-  if (feature === "pdfDownload" || feature === "svgDownload" || feature === "noWatermark") {
-    console.log(`Checking permission-based feature: ${feature} for tier: ${subscriptionTier}`);
-    console.log(`Pro access: ${featureAccess.pro[feature]}, Business access: ${featureAccess.business[feature]}`);
-    
-    // Log exact access map
-    if (subscriptionTier === 'pro') {
-      console.log(`Pro tier featureAccess map:`, featureAccess.pro);
-    } else if (subscriptionTier === 'business') {
-      console.log(`Business tier featureAccess map:`, featureAccess.business);
-    }
-  }
-  
-  console.log(`Feature map for tier:`, featureAccess[subscriptionTier]);
   const result = featureAccess[subscriptionTier][feature] || false;
-  console.log(`Access result: ${result}`);
   return result;
 }
 
@@ -174,6 +165,8 @@ export function getRemainingUsage(
     case 'enhancedBarcodes':
     case 'fileUploads':
     case 'analytics':
+    case 'restaurant':
+    case 'restaurantTeam':
       // These are access-based features, not limited by usage
       return { daily: 999999, monthly: 999999 };
     default:

@@ -9,6 +9,7 @@ import DashboardShell from '@/components/dashboard/DashboardShell';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type Restaurant = {
   id: string;
@@ -41,6 +42,7 @@ export default function DashboardQrPage() {
   const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
   const { loading: accessLoading, access } = useRestaurantAccess();
+  const { subscriptionTier, baseSubscriptionTier, loading: subscriptionLoading, canUseFeature } = useSubscription();
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,9 @@ export default function DashboardQrPage() {
   useEffect(() => {
     let cancelled = false;
 
+    if (subscriptionLoading) return;
+    if (!canUseFeature('restaurant')) return;
+
     (async () => {
       setLoading(true);
       try {
@@ -78,7 +83,10 @@ export default function DashboardQrPage() {
     return () => {
       cancelled = true;
     };
-  }, [getAccessToken]);
+  }, [getAccessToken, subscriptionLoading, canUseFeature]);
+
+  const baseTier = baseSubscriptionTier || subscriptionTier;
+  const hasRestaurantAccess = canUseFeature('restaurant');
 
   const menuUrl = useMemo(() => {
     if (!restaurant?.slug) return '';
@@ -132,7 +140,7 @@ export default function DashboardQrPage() {
       title="Menu QR"
       subtitle="Generate QR codes that open your menu and collect WhatsApp orders"
       actions={
-        restaurant ? (
+        subscriptionLoading || baseTier === 'free' || !hasRestaurantAccess ? null : restaurant ? (
           <Link
             href={menuUrl || `/menu/${restaurant.slug}`}
             target="_blank"
@@ -143,6 +151,33 @@ export default function DashboardQrPage() {
         ) : null
       }
     >
+      {subscriptionLoading ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg" />
+        </div>
+      ) : baseTier === 'free' || !hasRestaurantAccess ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900">Restaurant QR tools are a premium feature</h1>
+            <p className="mt-2 text-gray-600">Start a paid trial or subscribe to generate menu/table QR codes.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/pricing?required=1&redirect=${encodeURIComponent('/dashboard/qr')}`}
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                View plans
+              </Link>
+              <Link
+                href="/generator"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Continue to generator
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {status.kind === 'error' ? (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
       ) : null}
@@ -303,6 +338,8 @@ export default function DashboardQrPage() {
           )}
         </div>
       ) : null}
+        </>
+      )}
     </DashboardShell>
   );
 }

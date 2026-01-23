@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getRestaurantAccess } from '@/lib/restaurant/access';
+import { requireFeatureAccess } from '@/lib/subscription/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,14 @@ export async function GET(request: Request) {
 
     const admin = createServerClient();
     if (!admin) return json(500, { error: 'Database not configured' });
+
+    const gate = await requireFeatureAccess(
+      admin,
+      access.userId,
+      'restaurant',
+      'Restaurant orders require a Pro or Business plan (or paid trial).'
+    );
+    if (!gate.ok) return json(gate.status, { error: gate.error });
 
     const url = new URL(request.url);
     const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || '50'), 1), 200);

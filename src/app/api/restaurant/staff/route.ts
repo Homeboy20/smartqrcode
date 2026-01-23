@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getRestaurantAccess, type RestaurantStaffRole } from '@/lib/restaurant/access';
+import { requireFeatureAccess } from '@/lib/subscription/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,14 @@ export async function GET(request: Request) {
 
     const admin = createServerClient();
     if (!admin) return json(500, { error: 'Database not configured' });
+
+    const gate = await requireFeatureAccess(
+      admin,
+      access.userId,
+      'restaurantTeam',
+      'Staff/team features require the Business plan (or Business paid trial).'
+    );
+    if (!gate.ok) return json(gate.status, { error: gate.error });
 
     const url = new URL(request.url);
     const assignableOnly = url.searchParams.get('assignable') === '1';
@@ -103,6 +112,14 @@ export async function POST(request: Request) {
 
     const admin = createServerClient();
     if (!admin) return json(500, { error: 'Database not configured' });
+
+    const gate = await requireFeatureAccess(
+      admin,
+      access.userId,
+      'restaurantTeam',
+      'Staff/team features require the Business plan (or Business paid trial).'
+    );
+    if (!gate.ok) return json(gate.status, { error: gate.error });
 
     const body = await request.json().catch(() => ({}));
     const email = String(body?.email || '').trim().toLowerCase();

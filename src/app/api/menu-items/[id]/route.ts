@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { verifyUserAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
+import { requireFeatureAccess } from '@/lib/subscription/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,14 @@ function badRequest(message: string) {
 async function getRestaurantIdForUser(userId: string) {
   const supabase = createServerClient();
   if (!supabase) return { supabase: null as any, restaurantId: null as string | null, error: 'Database not configured' };
+
+  const gate = await requireFeatureAccess(
+    supabase,
+    userId,
+    'restaurant',
+    'Restaurant features require a Pro or Business plan (or paid trial).'
+  );
+  if (!gate.ok) return { supabase, restaurantId: null as string | null, error: gate.error };
 
   const { data, error } = await supabase
     .from('restaurants')

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { getRestaurantAccess, type RestaurantStaffRole } from '@/lib/restaurant/access';
+import { requireFeatureAccess } from '@/lib/subscription/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,6 +57,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const access = await getRestaurantAccess(request);
     const admin = createServerClient();
     if (!admin) return json(500, { error: 'Database not configured' });
+
+    const gate = await requireFeatureAccess(
+      admin,
+      access.userId,
+      'restaurant',
+      'Restaurant orders require a Pro or Business plan (or paid trial).'
+    );
+    if (!gate.ok) return json(gate.status, { error: gate.error });
 
     const id = String(params?.id || '').trim();
     if (!id) return json(400, { error: 'Order id is required' });

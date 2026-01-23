@@ -74,6 +74,11 @@ export async function POST(req: NextRequest) {
       return json(403, { error: 'File uploads require a Pro or Business plan.' });
     }
 
+    // Restaurant uploads (menu images / PDFs) also require restaurant access.
+    if (!hasFeatureAccess(tier, 'restaurant')) {
+      return json(402, { error: 'Restaurant uploads require a Pro or Business plan (or paid trial).' });
+    }
+
     const form = await req.formData();
     const file = form.get('file');
 

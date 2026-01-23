@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type Restaurant = {
   id: string;
@@ -53,6 +54,7 @@ export default function DashboardMenuPage() {
   const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
   const { loading: accessLoading, access } = useRestaurantAccess();
+  const { subscriptionTier, baseSubscriptionTier, loading: subscriptionLoading, canUseFeature } = useSubscription();
 
   useEffect(() => {
     if (accessLoading) return;
@@ -60,6 +62,9 @@ export default function DashboardMenuPage() {
       router.replace('/dashboard/orders');
     }
   }, [accessLoading, access, router]);
+
+  const baseTier = baseSubscriptionTier || subscriptionTier;
+  const hasRestaurantAccess = canUseFeature('restaurant');
 
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -106,9 +111,11 @@ export default function DashboardMenuPage() {
   }
 
   useEffect(() => {
+    if (subscriptionLoading) return;
+    if (!hasRestaurantAccess) return;
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [subscriptionLoading, hasRestaurantAccess]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, MenuItem[]>();
@@ -274,6 +281,33 @@ export default function DashboardMenuPage() {
         ) : null
       }
     >
+      {subscriptionLoading ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg" />
+        </div>
+      ) : baseTier === 'free' || !hasRestaurantAccess ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900">Restaurant menu is a premium feature</h1>
+            <p className="mt-2 text-gray-600">Start a paid trial or subscribe to manage menu items and uploads.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/pricing?required=1&redirect=${encodeURIComponent('/dashboard/menu')}`}
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                View plans
+              </Link>
+              <Link
+                href="/generator"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Continue to generator
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {status.kind === 'error' ? (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
       ) : null}
@@ -501,6 +535,8 @@ export default function DashboardMenuPage() {
           </div>
         )
       ) : null}
+        </>
+      )}
     </DashboardShell>
   );
 }

@@ -17,7 +17,8 @@ export default function RegisterPage() {
   const { settings: appSettings } = useAppSettings();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams?.get('redirect') || '/dashboard';
+  const intendedRedirect = searchParams?.get('redirect') || '/dashboard';
+  const redirect = `/pricing?required=1&redirect=${encodeURIComponent(intendedRedirect)}`;
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

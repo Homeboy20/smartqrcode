@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserAccess } from '@/lib/supabase/auth';
 import { createServerClient } from '@/lib/supabase/server';
 import { ensureUniqueRestaurantSlug, slugifyRestaurantName } from '@/lib/restaurant/slug';
+import { requireFeatureAccess } from '@/lib/subscription/guards';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -99,6 +100,13 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
     if (!supabase) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
+    const gate = await requireFeatureAccess(supabase, userId, 'restaurant',
+      'Restaurant features require a Pro or Business plan (or paid trial).'
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+
     const { data: existing } = await supabase
       .from('restaurants')
       .select('id')
@@ -175,6 +183,13 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = createServerClient();
     if (!supabase) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+
+    const gate = await requireFeatureAccess(supabase, userId, 'restaurant',
+      'Restaurant features require a Pro or Business plan (or paid trial).'
+    );
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
 
     const patch: Record<string, any> = {};
     if (name !== undefined) patch.name = name;

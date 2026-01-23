@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRestaurantAccess } from '@/hooks/useRestaurantAccess';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type StaffRole = 'manager' | 'kitchen' | 'waiter' | 'delivery';
 
@@ -28,6 +30,7 @@ export default function DashboardStaffPage() {
   const router = useRouter();
   const { getAccessToken } = useSupabaseAuth();
   const { loading: accessLoading, access } = useRestaurantAccess();
+  const { subscriptionTier, baseSubscriptionTier, loading: subscriptionLoading, canUseFeature } = useSubscription();
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -57,6 +60,9 @@ export default function DashboardStaffPage() {
     return base;
   }, [isOwner]);
 
+  const baseTier = baseSubscriptionTier || subscriptionTier;
+  const hasTeamAccess = canUseFeature('restaurantTeam');
+
   useEffect(() => {
     if (accessLoading) return;
     if (!access) return;
@@ -69,6 +75,13 @@ export default function DashboardStaffPage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (subscriptionLoading) return;
+    if (!hasTeamAccess) {
+      setLoading(false);
+      setStatus({ kind: 'idle' });
+      return;
+    }
 
     (async () => {
       setLoading(true);
@@ -102,7 +115,7 @@ export default function DashboardStaffPage() {
     return () => {
       cancelled = true;
     };
-  }, [getAccessToken]);
+  }, [getAccessToken, subscriptionLoading, hasTeamAccess]);
 
   async function inviteStaff() {
     setStatus({ kind: 'loading' });
@@ -167,6 +180,33 @@ export default function DashboardStaffPage() {
       title="Staff"
       subtitle="Add and manage managers, kitchen staff, and waiters for your restaurant."
     >
+      {subscriptionLoading ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="h-24 bg-gray-200 animate-pulse rounded-lg" />
+        </div>
+      ) : baseTier === 'free' || !hasTeamAccess ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900">Staff management is Business-only</h1>
+            <p className="mt-2 text-gray-600">Upgrade to Business to add team members, roles, and notifications.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/pricing?required=1&redirect=${encodeURIComponent('/dashboard/staff')}`}
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                View plans
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Back to dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {status.kind === 'error' ? (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
       ) : null}
@@ -328,6 +368,8 @@ export default function DashboardStaffPage() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </DashboardShell>
   );
 }

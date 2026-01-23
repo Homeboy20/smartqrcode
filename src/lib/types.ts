@@ -29,6 +29,7 @@ export interface UseSubscriptionReturn {
   loading: boolean;
   error: string | null;
   subscriptionTier: SubscriptionTier;
+  baseSubscriptionTier?: SubscriptionTier;
   featuresUsage: UserData['featuresUsage'];
   limits: any;
   getLimit: (featureKey: string) => number;

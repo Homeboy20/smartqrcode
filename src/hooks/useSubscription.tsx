@@ -171,6 +171,7 @@ export function useSubscription(): UseSubscriptionReturn {
     loading: loading || appSettingsLoading,
     error,
     subscriptionTier: effectiveTier,
+    baseSubscriptionTier: subscriptionTier,
     featuresUsage,
     limits: effectiveLimits,
     getLimit: (featureKey: string) => {
@@ -193,6 +194,13 @@ export function useSubscription(): UseSubscriptionReturn {
       }
     },
     canUseFeature: (feature: string) => {
+      const ft = feature as FeatureType;
+
+      // Never let global Free Mode unlock restaurant features.
+      if (ft === 'restaurant' || ft === 'restaurantTeam') {
+        return hasFeatureAccess(subscriptionTier as SubscriptionTier, ft);
+      }
+
       if (freeModeForAuthenticatedUser) return true;
 
       // Anonymous Free Mode: allow only basic generation.
@@ -203,7 +211,6 @@ export function useSubscription(): UseSubscriptionReturn {
         return false;
       }
 
-      const ft = feature as FeatureType;
       return hasFeatureAccess(effectiveTier as SubscriptionTier, ft);
     },
     remainingUsage: (feature: string) => {

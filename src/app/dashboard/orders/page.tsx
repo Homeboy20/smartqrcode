@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import DashboardShell from '@/components/dashboard/DashboardShell';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRestaurantAccess, type RestaurantAccess, type RestaurantStaffRole } from '@/hooks/useRestaurantAccess';
+import { useSubscription } from '@/hooks/useSubscription';
 
 type AssignableStaff = {
   userId: string;
@@ -188,6 +190,7 @@ function getNextActions(opts: {
 export default function DashboardOrdersPage() {
   const { getAccessToken } = useSupabaseAuth();
   const { loading: accessLoading, access, error: accessError } = useRestaurantAccess();
+  const { loading: subscriptionLoading, canUseFeature } = useSubscription();
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +209,7 @@ export default function DashboardOrdersPage() {
   const seenNotificationIdsRef = useRef<Set<string>>(new Set());
 
   const canAssignOrders = !!access && canAssign(access.staffRole, access.isOwner);
+  const hasRestaurantAccess = canUseFeature('restaurant');
 
   const playNotifySound = () => {
     if (!audioUnlockedRef.current) return;
@@ -391,6 +395,13 @@ export default function DashboardOrdersPage() {
   useEffect(() => {
     let cancelled = false;
 
+    if (subscriptionLoading) return;
+    if (!hasRestaurantAccess) {
+      setLoading(false);
+      setStatus({ kind: 'idle' });
+      return;
+    }
+
     if (accessLoading) return;
 
     if (accessError || !access) {
@@ -442,7 +453,7 @@ export default function DashboardOrdersPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [accessLoading, accessError, access, getAccessToken]);
+  }, [subscriptionLoading, hasRestaurantAccess, accessLoading, accessError, access, getAccessToken]);
 
   async function notifyOrder(orderId: string) {
     if (!access) return;
@@ -547,6 +558,35 @@ export default function DashboardOrdersPage() {
       subtitle="Kitchen, waiters, and delivery staff see only what they need."
       navItems={navItems}
     >
+      {subscriptionLoading ? (
+        <div className="space-y-3">
+          <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          <div className="h-10 bg-gray-100 animate-pulse rounded" />
+          <div className="h-10 bg-gray-100 animate-pulse rounded" />
+        </div>
+      ) : !hasRestaurantAccess ? (
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h1 className="text-2xl font-bold text-gray-900">Orders are a premium feature</h1>
+            <p className="mt-2 text-gray-600">Start a paid trial or subscribe to manage restaurant orders.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href={`/pricing?required=1&redirect=${encodeURIComponent('/dashboard/orders')}`}
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                View plans
+              </Link>
+              <Link
+                href="/generator"
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Continue to generator
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       {status.kind === 'error' ? (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
       ) : null}
@@ -721,6 +761,8 @@ export default function DashboardOrdersPage() {
             </div>
           ))}
         </div>
+      )}
+        </>
       )}
     </DashboardShell>
   );

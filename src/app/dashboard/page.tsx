@@ -27,7 +27,7 @@ function formatShortDate(value?: string) {
 export default function DashboardPage() {
   const router = useRouter();
   const { user, getAccessToken } = useSupabaseAuth();
-  const { subscriptionTier, loading, featuresUsage, limits } = useSubscription();
+  const { subscriptionTier, baseSubscriptionTier, loading, featuresUsage, limits, canUseFeature } = useSubscription();
   const { loading: accessLoading, access } = useRestaurantAccess();
 
   const [recentCodes, setRecentCodes] = useState<RecentCode[] | null>(null);
@@ -140,6 +140,36 @@ export default function DashboardPage() {
     );
   }
 
+  // Force plan selection for dashboard access (new users land here after signup).
+  // Note: Free Mode may elevate effectiveTier; use base tier for paywall decisions.
+  const baseTier = baseSubscriptionTier || subscriptionTier;
+  if (baseTier === 'free') {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h1 className="text-2xl font-bold text-gray-900">Choose a plan to continue</h1>
+          <p className="mt-2 text-gray-600">
+            Your account is on the Free tier. To access the dashboard and restaurant tools, start a paid trial or subscribe.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href={`/pricing?required=1&redirect=${encodeURIComponent('/dashboard')}`}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              View plans
+            </Link>
+            <Link
+              href="/generator"
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+            >
+              Continue to generator
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
@@ -232,31 +262,48 @@ export default function DashboardPage() {
 
           <div className="bg-white border border-gray-200 rounded-lg p-6 mt-4">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Restaurant Menu</h2>
-            <div className="space-y-2">
-              <Link
-                href="/dashboard/settings"
-                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
-              >
-                <span className="font-medium text-gray-900">Onboarding & Settings</span>
-                <span className="text-xs text-gray-500">WhatsApp + payments</span>
-              </Link>
+            {canUseFeature('restaurant') ? (
+              <div className="space-y-2">
+                <Link
+                  href="/dashboard/settings"
+                  className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+                >
+                  <span className="font-medium text-gray-900">Onboarding & Settings</span>
+                  <span className="text-xs text-gray-500">WhatsApp + payments</span>
+                </Link>
 
-              <Link
-                href="/dashboard/menu"
-                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
-              >
-                <span className="font-medium text-gray-900">Manage Menu</span>
-                <span className="text-xs text-gray-500">CRUD items</span>
-              </Link>
+                <Link
+                  href="/dashboard/menu"
+                  className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+                >
+                  <span className="font-medium text-gray-900">Manage Menu</span>
+                  <span className="text-xs text-gray-500">CRUD items</span>
+                </Link>
 
-              <Link
-                href="/dashboard/qr"
-                className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
-              >
-                <span className="font-medium text-gray-900">Generate Menu QR</span>
-                <span className="text-xs text-gray-500">/menu/slug</span>
-              </Link>
-            </div>
+                <Link
+                  href="/dashboard/qr"
+                  className="flex items-center justify-between p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition"
+                >
+                  <span className="font-medium text-gray-900">Generate Menu QR</span>
+                  <span className="text-xs text-gray-500">/menu/slug</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
+                <div className="text-sm font-semibold text-yellow-900">Restaurant is a premium feature</div>
+                <div className="mt-1 text-sm text-yellow-800">
+                  Start a paid trial or subscribe to unlock the restaurant menu tools.
+                </div>
+                <div className="mt-3">
+                  <Link
+                    href="/pricing"
+                    className="inline-flex items-center justify-center rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-black"
+                  >
+                    View plans
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

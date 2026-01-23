@@ -1015,6 +1015,18 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                         : 'Bulk generation'}
                     </span>
                   </li>
+                  {planFeatures.restaurant ? (
+                    <li className="flex items-start">
+                      <span className="mt-0.5 mr-2 text-green-600">✓</span>
+                      <span>Restaurant menu + orders</span>
+                    </li>
+                  ) : null}
+                  {planFeatures.restaurantTeam ? (
+                    <li className="flex items-start">
+                      <span className="mt-0.5 mr-2 text-green-600">✓</span>
+                      <span>Staff roles + notifications</span>
+                    </li>
+                  ) : null}
                 </ul>
 
                 <div className="mt-6 rounded-xl bg-gray-50 border border-gray-200 p-4">

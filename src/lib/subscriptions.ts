@@ -10,6 +10,8 @@ interface FeatureLimits {
   maxAICustomizations: number;
   analyticsEnabled: boolean;
   customBrandingAllowed: boolean;
+  restaurant: boolean;
+  restaurantTeam: boolean;
   teamMembersAllowed: boolean;
   maxTeamMembers: number;
 }
@@ -25,6 +27,8 @@ export const subscriptionFeatures: Record<SubscriptionTier, FeatureLimits> = {
     maxAICustomizations: 0,
     analyticsEnabled: false,
     customBrandingAllowed: false,
+    restaurant: false,
+    restaurantTeam: false,
     teamMembersAllowed: false,
     maxTeamMembers: 0
   },
@@ -37,6 +41,8 @@ export const subscriptionFeatures: Record<SubscriptionTier, FeatureLimits> = {
     maxAICustomizations: 10,
     analyticsEnabled: true,
     customBrandingAllowed: true,
+    restaurant: true,
+    restaurantTeam: false,
     teamMembersAllowed: false,
     maxTeamMembers: 0
   },
@@ -49,6 +55,8 @@ export const subscriptionFeatures: Record<SubscriptionTier, FeatureLimits> = {
     maxAICustomizations: 50,
     analyticsEnabled: true,
     customBrandingAllowed: true,
+    restaurant: true,
+    restaurantTeam: true,
     teamMembersAllowed: true,
     maxTeamMembers: 5
   }
@@ -72,6 +80,8 @@ export function hasFeatureAccess(
       feature === 'aiCustomizationAllowed' || 
       feature === 'analyticsEnabled' || 
       feature === 'customBrandingAllowed' ||
+      feature === 'restaurant' ||
+      feature === 'restaurantTeam' ||
       feature === 'teamMembersAllowed') {
     return tierFeatures[feature];
   }
