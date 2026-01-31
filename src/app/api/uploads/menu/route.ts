@@ -5,6 +5,9 @@ import { randomUUID } from 'crypto';
 import { createServerClient } from '@/lib/supabase/server';
 import { hasFeatureAccess } from '@/lib/subscription';
 import type { SubscriptionTier } from '@/lib/subscription';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
+import { existsSync } from 'fs';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,34 +105,38 @@ export async function POST(req: NextRequest) {
       return json(400, { error: 'File is too large (max 15MB).' });
     }
 
-    const bucket = process.env.NEXT_PUBLIC_MENU_UPLOADS_BUCKET || 'menu-uploads';
-
     const safeName = sanitizeFilename(originalName || (isPdf ? 'menu.pdf' : 'image'));
-    const objectPath = `menus/${user.id}/${safeRandomId()}-${safeName}`;
+    const relativePath = `menus/${user.id}/${safeRandomId()}-${safeName}`;
+    
+    // Save to public/uploads directory
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+    const userDir = path.join(uploadsDir, 'menus', user.id);
+    const filePath = path.join(uploadsDir, relativePath);
+
+    // Ensure directory exists
+    if (!existsSync(userDir)) {
+      await mkdir(userDir, { recursive: true });
+    }
 
     const bytes = Buffer.from(await fileAny.arrayBuffer());
 
-    const { error: uploadError } = await adminClient.storage
-      .from(bucket)
-      .upload(objectPath, bytes, {
-        contentType: contentType || (isPdf ? 'application/pdf' : 'application/octet-stream'),
-        upsert: false,
-      });
-
-    if (uploadError) {
+    try {
+      await writeFile(filePath, bytes);
+    } catch (writeError: any) {
       return json(500, {
         error: 'Upload failed',
-        details: uploadError.message,
-        hint: 'Ensure the Storage bucket exists and is public if you want anyone to view the menu/brochure.',
+        details: writeError.message,
+        hint: 'Ensure the server has write permissions to the public/uploads directory.',
       });
     }
 
-    const { data: publicData } = adminClient.storage.from(bucket).getPublicUrl(objectPath);
+    // Return public URL relative to your domain
+    const publicUrl = `/uploads/${relativePath}`;
 
     return json(200, {
       ok: true,
-      url: publicData.publicUrl,
-      path: objectPath,
+      url: publicUrl,
+      path: relativePath,
       contentType,
     });
   } catch (e: any) {
