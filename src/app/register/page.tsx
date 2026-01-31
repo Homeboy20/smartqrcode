@@ -12,6 +12,12 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    displayName?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
   const [loading, setLoading] = useState(false);
   const { user, signUp, signInWithGoogle, error: authError, loading: authChecking, clearError } = useSupabaseAuth();
   const { settings: appSettings } = useAppSettings();
@@ -43,9 +49,36 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     setSuccessMessage(null);
+    setFieldErrors({});
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
+    // Client-side validation
+    const errors: typeof fieldErrors = {};
+    
+    if (!displayName.trim()) {
+      errors.displayName = 'Display name is required';
+    }
+    
+    if (!email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    if (!password) {
+      errors.password = 'Password is required';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fix the errors below');
       return;
     }
 
@@ -54,7 +87,12 @@ export default function RegisterPage() {
       clearError();
       const success = await signUp(email, password, displayName);
       if (!success) {
-        setError(authError || "Registration failed. Please try again.");
+        const errorMsg = authError || "Registration failed. Please try again.";
+        setError(errorMsg);
+        // Set field-specific errors if we can detect them
+        if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('already')) {
+          setFieldErrors({ email: 'This email is already registered' });
+        }
         return;
       }
       // Supabase may require email confirmation, so we can't always redirect immediately.
@@ -133,11 +171,27 @@ export default function RegisterPage() {
                 type="text"
                 required
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  if (fieldErrors.displayName) {
+                    setFieldErrors(prev => ({ ...prev, displayName: undefined }));
+                  }
+                }}
                 disabled={loading}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${
+                  fieldErrors.displayName 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-gray-300 focus:border-indigo-500'
+                }`}
                 placeholder="Your name"
+                aria-invalid={!!fieldErrors.displayName}
+                aria-describedby={fieldErrors.displayName ? 'displayName-error' : undefined}
               />
+              {fieldErrors.displayName && (
+                <p id="displayName-error" className="mt-1 text-sm text-red-600">
+                  {fieldErrors.displayName}
+                </p>
+              )}
             </div>
 
             <div>
@@ -151,11 +205,27 @@ export default function RegisterPage() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) {
+                    setFieldErrors(prev => ({ ...prev, email: undefined }));
+                  }
+                }}
                 disabled={loading}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${
+                  fieldErrors.email 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                    : 'border-gray-300 focus:border-indigo-500'
+                }`}
                 placeholder="you@example.com"
+                aria-invalid={!!fieldErrors.email}
+                aria-describedby={fieldErrors.email ? 'email-error' : undefined}
               />
+              {fieldErrors.email && (
+                <p id="email-error" className="mt-1 text-sm text-red-600">
+                  {fieldErrors.email}
+                </p>
+              )}
             </div>
 
             <div>
@@ -171,10 +241,21 @@ export default function RegisterPage() {
                   required
                   minLength={6}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) {
+                      setFieldErrors(prev => ({ ...prev, password: undefined }));
+                    }
+                  }}
                   disabled={loading}
-                  className="block w-full pr-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className={`block w-full pr-24 px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${
+                    fieldErrors.password 
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:border-indigo-500'
+                  }`}
                   placeholder="At least 6 characters"
+                  aria-invalid={!!fieldErrors.password}
+                  aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 />
                 <button
                   type="button"
@@ -186,7 +267,13 @@ export default function RegisterPage() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
-              <p className="mt-2 text-xs text-gray-500">Use at least 6 characters.</p>
+              {fieldErrors.password ? (
+                <p id="password-error" className="mt-1 text-sm text-red-600">
+                  {fieldErrors.password}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-500">Use at least 6 characters.</p>
+              )}
             </div>
 
             <div>
@@ -201,10 +288,21 @@ export default function RegisterPage() {
                   autoComplete="new-password"
                   required
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (fieldErrors.confirmPassword) {
+                      setFieldErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                    }
+                  }}
                   disabled={loading}
-                  className="block w-full pr-24 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className={`block w-full pr-24 px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 sm:text-sm ${
+                    fieldErrors.confirmPassword 
+                      ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
+                      : 'border-gray-300 focus:border-indigo-500'
+                  }`}
                   placeholder="Re-enter your password"
+                  aria-invalid={!!fieldErrors.confirmPassword}
+                  aria-describedby={fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
                 />
                 <button
                   type="button"
@@ -216,6 +314,11 @@ export default function RegisterPage() {
                   {showConfirmPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
+              {fieldErrors.confirmPassword && (
+                <p id="confirmPassword-error" className="mt-1 text-sm text-red-600">
+                  {fieldErrors.confirmPassword}
+                </p>
+              )}
             </div>
 
             <button

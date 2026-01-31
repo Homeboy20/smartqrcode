@@ -169,6 +169,24 @@ export default function PhoneSignup() {
 
       const { e164 } = normalizeToE164({ raw: phoneNumber, defaultCountry: selectedCountry });
 
+      // Check if phone number is already registered
+      try {
+        const checkRes = await fetch('/api/auth/check-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: e164 }),
+        });
+        const checkData = await checkRes.json().catch(() => ({}));
+        
+        if (checkData.exists) {
+          setLocalError('This phone number is already registered. Please sign in instead.');
+          return;
+        }
+      } catch (err) {
+        // If check fails, continue with registration (non-blocking)
+        console.warn('Phone duplicate check failed:', err);
+      }
+
       const verifier =
         recaptchaVerifierRef.current || (await setupRecaptcha('recaptcha-container'));
       recaptchaVerifierRef.current = verifier;

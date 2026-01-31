@@ -274,7 +274,17 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       if (error) {
-        setError(error.message);
+        // Parse specific error messages
+        let errorMsg = error.message;
+        if (error.message.toLowerCase().includes('already registered') || 
+            error.message.toLowerCase().includes('email already exists')) {
+          errorMsg = 'This email is already registered. Please sign in instead.';
+        } else if (error.message.toLowerCase().includes('invalid email')) {
+          errorMsg = 'Please enter a valid email address.';
+        } else if (error.message.toLowerCase().includes('password')) {
+          errorMsg = 'Password must be at least 6 characters long.';
+        }
+        setError(errorMsg);
         return false;
       }
 
@@ -296,7 +306,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       return true;
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Registration failed');
       return false;
     }
   };
@@ -376,12 +386,14 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Sign in with Google
+  // Sign in with Google (auto-login if account exists)
   const signInWithGoogle = async (options?: { redirectTo?: string }) => {
     try {
       clearError();
 
       const redirectTo = options?.redirectTo || `${window.location.origin}/auth/callback`;
+      // OAuth flow handles both signup and signin automatically
+      // If account exists, it signs in; if not, it creates new account
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
