@@ -21,6 +21,7 @@ export default function AdminSupportChatPage() {
   const { loading: authLoading, isAdmin } = useSupabaseAuth();
 
   const [online, setOnline] = useState(false);
+  const [chatConnected, setChatConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threads, setThreads] = useState<Record<string, SessionThread>>({});
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -69,7 +70,11 @@ export default function AdminSupportChatPage() {
         },
       });
 
-      chatChannel = supabase.channel('support:chat');
+      chatChannel = supabase.channel('support:chat', {
+        config: {
+          broadcast: { ack: true },
+        },
+      });
       chatChannelRef.current = chatChannel;
 
       presenceChannel.subscribe(async (status: any) => {
@@ -82,6 +87,11 @@ export default function AdminSupportChatPage() {
             setError(e?.message || 'Failed to go online');
             setOnline(false);
           }
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setError('Failed to connect to live chat presence.');
+          setOnline(false);
         }
       });
 
@@ -111,7 +121,17 @@ export default function AdminSupportChatPage() {
       setActiveSessionId((prevActive) => prevActive || msg.sessionId);
       });
 
-      chatChannel.subscribe();
+      chatChannel.subscribe((status: any) => {
+        if (!isMounted) return;
+        if (status === 'SUBSCRIBED') {
+          setChatConnected(true);
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setChatConnected(false);
+          setError('Failed to connect to live chat.');
+        }
+      });
     })();
 
     return () => {
@@ -138,7 +158,7 @@ export default function AdminSupportChatPage() {
 
     try {
       const channel = chatChannelRef.current;
-      if (!channel) throw new Error('Chat is not connected yet.');
+      if (!channel || !chatConnected) throw new Error('Chat is not connected yet.');
 
       const sendRes = await channel.send({
         type: 'broadcast',
@@ -214,6 +234,9 @@ export default function AdminSupportChatPage() {
           >
             {online ? 'Online' : 'Offline'}
           </span>
+          {!chatConnected && (
+            <span className="text-xs text-gray-500">Connecting…</span>
+          )}
         </div>
       </div>
 

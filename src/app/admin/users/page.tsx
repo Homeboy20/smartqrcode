@@ -22,6 +22,16 @@ interface User {
   };
 }
 
+type StaffAssignment = {
+  id: string;
+  userId: string;
+  role: string;
+  restaurantId: string;
+  restaurantName: string | null;
+  restaurantSlug: string | null;
+  createdAt: string;
+};
+
 export default function AdminUsersPage() {
   const { user, loading: authLoading } = useSupabaseAuth();
   const isDev = process.env.NODE_ENV === 'development';
@@ -33,6 +43,7 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedTier, setSelectedTier] = useState('all');
+  const [selectedAccountType, setSelectedAccountType] = useState<'all' | 'customer' | 'staff'>('all');
   const [error, setError] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0); // Add a version state to force refresh
   const [isClient, setIsClient] = useState(false);
@@ -49,6 +60,7 @@ export default function AdminUsersPage() {
     status: 'active'
   });
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [staffByUser, setStaffByUser] = useState<Record<string, StaffAssignment[]>>({});
   const [newUser, setNewUser] = useState<Partial<User>>({
     email: '',
     displayName: '',
@@ -109,6 +121,35 @@ export default function AdminUsersPage() {
         } else {
           console.error('Received invalid user data format:', data);
           setError('Received invalid data from server');
+        }
+
+        // Fetch staff assignments for account type separation
+        try {
+          const staffRes = await fetch('/api/admin/staff', {
+            cache: 'no-store',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (staffRes.ok) {
+            const staffData = await staffRes.json();
+            const staffList: StaffAssignment[] = Array.isArray(staffData?.staff) ? staffData.staff : [];
+            const nextIndex: Record<string, StaffAssignment[]> = {};
+            staffList.forEach((row) => {
+              if (!row?.userId) return;
+              if (!nextIndex[row.userId]) nextIndex[row.userId] = [];
+              nextIndex[row.userId].push(row);
+            });
+            setStaffByUser(nextIndex);
+          } else {
+            console.warn('Failed to load staff assignments:', staffRes.status);
+            setStaffByUser({});
+          }
+        } catch (staffErr) {
+          console.warn('Failed to load staff assignments:', staffErr);
+          setStaffByUser({});
         }
       } catch (err) {
         console.error('Failed to fetch users:', err);
@@ -378,6 +419,7 @@ export default function AdminUsersPage() {
 
   // Filter users based on search term and filters
   const filteredUsers = users.filter(user => {
+    const isStaff = Boolean(staffByUser[user.id]?.length);
     const matchesSearch = 
       searchTerm === '' || 
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -385,8 +427,11 @@ export default function AdminUsersPage() {
     
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     const matchesTier = selectedTier === 'all' || user.subscriptionTier === selectedTier;
+    const matchesAccountType =
+      selectedAccountType === 'all' ||
+      (selectedAccountType === 'staff' ? isStaff : !isStaff);
     
-    return matchesSearch && matchesRole && matchesTier;
+    return matchesSearch && matchesRole && matchesTier && matchesAccountType;
   });
 
   // Check if user is authenticated
@@ -440,7 +485,7 @@ export default function AdminUsersPage() {
 
       {/* Filters and Search */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="col-span-1 md:col-span-2">
             <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
               Search Users
@@ -486,6 +531,22 @@ export default function AdminUsersPage() {
               <option value="free">Free</option>
               <option value="pro">Pro</option>
               <option value="business">Business</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="accountTypeFilter" className="block text-sm font-medium text-gray-700 mb-1">
+              Filter by Account Type
+            </label>
+            <select
+              id="accountTypeFilter"
+              className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+              value={selectedAccountType}
+              onChange={(e) => setSelectedAccountType(e.target.value as 'all' | 'customer' | 'staff')}
+            >
+              <option value="all">All</option>
+              <option value="customer">Customers</option>
+              <option value="staff">Staff</option>
             </select>
           </div>
         </div>
@@ -552,6 +613,9 @@ export default function AdminUsersPage() {
                     Role
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Account Type
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created At
                   </th>
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -560,8 +624,21 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                {filteredUsers.map((user) => {
+                  const staffRows = staffByUser[user.id] || [];
+                  const isStaff = staffRows.length > 0;
+                  const staffRoles = Array.from(new Set(staffRows.map((s) => s.role))).join(', ');
+                  const staffRestaurantNames = staffRows
+                    .map((s) => s.restaurantName || s.restaurantSlug || 'Unknown')
+                    .filter(Boolean);
+                  const restaurantLabel = staffRestaurantNames.length
+                    ? staffRestaurantNames.length === 1
+                      ? staffRestaurantNames[0]
+                      : `${staffRestaurantNames.length} restaurants`
+                    : 'Unknown';
+
+                  return (
+                    <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -578,6 +655,11 @@ export default function AdminUsersPage() {
                           <div className="text-sm text-gray-500">
                             {user.email || 'No email'}
                           </div>
+                          {isStaff && (
+                            <div className="text-xs text-indigo-600 mt-1">
+                              Staff: {staffRoles || 'assigned'} · {restaurantLabel}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -598,6 +680,12 @@ export default function AdminUsersPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${isStaff ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {isStaff ? 'Staff' : 'Customer'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(user.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -612,7 +700,8 @@ export default function AdminUsersPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -30,6 +30,7 @@ export default function SupportChatWidget() {
 
   const [agentOnline, setAgentOnline] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [chatConnected, setChatConnected] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -65,14 +66,22 @@ export default function SupportChatWidget() {
 
     presenceChannel.subscribe((status) => {
       if (!isMounted) return;
-      setSubscribed(status === 'SUBSCRIBED');
       if (status === 'SUBSCRIBED') {
-        // Viewers do NOT call track(); only agents track themselves.
+        setSubscribed(true);
         updatePresence();
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setSubscribed(false);
+        setError('Failed to connect to live chat presence.');
       }
     });
 
-    const chatChannel = supabase.channel('support:chat');
+    const chatChannel = supabase.channel('support:chat', {
+      config: {
+        broadcast: { ack: true },
+      },
+    });
     chatChannelRef.current = chatChannel;
 
     chatChannel.on('broadcast', { event: 'chat_message' }, ({ payload }) => {
@@ -92,7 +101,17 @@ export default function SupportChatWidget() {
       setMessages((prev) => [...prev, msg]);
     });
 
-    chatChannel.subscribe();
+    chatChannel.subscribe((status) => {
+      if (!isMounted) return;
+      if (status === 'SUBSCRIBED') {
+        setChatConnected(true);
+        return;
+      }
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setChatConnected(false);
+        setError('Failed to connect to live chat.');
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -128,10 +147,10 @@ export default function SupportChatWidget() {
     setDraft('');
 
     try {
-      const channel = chatChannelRef.current;
-      if (!channel) {
-        throw new Error('Chat is not connected yet.');
-      }
+        const channel = chatChannelRef.current;
+        if (!channel || !chatConnected) {
+          throw new Error('Chat is not connected yet.');
+        }
 
       const sendRes = await channel.send({
         type: 'broadcast',
@@ -151,7 +170,30 @@ export default function SupportChatWidget() {
     }
   };
 
-  if (!agentOnline) return null;
+  if (!agentOnline) {
+    return (
+      <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Live support chat</h2>
+            <p className="mt-1 text-sm text-gray-600">No support agent is online right now.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 border border-gray-200">
+              Offline
+            </span>
+            {!subscribed && (
+              <span className="text-xs text-gray-500">Connecting…</span>
+            )}
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Live chat is unavailable at the moment. Please use the contact form.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 sm:p-6">
@@ -218,14 +260,15 @@ export default function SupportChatWidget() {
                 }
               }}
               placeholder="Type a message…"
+              disabled={!chatConnected}
               className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
             <button
               type="button"
               onClick={send}
-              disabled={!draft.trim()}
+              disabled={!draft.trim() || !chatConnected}
               className={
-                !draft.trim()
+                !draft.trim() || !chatConnected
                   ? 'rounded-md px-4 py-2 text-sm font-semibold text-white bg-indigo-300 cursor-not-allowed'
                   : 'rounded-md px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700'
               }
