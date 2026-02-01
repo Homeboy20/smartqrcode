@@ -255,6 +255,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const sendVerificationEmail = async (): Promise<boolean> => {
     if (!auth?.currentUser) return false;
+    if (!auth.currentUser.email) {
+      setError('Email address is missing for this account. Please verify using phone instead.');
+      return false;
+    }
     try {
       clearError();
       await sendEmailVerification(auth.currentUser);

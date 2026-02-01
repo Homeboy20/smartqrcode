@@ -41,6 +41,7 @@ export default function VerifyAccountPage() {
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const canEmailVerify = Boolean(firebaseUser?.email);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/dashboard';
@@ -110,6 +111,10 @@ export default function VerifyAccountPage() {
     
     try {
       if (verificationMethod === 'email') {
+        if (!canEmailVerify) {
+          setStatusMessage('Email verification is unavailable because this account has no email address. Please verify by phone instead.');
+          return;
+        }
         // Send email verification
         const success = await sendVerificationEmail();
         if (success) {
@@ -252,6 +257,9 @@ export default function VerifyAccountPage() {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             onClick={() => setVerificationMethod('email')}
+            disabled={!canEmailVerify}
+            aria-disabled={!canEmailVerify}
+            title={canEmailVerify ? undefined : 'Email verification requires an email address on the account'}
           >
             Email Verification
           </button>
@@ -269,6 +277,11 @@ export default function VerifyAccountPage() {
         
         {verificationMethod === 'email' ? (
           <div className="space-y-4">
+            {!canEmailVerify && (
+              <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800 border border-yellow-200">
+                Email verification is unavailable because this account has no email address. Please verify by phone instead.
+              </div>
+            )}
             <p className="text-gray-600">
               We'll send a verification link to your email address. Click the link to verify your account.
             </p>
@@ -278,7 +291,7 @@ export default function VerifyAccountPage() {
                 <p className="mb-3">Didn't receive the email?</p>
                 <button
                   onClick={handleSendVerification}
-                  disabled={sending}
+                  disabled={sending || !canEmailVerify}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {sending ? 'Sending...' : 'Resend Verification Email'}
@@ -287,7 +300,7 @@ export default function VerifyAccountPage() {
             ) : (
               <button
                 onClick={handleSendVerification}
-                disabled={sending}
+                disabled={sending || !canEmailVerify}
                 className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
               >
                 {sending ? 'Sending...' : 'Send Verification Email'}
