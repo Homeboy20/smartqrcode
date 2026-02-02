@@ -73,6 +73,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAdmin, setIsAdmin] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number>(0);
   const lastRefreshRef = React.useRef<number>(0);
+  const initializedRef = React.useRef(false);
 
   // Check if user is admin
   const checkAdminStatus = React.useCallback(async (_userId: string, accessToken?: string) => {
@@ -175,7 +176,10 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsAdmin(false);
         setAdminLoading(false);
       } finally {
-        if (!disposed) setLoading(false);
+        if (!disposed) {
+          setLoading(false);
+          initializedRef.current = true;
+        }
       }
     };
 
@@ -184,7 +188,8 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setLoading(true);
+        const shouldBlock = !initializedRef.current;
+        if (shouldBlock) setLoading(true);
         try {
           // Note: ignore the event for state; session is source of truth here.
           await applySessionState(session);
@@ -195,7 +200,7 @@ export const SupabaseAuthProvider: React.FC<{ children: React.ReactNode }> = ({
           setIsAdmin(false);
           setAdminLoading(false);
         } finally {
-          setLoading(false);
+          if (shouldBlock) setLoading(false);
         }
       }
     );

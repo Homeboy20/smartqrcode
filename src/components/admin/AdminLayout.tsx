@@ -18,10 +18,12 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [showStuckHint, setShowStuckHint] = useState(false);
+  const [initialAuthResolved, setInitialAuthResolved] = useState(false);
 
   useEffect(() => {
     if (!(loading || adminLoading)) {
       setShowStuckHint(false);
+      setInitialAuthResolved(true);
       return;
     }
     const t = setTimeout(() => setShowStuckHint(true), 10_000);
@@ -30,7 +32,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
   useEffect(() => {
     // If public mode is enabled, bypass admin check
-    if (isPublic || loading) {
+    if (isPublic || loading || adminLoading) {
       return;
     }
 
@@ -44,7 +46,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
   }, [user, loading, isPublic, router, pathname]);
 
   // Show loading state while checking auth
-  if (loading || adminLoading) {
+  if (!initialAuthResolved && (loading || adminLoading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -105,7 +107,7 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
 
   // If not logged in (and not public), we will redirect to login.
   // Avoid flashing "Access Denied" while the redirect happens.
-  if (!user && !isPublic) {
+  if (!user && !isPublic && !loading && !adminLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-6 shadow-sm text-center">
@@ -145,7 +147,34 @@ function AdminLayoutContent({ children }: AdminLayoutProps) {
           </div>
           
           {/* Main content - scrollable */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto relative">
+            {(loading || adminLoading) && (
+              <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
+                <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-white px-4 py-2 shadow-sm">
+                  <svg
+                    className="h-4 w-4 animate-spin text-indigo-600"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  <span className="text-xs text-gray-700">Refreshing session…</span>
+                </div>
+              </div>
+            )}
             {children}
           </main>
         </div>
