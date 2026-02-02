@@ -12,11 +12,12 @@ type ChatMessage = {
 };
 
 function getOrCreateSessionId(): string {
-  if (typeof window === 'undefined') return crypto.randomUUID();
+  const fallbackId = () => `session_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  if (typeof window === 'undefined') return (globalThis.crypto?.randomUUID?.() ?? fallbackId());
   const key = 'support_chat_session_id';
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id = window.crypto?.randomUUID?.() ?? fallbackId();
   window.localStorage.setItem(key, id);
   return id;
 }
@@ -40,6 +41,13 @@ export default function SupportChatWidget() {
 
   useEffect(() => {
     let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (token) supabase.realtime.setAuth(token);
+    }).catch(() => {
+      // ignore
+    });
 
     const presenceChannel = supabase.channel('support:presence', {
       config: {

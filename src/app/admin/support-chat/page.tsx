@@ -51,6 +51,13 @@ export default function AdminSupportChatPage() {
     let isMounted = true;
     setError(null);
 
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (token) supabase.realtime.setAuth(token);
+    }).catch(() => {
+      // ignore
+    });
+
     const presenceKeyPromise = supabase.auth
       .getUser()
       .then(({ data }) => (data.user?.id ? `agent:${data.user.id}` : `agent:${crypto.randomUUID()}`))
