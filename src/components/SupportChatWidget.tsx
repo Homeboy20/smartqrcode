@@ -34,6 +34,9 @@ export default function SupportChatWidget() {
   const [chatConnected, setChatConnected] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [email, setEmail] = useState('');
+  const [subject, setSubject] = useState('');
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -45,6 +48,8 @@ export default function SupportChatWidget() {
     supabase.auth.getSession().then(({ data }) => {
       const token = data.session?.access_token;
       if (token) supabase.realtime.setAuth(token);
+      const userEmail = data.session?.user?.email;
+      if (userEmail && isMounted) setEmail(userEmail);
     }).catch(() => {
       // ignore
     });
@@ -130,6 +135,32 @@ export default function SupportChatWidget() {
   }, [sessionId]);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadHistory = async () => {
+      setLoadingHistory(true);
+      try {
+        const res = await fetch(`/api/support-chat/messages?sessionId=${encodeURIComponent(sessionId)}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data?.messages)) {
+          setMessages(data.messages as ChatMessage[]);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
     // auto-scroll to bottom
     const el = listRef.current;
     if (!el) return;
@@ -155,6 +186,22 @@ export default function SupportChatWidget() {
     setDraft('');
 
     try {
+      const res = await fetch('/api/support-chat/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          text,
+          email: email || undefined,
+          subject: subject || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || 'Failed to send');
+      }
+
         const channel = chatChannelRef.current;
         if (!channel || !chatConnected) {
           throw new Error('Chat is not connected yet.');
@@ -221,8 +268,42 @@ export default function SupportChatWidget() {
       </div>
 
       <div className="mt-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div className="border-b border-gray-200 bg-white p-3 space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex-1">
+              <label htmlFor="support-chat-email" className="block text-xs font-medium text-gray-600">
+                Email for transcript (optional)
+              </label>
+              <input
+                id="support-chat-email"
+                name="supportChatEmail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div className="flex-1">
+              <label htmlFor="support-chat-subject" className="block text-xs font-medium text-gray-600">
+                Ticket subject (optional)
+              </label>
+              <input
+                id="support-chat-subject"
+                name="supportChatSubject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Billing question"
+                className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
         <div ref={listRef} className="h-56 overflow-y-auto p-3 space-y-2">
-          {messages.length === 0 ? (
+          {loadingHistory ? (
+            <p className="text-sm text-gray-500">Loading conversation…</p>
+          ) : messages.length === 0 ? (
             <p className="text-sm text-gray-500">Start a conversation…</p>
           ) : (
             messages.map((m) => (
