@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { 
   StripeCredentials, 
@@ -80,10 +80,18 @@ export default function PaymentSettingsPage() {
   const [migrating, setMigrating] = useState(false);
   const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   // Get the base URL (client-side)
   const [baseUrl, setBaseUrl] = useState('');
   
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
@@ -94,7 +102,9 @@ export default function PaymentSettingsPage() {
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        setLoading(true);
+        if (isMountedRef.current) {
+          setLoading(true);
+        }
 
         const accessToken = session?.access_token;
         if (!accessToken) {
@@ -116,35 +126,41 @@ export default function PaymentSettingsPage() {
         const data = await response.json();
         
         // Update provider status
-        setProvidersStatus({
-          stripe: !!data.stripe?.isActive,
-          paypal: !!data.paypal?.isActive,
-          flutterwave: !!data.flutterwave?.isActive,
-          paystack: !!data.paystack?.isActive
-        });
+        if (isMountedRef.current) {
+          setProvidersStatus({
+            stripe: !!data.stripe?.isActive,
+            paypal: !!data.paypal?.isActive,
+            flutterwave: !!data.flutterwave?.isActive,
+            paystack: !!data.paystack?.isActive
+          });
+        }
         
         // Set credentials if they exist
-        if (data.stripe?.credentials) {
+        if (data.stripe?.credentials && isMountedRef.current) {
           setStripeCredentials(data.stripe.credentials);
         }
         
-        if (data.paypal?.credentials) {
+        if (data.paypal?.credentials && isMountedRef.current) {
           setPaypalCredentials(data.paypal.credentials);
         }
         
-        if (data.flutterwave?.credentials) {
+        if (data.flutterwave?.credentials && isMountedRef.current) {
           setFlutterwaveCredentials(data.flutterwave.credentials);
         }
         
-        if (data.paystack?.credentials) {
+        if (data.paystack?.credentials && isMountedRef.current) {
           setPaystackCredentials(data.paystack.credentials);
         }
         
       } catch (err) {
         console.error('Error fetching payment settings:', err);
-        setError('Failed to load payment settings');
+        if (isMountedRef.current) {
+          setError('Failed to load payment settings');
+        }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
     

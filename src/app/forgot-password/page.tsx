@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
@@ -14,9 +14,18 @@ export default function ForgotPasswordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isMountedRef.current) return;
     setError(null);
     setMessage(null);
 
@@ -30,14 +39,22 @@ export default function ForgotPasswordPage() {
       clearError();
       const ok = await resetPassword(email);
       if (!ok) {
-        setError(authError || 'Failed to send reset email');
+        if (isMountedRef.current) {
+          setError(authError || 'Failed to send reset email');
+        }
         return;
       }
-      setMessage('If an account exists for this email, a password reset link has been sent.');
+      if (isMountedRef.current) {
+        setMessage('If an account exists for this email, a password reset link has been sent.');
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to send reset email');
+      if (isMountedRef.current) {
+        setError(err?.message || 'Failed to send reset email');
+      }
     } finally {
-      setSubmitting(false);
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 

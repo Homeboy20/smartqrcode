@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { SUBSCRIPTION_PRICING, type PricingTier, type CurrencyCode } from '@/lib/currency';
 
@@ -46,6 +46,7 @@ export default function AppSettingsPage() {
   const [fxCurrency, setFxCurrency] = useState('');
   const [fxRate, setFxRate] = useState('');
   const [fxImportJson, setFxImportJson] = useState('');
+  const isMountedRef = useRef(true);
   
   const [settings, setSettings] = useState<AppSettings>({
     freeMode: false,
@@ -76,12 +77,21 @@ export default function AppSettingsPage() {
 
   // Fetch existing app settings
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const fetchSettings = async () => {
       try {
         const accessToken = session?.access_token;
         if (!accessToken) {
           if (isDev) console.log('No session, skipping fetch');
-          setLoading(false);
+          if (isMountedRef.current) {
+            setLoading(false);
+          }
           return;
         }
         
@@ -96,51 +106,55 @@ export default function AppSettingsPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.settings) {
-            setSettings((prev) => {
-              const incoming = data.settings as Partial<AppSettings>;
-              return {
-                ...prev,
-                ...incoming,
-                freeModeFeatures: {
-                  ...prev.freeModeFeatures,
-                  ...(incoming.freeModeFeatures ?? {}),
-                },
-                branding: {
-                  ...prev.branding,
-                  ...(incoming.branding ?? {}),
-                },
-                firebase: {
-                  ...(prev.firebase ?? {
-                    enabled: false,
-                    apiKey: '',
-                    authDomain: '',
-                    projectId: '',
-                    storageBucket: '',
-                    messagingSenderId: '',
-                    appId: '',
-                    measurementId: '',
-                    phoneAuthEnabled: false,
-                    recaptchaSiteKey: '',
-                  }),
-                  ...(incoming.firebase ?? {}),
-                },
-                pricing: {
-                  ...(prev.pricing ?? SUBSCRIPTION_PRICING),
-                  ...(incoming.pricing ?? {}),
-                },
-              };
-            });
+            if (isMountedRef.current) {
+              setSettings((prev) => {
+                const incoming = data.settings as Partial<AppSettings>;
+                return {
+                  ...prev,
+                  ...incoming,
+                  freeModeFeatures: {
+                    ...prev.freeModeFeatures,
+                    ...(incoming.freeModeFeatures ?? {}),
+                  },
+                  branding: {
+                    ...prev.branding,
+                    ...(incoming.branding ?? {}),
+                  },
+                  firebase: {
+                    ...(prev.firebase ?? {
+                      enabled: false,
+                      apiKey: '',
+                      authDomain: '',
+                      projectId: '',
+                      storageBucket: '',
+                      messagingSenderId: '',
+                      appId: '',
+                      measurementId: '',
+                      phoneAuthEnabled: false,
+                      recaptchaSiteKey: '',
+                    }),
+                    ...(incoming.firebase ?? {}),
+                  },
+                  pricing: {
+                    ...(prev.pricing ?? SUBSCRIPTION_PRICING),
+                    ...(incoming.pricing ?? {}),
+                  },
+                };
+              });
+            }
           }
         }
       } catch (err) {
         console.error('Error fetching app settings:', err);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSettings();
-  }, [session]);
+  }, [session, isDev]);
 
   const handleToggleFreeMode = () => {
     setSettings(prev => ({

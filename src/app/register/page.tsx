@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -28,6 +28,14 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const requiresPhoneVerification = Boolean(appSettings?.firebase?.phoneAuthEnabled);
   const isPhoneVerified = Boolean(
@@ -47,6 +55,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!isMountedRef.current) return;
     setError(null);
     setSuccessMessage(null);
     setFieldErrors({});
@@ -88,28 +97,39 @@ export default function RegisterPage() {
       const success = await signUp(email, password, displayName);
       if (!success) {
         const errorMsg = authError || "Registration failed. Please try again.";
-        setError(errorMsg);
+        if (isMountedRef.current) {
+          setError(errorMsg);
+        }
         // Set field-specific errors if we can detect them
         if (errorMsg.toLowerCase().includes('email') && errorMsg.toLowerCase().includes('already')) {
-          setFieldErrors({ email: 'This email is already registered' });
+          if (isMountedRef.current) {
+            setFieldErrors({ email: 'This email is already registered' });
+          }
         }
         return;
       }
       // Supabase may require email confirmation, so we can't always redirect immediately.
-      setSuccessMessage(
-        requiresPhoneVerification
-          ? 'Account created. If email confirmation is enabled, verify your email, then sign in to verify your phone.'
-          : 'Account created. If email confirmation is enabled, check your inbox to verify, then sign in.'
-      );
+      if (isMountedRef.current) {
+        setSuccessMessage(
+          requiresPhoneVerification
+            ? 'Account created. If email confirmation is enabled, verify your email, then sign in to verify your phone.'
+            : 'Account created. If email confirmation is enabled, check your inbox to verify, then sign in.'
+        );
+      }
     } catch (err) {
-      setError((err as Error).message || "Registration failed. Please try again.");
+      if (isMountedRef.current) {
+        setError((err as Error).message || "Registration failed. Please try again.");
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleGoogleSignup = async () => {
     try {
+      if (!isMountedRef.current) return;
       setLoading(true);
       setError(null);
       setSuccessMessage(null);
@@ -118,12 +138,18 @@ export default function RegisterPage() {
       const redirectTo = `${origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
       const success = await signInWithGoogle({ redirectTo });
       if (!success) {
-        setError(authError || 'Failed to sign up with Google. Please try again.');
+        if (isMountedRef.current) {
+          setError(authError || 'Failed to sign up with Google. Please try again.');
+        }
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to sign up with Google');
+      if (isMountedRef.current) {
+        setError(err?.message || 'Failed to sign up with Google');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

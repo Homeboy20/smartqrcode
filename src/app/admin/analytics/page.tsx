@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface ChartData {
@@ -123,11 +123,21 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState<'week' | 'month' | 'year'>('week');
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
-        setLoading(true);
+        if (isMountedRef.current) {
+          setLoading(true);
+        }
         // In a real app, fetch data from API with cache control headers
         // const response = await fetch(`/api/admin/analytics?timeFrame=${timeFrame}`, {
         //   cache: 'no-store',
@@ -140,11 +150,15 @@ export default function AnalyticsPage() {
         
         // For now, use mock data
         await new Promise(resolve => setTimeout(resolve, 800)); // Simulate API delay
-        setAnalyticsData(getMockData());
+        if (isMountedRef.current) {
+          setAnalyticsData(getMockData());
+        }
       } catch (error) {
         console.error("Error fetching analytics data:", error);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 

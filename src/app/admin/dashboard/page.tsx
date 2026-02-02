@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
@@ -74,16 +74,28 @@ export default function AdminDashboardPage() {
     recentUsers: [],
     recentTransactions: []
   });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Fetch dashboard data from analytics API
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        if (!isMountedRef.current) return;
         setLoading(true);
 
         const token = await getAccessToken();
         if (!token) {
-          throw new Error('Authentication required');
+          if (isMountedRef.current) {
+            setLoading(false);
+          }
+          return;
         }
         
         const response = await fetch('/api/admin/analytics', {
@@ -95,7 +107,7 @@ export default function AdminDashboardPage() {
           }
         });
         
-        if (response.ok) {
+        if (response.ok && isMountedRef.current) {
           const data = await response.json();
           setStats({
             totalUsers: data.summary?.totalUsers || 0,
@@ -112,7 +124,9 @@ export default function AdminDashboardPage() {
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface FlutterwaveCustomer {
@@ -38,6 +38,14 @@ export default function FlutterwaveCustomersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<FlutterwaveCustomer | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchCustomers();
@@ -45,12 +53,16 @@ export default function FlutterwaveCustomersPage() {
 
   const fetchCustomers = async () => {
     try {
+      if (!isMountedRef.current) return;
       setLoading(true);
       setError(null);
 
       const token = await getAccessToken();
       if (!token) {
-        throw new Error('Authentication required');
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+        return;
       }
 
       const params = new URLSearchParams();
@@ -71,16 +83,22 @@ export default function FlutterwaveCustomersPage() {
       }
 
       const data = await response.json();
-      setCustomers(data.customers || []);
-      
-      if (data.meta?.page_info) {
-        setTotalPages(data.meta.page_info.total_pages || 1);
+      if (isMountedRef.current) {
+        setCustomers(data.customers || []);
+        
+        if (data.meta?.page_info) {
+          setTotalPages(data.meta.page_info.total_pages || 1);
+        }
       }
     } catch (err) {
       console.error('Error fetching customers:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch customers');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch customers');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -101,7 +119,7 @@ export default function FlutterwaveCustomersPage() {
         },
       });
 
-      if (response.ok) {
+      if (response.ok && isMountedRef.current) {
         const data = await response.json();
         setSelectedCustomer(data.customer);
         setShowModal(true);

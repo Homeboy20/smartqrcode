@@ -420,10 +420,12 @@ export default function AdminUsersPage() {
   // Filter users based on search term and filters
   const filteredUsers = users.filter(user => {
     const isStaff = Boolean(staffByUser[user.id]?.length);
+    const emailValue = (user.email || '').toLowerCase();
+    const displayNameValue = (user.displayName || '').toLowerCase();
     const matchesSearch = 
       searchTerm === '' || 
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.displayName && user.displayName.toLowerCase().includes(searchTerm.toLowerCase()));
+      emailValue.includes(searchTerm.toLowerCase()) ||
+      displayNameValue.includes(searchTerm.toLowerCase());
     
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     const matchesTier = selectedTier === 'all' || user.subscriptionTier === selectedTier;

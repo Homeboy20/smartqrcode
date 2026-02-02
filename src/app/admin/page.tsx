@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 
@@ -52,6 +52,14 @@ export default function AdminDashboardPage() {
     totalRevenue: '...',
     activeSubscriptions: '...'
   });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Simulate fetching dashboard data
   useEffect(() => {
@@ -63,16 +71,20 @@ export default function AdminDashboardPage() {
         
         // Simulate API delay and data
         await new Promise(resolve => setTimeout(resolve, 1500));
-        setStats({
-          totalUsers: '156',
-          totalQrCodes: '2,543',
-          totalRevenue: '$12,435',
-          activeSubscriptions: '78'
-        });
+        if (isMountedRef.current) {
+          setStats({
+            totalUsers: '156',
+            totalQrCodes: '2,543',
+            totalRevenue: '$12,435',
+            activeSubscriptions: '78'
+          });
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 

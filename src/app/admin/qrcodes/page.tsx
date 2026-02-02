@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
@@ -42,12 +42,22 @@ export default function AdminQrCodesPage() {
     format: 'png',
     userId: ''
   });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Function to refresh QR code data
   const refreshQrCodes = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
       
       const token = await getAccessToken();
       if (!token) {
@@ -68,12 +78,18 @@ export default function AdminQrCodesPage() {
       }
       
       const data = await response.json();
-      setQrCodes(data.qrCodes || []);
+      if (isMountedRef.current) {
+        setQrCodes(data.qrCodes || []);
+      }
     } catch (err) {
       console.error('Failed to fetch QR codes:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load QR codes');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load QR codes');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -83,11 +99,14 @@ export default function AdminQrCodesPage() {
 
   // Filter QR codes based on search term and filters
   const filteredQrCodes = qrCodes.filter(qrCode => {
+    const nameValue = (qrCode.name || '').toLowerCase();
+    const contentValue = (qrCode.content || '').toLowerCase();
+    const emailValue = (qrCode.userEmail || '').toLowerCase();
     const matchesSearch = 
       searchTerm === '' || 
-      qrCode.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      qrCode.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (qrCode.userEmail && qrCode.userEmail.toLowerCase().includes(searchTerm.toLowerCase()));
+      nameValue.includes(searchTerm.toLowerCase()) ||
+      contentValue.includes(searchTerm.toLowerCase()) ||
+      emailValue.includes(searchTerm.toLowerCase());
     
     const matchesType = selectedType === 'all' || qrCode.type === selectedType;
     

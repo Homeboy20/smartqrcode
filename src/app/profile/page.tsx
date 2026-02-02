@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -33,6 +33,14 @@ export default function ProfilePage() {
   const [formData, setFormData] = useState({
     displayName: '',
   });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -112,6 +120,7 @@ export default function ProfilePage() {
         const dbCreatedAt = dbCreatedAtRaw ? new Date(dbCreatedAtRaw) : undefined;
 
         // Prefer DB profile values, then auth metadata fallbacks.
+        if (!isMountedRef.current) return;
         setUserProfile(prev => {
           const base = prev || {
             displayName: displayNameFromMeta || '',
@@ -142,7 +151,7 @@ export default function ProfilePage() {
           };
         });
 
-        if (dbDisplayName) {
+        if (dbDisplayName && isMountedRef.current) {
           setFormData({ displayName: dbDisplayName });
         }
 
@@ -175,6 +184,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
+      if (!isMountedRef.current) return;
       setProfileLoading(true);
       setError(null);
       setUpdateSuccess(false);
@@ -184,26 +194,36 @@ export default function ProfilePage() {
         throw new Error('Failed to update profile');
       }
 
-      setUserProfile(prev =>
-        prev
-          ? { ...prev, displayName: formData.displayName }
-          : {
-              displayName: formData.displayName,
-              email: user.email || '',
-              photoURL: (user.user_metadata as any)?.avatar_url || undefined,
-              subscriptionTier: 'free',
-              role: 'user',
-            }
-      );
-      setUpdateSuccess(true);
+      if (isMountedRef.current) {
+        setUserProfile(prev =>
+          prev
+            ? { ...prev, displayName: formData.displayName }
+            : {
+                displayName: formData.displayName,
+                email: user.email || '',
+                photoURL: (user.user_metadata as any)?.avatar_url || undefined,
+                subscriptionTier: 'free',
+                role: 'user',
+              }
+        );
+        setUpdateSuccess(true);
+      }
       
       // Hide success message after 3 seconds
-      setTimeout(() => setUpdateSuccess(false), 3000);
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setUpdateSuccess(false);
+        }
+      }, 3000);
     } catch (err) {
       console.error('Failed to update profile:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to update profile');
+      }
     } finally {
-      setProfileLoading(false);
+      if (isMountedRef.current) {
+        setProfileLoading(false);
+      }
     }
   };
 

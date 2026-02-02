@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { subscriptionFeatures, subscriptionPricing, SubscriptionTier } from '@/lib/subscriptions';
 
@@ -18,6 +18,14 @@ export default function AdminPackagesPage() {
   const [pricing, setPricing] = useState({ ...subscriptionPricing });
   const [features, setFeatures] = useState({ ...subscriptionFeatures });
   const [editingTier, setEditingTier] = useState<SubscriptionTier | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const featureDefinitions: PackageFeature[] = [
     { name: 'Max QR Codes', key: 'maxQRCodes', type: 'number' },
@@ -34,6 +42,7 @@ export default function AdminPackagesPage() {
 
   const updatePackages = async () => {
     try {
+      if (!isMountedRef.current) return;
       setLoading(true);
       setError(null);
       setSuccess(null);
@@ -54,12 +63,18 @@ export default function AdminPackagesPage() {
         throw new Error(errorData.error || 'Failed to update packages');
       }
       
-      setSuccess('Packages updated successfully');
+      if (isMountedRef.current) {
+        setSuccess('Packages updated successfully');
+      }
     } catch (err) {
       console.error('Failed to update packages:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update packages');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to update packages');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Restaurant = {
   id: string;
@@ -149,6 +149,14 @@ export default function MenuClient({
 
   const [placingOrder, setPlacingOrder] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const brandColor = useMemo(() => {
     const raw = String(restaurant.brand_primary_color || '').trim();
@@ -220,6 +228,7 @@ export default function MenuClient({
     if (!canOrder) return;
     if (placingOrder) return;
 
+    if (!isMountedRef.current) return;
     setPlacingOrder(true);
     setPlaceError(null);
 
@@ -263,9 +272,13 @@ export default function MenuClient({
       const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
       window.open(url, '_blank', 'noreferrer');
     } catch (e: any) {
-      setPlaceError(String(e?.message || 'Failed to create order'));
+      if (isMountedRef.current) {
+        setPlaceError(String(e?.message || 'Failed to create order'));
+      }
     } finally {
-      setPlacingOrder(false);
+      if (isMountedRef.current) {
+        setPlacingOrder(false);
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -19,6 +19,14 @@ export default function LoginPage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (user && !loading) {
@@ -40,24 +48,32 @@ export default function LoginPage() {
     }
 
     try {
+      if (!isMountedRef.current) return;
       setAuthLoading(true);
       setError(null);
       clearError();
 
       const success = await signIn(formData.email, formData.password);
       if (!success) {
-        setError(authError || "Sign in failed. Please check your credentials.");
+        if (isMountedRef.current) {
+          setError(authError || "Sign in failed. Please check your credentials.");
+        }
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      setError(err?.message || "Failed to sign in");
+      if (isMountedRef.current) {
+        setError(err?.message || "Failed to sign in");
+      }
     } finally {
-      setAuthLoading(false);
+      if (isMountedRef.current) {
+        setAuthLoading(false);
+      }
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
+      if (!isMountedRef.current) return;
       setAuthLoading(true);
       setError(null);
       clearError();
@@ -66,13 +82,19 @@ export default function LoginPage() {
       const redirectTo = `${origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
       const success = await signInWithGoogle({ redirectTo });
       if (!success) {
-        setError(authError || "Failed to login with Google. Please try again.");
+        if (isMountedRef.current) {
+          setError(authError || "Failed to login with Google. Please try again.");
+        }
       }
     } catch (err: any) {
       console.error("Google login error:", err);
-      setError(err?.message || "Failed to login with Google");
+      if (isMountedRef.current) {
+        setError(err?.message || "Failed to login with Google");
+      }
     } finally {
-      setAuthLoading(false);
+      if (isMountedRef.current) {
+        setAuthLoading(false);
+      }
     }
   };
 

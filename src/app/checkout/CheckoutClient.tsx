@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -185,13 +185,34 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
 
   const [providerNotice, setProviderNotice] = useState<string | null>(null);
   const providerNoticeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (providerNoticeTimerRef.current) {
+        clearTimeout(providerNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   const showProviderNotice = React.useCallback((message: string) => {
+    if (!isMountedRef.current) return;
     setProviderNotice(message);
     if (providerNoticeTimerRef.current) {
       clearTimeout(providerNoticeTimerRef.current);
     }
-    providerNoticeTimerRef.current = setTimeout(() => setProviderNotice(null), 8_000);
+    providerNoticeTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setProviderNotice(null);
+      }
+    }, 8_000);
   }, []);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -251,17 +272,21 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
   }, [user?.email]);
 
   const fetchPricing = React.useCallback(async (countryOverride: string | null) => {
+    if (!isMountedRef.current) return;
     setLoadingCurrency(true);
     try {
       const url = countryOverride ? `/api/pricing?country=${encodeURIComponent(countryOverride)}` : '/api/pricing';
       const res = await fetch(url);
       const data = await res.json();
-      setCurrencyInfo(data);
+      if (isMountedRef.current) {
+        setCurrencyInfo(data);
+      }
 
       const providers = (data?.availableProviders || []) as UniversalPaymentProvider[];
       const recommended = data?.recommendedProvider as UniversalPaymentProvider | undefined;
 
-      setProvider((prev) => {
+      if (isMountedRef.current) {
+        setProvider((prev) => {
         if (providers.length === 0) return prev;
         if (providers.includes(prev)) return prev;
 
@@ -275,34 +300,41 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
         showProviderNotice(
           `Payment provider changed to ${providerLabel(nextProvider)} because the previous provider isn't available for ${detectedCountry} (${detectedCurrency}).`
         );
-        return nextProvider;
-      });
+          return nextProvider;
+        });
+      }
     } catch (err) {
       console.error('Failed to fetch currency info:', err);
-      setCurrencyInfo({
-        country: 'US',
-        currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
-        availableProviders: ['flutterwave', 'paystack'],
-        recommendedProvider: 'flutterwave',
-        pricing: {
-          pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
-          business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
-        },
-        paidTrial: { days: 7, multiplier: 0.3 },
-        pricingTrial: {
-          pro: { amount: 2.99, formatted: '$2.99', usd: 9.99 },
-          business: { amount: 8.99, formatted: '$8.99', usd: 29.99 },
-        },
-      });
-      setProvider('flutterwave');
+      if (isMountedRef.current) {
+        setCurrencyInfo({
+          country: 'US',
+          currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
+          availableProviders: ['flutterwave', 'paystack'],
+          recommendedProvider: 'flutterwave',
+          pricing: {
+            pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
+            business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
+          },
+          paidTrial: { days: 7, multiplier: 0.3 },
+          pricingTrial: {
+            pro: { amount: 2.99, formatted: '$2.99', usd: 9.99 },
+            business: { amount: 8.99, formatted: '$8.99', usd: 29.99 },
+          },
+        });
+        setProvider('flutterwave');
+      }
     } finally {
-      setLoadingCurrency(false);
+      if (isMountedRef.current) {
+        setLoadingCurrency(false);
+      }
     }
   }, [showProviderNotice]);
 
   useEffect(() => {
     if (props.initialCurrencyInfo) {
-      setLoadingCurrency(false);
+      if (isMountedRef.current) {
+        setLoadingCurrency(false);
+      }
       return;
     }
     let cancelled = false;
@@ -451,16 +483,21 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
   }, [requiresPhoneVerification, refreshSession, user?.id]);
 
   async function submitCheckout() {
+    if (!isMountedRef.current) return;
     setError(null);
 
     if (requiresPhoneVerification && user && !isPhoneVerified) {
-      setError('Please verify your phone number before checkout.');
+      if (isMountedRef.current) {
+        setError('Please verify your phone number before checkout.');
+      }
       return;
     }
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Please enter your email address.');
+      if (isMountedRef.current) {
+        setError('Please enter your email address.');
+      }
       return;
     }
 
@@ -564,12 +601,16 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
               }
               window.location.href = `${window.location.origin}/dashboard?welcome=true`;
             } catch (err: any) {
-              setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
-              setIsSubmitting(false);
+              if (isMountedRef.current) {
+                setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
+                setIsSubmitting(false);
+              }
             }
           },
           onClose: () => {
-            setIsSubmitting(false);
+            if (isMountedRef.current) {
+              setIsSubmitting(false);
+            }
           },
         });
 
@@ -646,12 +687,16 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
 
               window.location.href = `${window.location.origin}/dashboard?welcome=true`;
             } catch (err: any) {
-              setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
-              setIsSubmitting(false);
+              if (isMountedRef.current) {
+                setError(String(err?.message || 'Payment completed, but activation is pending. Please refresh in a moment.'));
+                setIsSubmitting(false);
+              }
             }
           },
           onclose: () => {
-            setIsSubmitting(false);
+            if (isMountedRef.current) {
+              setIsSubmitting(false);
+            }
           },
         });
         return;
@@ -663,8 +708,10 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
       window.location.href = redirectUrl;
     } catch (e) {
       console.error('Checkout error:', e);
-      setError(e instanceof Error ? e.message : 'Checkout failed. Please try again.');
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setError(e instanceof Error ? e.message : 'Checkout failed. Please try again.');
+        setIsSubmitting(false);
+      }
     }
   }
 

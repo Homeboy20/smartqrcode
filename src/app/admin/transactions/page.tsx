@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Transaction {
@@ -40,11 +40,21 @@ export default function AdminTransactionsPage() {
     plan: '',
     transactionId: ''
   });
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const refreshTransactions = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
       
       const token = await getAccessToken();
       if (!token) {
@@ -65,12 +75,18 @@ export default function AdminTransactionsPage() {
       }
       
       const data = await response.json();
-      setTransactions(data.transactions || []);
+      if (isMountedRef.current) {
+        setTransactions(data.transactions || []);
+      }
     } catch (err) {
       console.error('Failed to fetch transactions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load transactions');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load transactions');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -193,10 +209,12 @@ export default function AdminTransactionsPage() {
   };
 
   const filteredTransactions = transactions.filter(transaction => {
+    const emailValue = (transaction.userEmail || '').toLowerCase();
+    const idValue = (transaction.transactionId || '').toLowerCase();
     const matchesSearch = 
       searchTerm === '' || 
-      transaction.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.transactionId.toLowerCase().includes(searchTerm.toLowerCase());
+      emailValue.includes(searchTerm.toLowerCase()) ||
+      idValue.includes(searchTerm.toLowerCase());
     
     const matchesStatus = selectedStatus === 'all' || transaction.status === selectedStatus;
     const matchesGateway = selectedGateway === 'all' || transaction.paymentGateway === selectedGateway;

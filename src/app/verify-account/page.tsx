@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/FirebaseAuthContext';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -45,6 +45,14 @@ export default function VerifyAccountPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams?.get('redirect') || '/dashboard';
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const countryOptions = React.useMemo(() => getCountryCallingCodeOptions(), []);
   const selectedOption = React.useMemo(
@@ -106,28 +114,37 @@ export default function VerifyAccountPage() {
   }, [supabaseUser, supabaseLoading, router, redirectTo]);
   
   const handleSendVerification = async () => {
+    if (!isMountedRef.current) return;
     setSending(true);
     setStatusMessage('');
     
     try {
       if (verificationMethod === 'email') {
         if (!canEmailVerify) {
-          setStatusMessage('Email verification is unavailable because this account has no email address. Please verify by phone instead.');
+          if (isMountedRef.current) {
+            setStatusMessage('Email verification is unavailable because this account has no email address. Please verify by phone instead.');
+          }
           return;
         }
         // Send email verification
         const success = await sendVerificationEmail();
         if (success) {
-          setVerificationSent(true);
-          setStatusMessage('Verification email sent! Please check your inbox and click the verification link.');
+          if (isMountedRef.current) {
+            setVerificationSent(true);
+            setStatusMessage('Verification email sent! Please check your inbox and click the verification link.');
+          }
         } else {
-          setStatusMessage('Failed to send verification email. Please try again.');
+          if (isMountedRef.current) {
+            setStatusMessage('Failed to send verification email. Please try again.');
+          }
         }
       } else {
         // Phone verification - first send code
         if (!phoneNumber) {
-          setStatusMessage('Please enter a valid phone number');
-          setSending(false);
+          if (isMountedRef.current) {
+            setStatusMessage('Please enter a valid phone number');
+            setSending(false);
+          }
           return;
         }
         
@@ -136,28 +153,39 @@ export default function VerifyAccountPage() {
 
           const recaptchaVerifier = await setupRecaptcha('recaptcha-container');
           const confirmation = await sendPhoneVerificationCode(e164, recaptchaVerifier);
-          setConfirmationResult(confirmation);
-          setCodeSent(true);
-          setStatusMessage('Verification code sent to your phone. Please enter it below.');
+          if (isMountedRef.current) {
+            setConfirmationResult(confirmation);
+            setCodeSent(true);
+            setStatusMessage('Verification code sent to your phone. Please enter it below.');
+          }
         } catch (error: any) {
           console.error('Error sending phone verification:', error);
-          setStatusMessage(`Error sending verification code: ${toFriendlyFirebasePhoneAuthError(error)}`);
+          if (isMountedRef.current) {
+            setStatusMessage(`Error sending verification code: ${toFriendlyFirebasePhoneAuthError(error)}`);
+          }
         }
       }
     } catch (error: any) {
       console.error('Error sending verification:', error);
-      setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
+      if (isMountedRef.current) {
+        setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
+      }
     } finally {
-      setSending(false);
+      if (isMountedRef.current) {
+        setSending(false);
+      }
     }
   };
   
   const handleVerifyCode = async () => {
     if (!verificationCode || !confirmationResult) {
-      setStatusMessage('Please enter the verification code');
+      if (isMountedRef.current) {
+        setStatusMessage('Please enter the verification code');
+      }
       return;
     }
     
+    if (!isMountedRef.current) return;
     setVerifying(true);
     setStatusMessage('');
     
@@ -166,13 +194,17 @@ export default function VerifyAccountPage() {
       if (success) {
         const accessToken = await getAccessToken();
         if (!accessToken) {
-          setStatusMessage('Please sign in again to finish verification.');
+          if (isMountedRef.current) {
+            setStatusMessage('Please sign in again to finish verification.');
+          }
           return;
         }
 
         const firebaseToken = await getIdToken();
         if (!firebaseToken) {
-          setStatusMessage('Missing Firebase token after verification. Please try again.');
+          if (isMountedRef.current) {
+            setStatusMessage('Missing Firebase token after verification. Please try again.');
+          }
           return;
         }
 
@@ -193,16 +225,28 @@ export default function VerifyAccountPage() {
         // Ensure the client immediately sees updated `user_metadata` (phone_verified_at).
         await refreshSession();
 
-        setStatusMessage('Phone verified successfully!');
-        setTimeout(() => router.push(redirectTo), 1200);
+        if (isMountedRef.current) {
+          setStatusMessage('Phone verified successfully!');
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              router.push(redirectTo);
+            }
+          }, 1200);
+        }
       } else {
-        setStatusMessage('Failed to verify phone. Please check the code and try again.');
+        if (isMountedRef.current) {
+          setStatusMessage('Failed to verify phone. Please check the code and try again.');
+        }
       }
     } catch (error: any) {
       console.error('Error verifying phone:', error);
-      setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
+      if (isMountedRef.current) {
+        setStatusMessage(`Error: ${toFriendlyFirebasePhoneAuthError(error)}`);
+      }
     } finally {
-      setVerifying(false);
+      if (isMountedRef.current) {
+        setVerifying(false);
+      }
     }
   };
   

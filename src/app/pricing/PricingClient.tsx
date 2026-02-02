@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -68,6 +68,14 @@ export default function PricingClient(props: { initialCurrencyInfo?: CurrencyInf
 
   const [currencyInfo, setCurrencyInfo] = useState<CurrencyInfo | null>(() => props.initialCurrencyInfo ?? null);
   const [loadingCurrency, setLoadingCurrency] = useState(() => !props.initialCurrencyInfo);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly' | 'trial'>(() => {
     try {
@@ -83,7 +91,9 @@ export default function PricingClient(props: { initialCurrencyInfo?: CurrencyInf
 
   useEffect(() => {
     if (props.initialCurrencyInfo) {
-      setLoadingCurrency(false);
+      if (isMountedRef.current) {
+        setLoadingCurrency(false);
+      }
       return;
     }
 
@@ -91,7 +101,9 @@ export default function PricingClient(props: { initialCurrencyInfo?: CurrencyInf
     fetch('/api/pricing')
       .then((res) => res.json())
       .then((data) => {
-        setCurrencyInfo(data);
+        if (isMountedRef.current) {
+          setCurrencyInfo(data);
+        }
 
         // Provider selection is handled on the /checkout page.
       })
@@ -103,35 +115,41 @@ export default function PricingClient(props: { initialCurrencyInfo?: CurrencyInf
         const fmt = (amount: number) =>
           new Intl.NumberFormat('en-US', { style: 'currency', currency: fallbackCurrency }).format(amount);
 
-        setCurrencyInfo({
-          country: 'US',
-          currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
-          availableProviders: ['flutterwave', 'paystack'],
-          recommendedProvider: 'flutterwave',
-          pricing: {
-            pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
-            business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
-          },
-          pricingYearly: {
-            pro: {
-              amount: 9.99 * YEARLY_MULTIPLIER,
-              formatted: fmt(9.99 * YEARLY_MULTIPLIER),
-              usd: 9.99 * YEARLY_MULTIPLIER,
+        if (isMountedRef.current) {
+          setCurrencyInfo({
+            country: 'US',
+            currency: { code: 'USD', symbol: '$', name: 'US Dollar' },
+            availableProviders: ['flutterwave', 'paystack'],
+            recommendedProvider: 'flutterwave',
+            pricing: {
+              pro: { amount: 9.99, formatted: '$9.99', usd: 9.99 },
+              business: { amount: 29.99, formatted: '$29.99', usd: 29.99 },
             },
-            business: {
-              amount: 29.99 * YEARLY_MULTIPLIER,
-              formatted: fmt(29.99 * YEARLY_MULTIPLIER),
-              usd: 29.99 * YEARLY_MULTIPLIER,
+            pricingYearly: {
+              pro: {
+                amount: 9.99 * YEARLY_MULTIPLIER,
+                formatted: fmt(9.99 * YEARLY_MULTIPLIER),
+                usd: 9.99 * YEARLY_MULTIPLIER,
+              },
+              business: {
+                amount: 29.99 * YEARLY_MULTIPLIER,
+                formatted: fmt(29.99 * YEARLY_MULTIPLIER),
+                usd: 29.99 * YEARLY_MULTIPLIER,
+              },
             },
-          },
-          paidTrial: { days: 7, multiplier: 0.3 },
-          pricingTrial: {
-            pro: { amount: 2.99, formatted: fmt(2.99), usd: 9.99 },
-            business: { amount: 8.99, formatted: fmt(8.99), usd: 29.99 },
-          },
-        });
+            paidTrial: { days: 7, multiplier: 0.3 },
+            pricingTrial: {
+              pro: { amount: 2.99, formatted: fmt(2.99), usd: 9.99 },
+              business: { amount: 8.99, formatted: fmt(8.99), usd: 29.99 },
+            },
+          });
+        }
       })
-      .finally(() => setLoadingCurrency(false));
+      .finally(() => {
+        if (isMountedRef.current) {
+          setLoadingCurrency(false);
+        }
+      });
   }, [props.initialCurrencyInfo]);
 
   // Respect an explicit country override (stored by the header selector).

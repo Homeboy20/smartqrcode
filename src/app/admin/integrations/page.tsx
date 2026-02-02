@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import Link from 'next/link';
 
@@ -87,16 +87,27 @@ export default function IntegrationsPage() {
 
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     fetchIntegrationStatus();
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const fetchIntegrationStatus = async () => {
     try {
+      if (!isMountedRef.current) return;
       setLoading(true);
       const token = await getAccessToken();
-      if (!token) return;
+      if (!token) {
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
+        return;
+      }
 
       // Fetch payment settings status
       const response = await fetch('/api/admin/payment-settings', {
@@ -105,7 +116,7 @@ export default function IntegrationsPage() {
         },
       });
 
-      if (response.ok) {
+      if (response.ok && isMountedRef.current) {
         const data = await response.json();
         
         setIntegrations(prev => prev.map(integration => {
@@ -122,7 +133,9 @@ export default function IntegrationsPage() {
     } catch (error) {
       console.error('Error fetching integration status:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

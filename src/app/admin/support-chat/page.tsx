@@ -41,6 +41,7 @@ export default function AdminSupportChatPage() {
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const chatChannelRef = useRef<any>(null);
+  const isMountedRef = useRef(true);
 
   const sessionList = useMemo(() => {
     return sessions
@@ -58,6 +59,13 @@ export default function AdminSupportChatPage() {
     : null;
 
   useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
@@ -67,7 +75,6 @@ export default function AdminSupportChatPage() {
     if (authLoading) return;
     if (!isAdmin) return;
 
-    let isMounted = true;
     setError(null);
 
     supabase.auth.getSession().then(({ data }) => {
@@ -79,10 +86,16 @@ export default function AdminSupportChatPage() {
 
     const loadSessions = async () => {
       try {
+        if (!isMountedRef.current) return;
         setLoadingSessions(true);
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData.session?.access_token;
-        if (!token) throw new Error('Not authenticated');
+        if (!token) {
+          if (isMountedRef.current) {
+            setLoadingSessions(false);
+          }
+          return;
+        }
 
         const res = await fetch('/api/admin/support-chat/sessions', {
           cache: 'no-store',
@@ -98,13 +111,17 @@ export default function AdminSupportChatPage() {
         }
 
         const data = await res.json();
-        if (Array.isArray(data?.sessions)) {
+        if (Array.isArray(data?.sessions) && isMountedRef.current) {
           setSessions(data.sessions as SessionSummary[]);
         }
       } catch (e: any) {
-        setError(e?.message || 'Failed to load support sessions');
+        if (isMountedRef.current) {
+          setError(e?.message || 'Failed to load support sessions');
+        }
       } finally {
-        setLoadingSessions(false);
+        if (isMountedRef.current) {
+          setLoadingSessions(false);
+        }
       }
     };
 
@@ -137,20 +154,26 @@ export default function AdminSupportChatPage() {
       chatChannelRef.current = chatChannel;
 
       presenceChannel.subscribe(async (status: any) => {
-        if (!isMounted) return;
+          if (!isMountedRef.current) return;
         if (status === 'SUBSCRIBED') {
           try {
             await presenceChannel.track({ role: 'agent', ts: Date.now() });
-            setOnline(true);
+              if (isMountedRef.current) {
+                setOnline(true);
+              }
           } catch (e: any) {
-            setError(e?.message || 'Failed to go online');
-            setOnline(false);
+              if (isMountedRef.current) {
+                setError(e?.message || 'Failed to go online');
+                setOnline(false);
+              }
           }
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setError('Failed to connect to live chat presence.');
-          setOnline(false);
+            if (isMountedRef.current) {
+              setError('Failed to connect to live chat presence.');
+              setOnline(false);
+            }
         }
       });
 
@@ -166,6 +189,7 @@ export default function AdminSupportChatPage() {
         ts: typeof p.ts === 'number' ? p.ts : Date.now(),
       };
 
+      if (!isMountedRef.current) return;
       setThreads((prev) => {
         const current = prev[msg.sessionId];
         const nextThread: SessionThread = {
@@ -198,21 +222,26 @@ export default function AdminSupportChatPage() {
       });
 
       chatChannel.subscribe((status: any) => {
-        if (!isMounted) return;
+        if (!isMountedRef.current) return;
         if (status === 'SUBSCRIBED') {
-          setChatConnected(true);
+          if (isMountedRef.current) {
+            setChatConnected(true);
+          }
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setChatConnected(false);
-          setError('Failed to connect to live chat.');
+          if (isMountedRef.current) {
+            setChatConnected(false);
+            setError('Failed to connect to live chat.');
+          }
         }
       });
     })();
 
     return () => {
-      isMounted = false;
-      setOnline(false);
+      if (isMountedRef.current) {
+        setOnline(false);
+      }
       if (presenceChannel) supabase.removeChannel(presenceChannel);
       if (chatChannel) supabase.removeChannel(chatChannel);
       chatChannelRef.current = null;
@@ -242,7 +271,7 @@ export default function AdminSupportChatPage() {
         const data = await res.json();
         if (!Array.isArray(data?.messages)) return;
 
-        if (!cancelled) {
+        if (!cancelled && isMountedRef.current) {
           setThreads((prev) => ({
             ...prev,
             [activeSessionId]: {
@@ -270,6 +299,7 @@ export default function AdminSupportChatPage() {
   }, [activeSession?.userEmail]);
 
   const send = async () => {
+    if (!isMountedRef.current) return;
     setError(null);
 
     if (!activeSessionId) {
@@ -323,6 +353,7 @@ export default function AdminSupportChatPage() {
         ts: Date.now(),
       };
 
+      if (!isMountedRef.current) return;
       setThreads((prev) => {
         const current = prev[msg.sessionId];
         const nextThread: SessionThread = {
@@ -341,7 +372,9 @@ export default function AdminSupportChatPage() {
         )
       );
     } catch (e: any) {
-      setError(e?.message || 'Failed to send');
+      if (isMountedRef.current) {
+        setError(e?.message || 'Failed to send');
+      }
     }
   };
 
@@ -363,11 +396,15 @@ export default function AdminSupportChatPage() {
 
       if (!res.ok) throw new Error(await res.text());
 
-      setSessions((prev) =>
-        prev.map((s) => (s.sessionId === activeSessionId ? { ...s, status: nextStatus } : s))
-      );
+      if (isMountedRef.current) {
+        setSessions((prev) =>
+          prev.map((s) => (s.sessionId === activeSessionId ? { ...s, status: nextStatus } : s))
+        );
+      }
     } catch (e: any) {
-      setError(e?.message || 'Failed to update status');
+      if (isMountedRef.current) {
+        setError(e?.message || 'Failed to update status');
+      }
     }
   };
 
@@ -392,16 +429,20 @@ export default function AdminSupportChatPage() {
 
       if (!res.ok) throw new Error(await res.text());
 
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.sessionId === activeSessionId
-            ? { ...s, transcriptLastSentAt: new Date().toISOString() }
-            : s
-        )
-      );
-      setError(null);
+      if (isMountedRef.current) {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.sessionId === activeSessionId
+              ? { ...s, transcriptLastSentAt: new Date().toISOString() }
+              : s
+          )
+        );
+        setError(null);
+      }
     } catch (e: any) {
-      setError(e?.message || 'Failed to send transcript');
+      if (isMountedRef.current) {
+        setError(e?.message || 'Failed to send transcript');
+      }
     }
   };
 

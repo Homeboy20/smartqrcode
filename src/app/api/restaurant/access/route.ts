@@ -10,7 +10,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ access }, { status: 200 });
   } catch (e: any) {
     const message = String(e?.message || 'Unauthorized');
-    const status = /unauthorized|invalid or expired token|no authentication token/i.test(message) ? 401 : 500;
+    const status = /unauthorized|invalid or expired token|no authentication token/i.test(message)
+      ? 401
+      : /restaurant not found/i.test(message)
+      ? 404
+      : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

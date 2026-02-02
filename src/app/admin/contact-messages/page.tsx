@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 import { supabase } from '@/lib/supabase/client';
 
@@ -26,26 +26,40 @@ export default function AdminContactMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
     if (!isAdmin) {
-      setLoading(false);
-      setError(null);
-      setMessages([]);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setError(null);
+        setMessages([]);
+      }
       return;
     }
 
     const load = async () => {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
 
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
         if (!accessToken) {
-          setError('Please log in again to continue.');
-          setMessages([]);
+          if (isMountedRef.current) {
+            setError('Please log in again to continue.');
+            setMessages([]);
+          }
           return;
         }
 
@@ -61,17 +75,25 @@ export default function AdminContactMessagesPage() {
         const json = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          setError((json as any)?.error || 'Request failed');
-          setMessages([]);
+          if (isMountedRef.current) {
+            setError((json as any)?.error || 'Request failed');
+            setMessages([]);
+          }
           return;
         }
 
-        setMessages(Array.isArray((json as any)?.messages) ? (json as any).messages : []);
+        if (isMountedRef.current) {
+          setMessages(Array.isArray((json as any)?.messages) ? (json as any).messages : []);
+        }
       } catch (e: any) {
-        setError(e?.message || 'Failed to load messages');
-        setMessages([]);
+        if (isMountedRef.current) {
+          setError(e?.message || 'Failed to load messages');
+          setMessages([]);
+        }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 

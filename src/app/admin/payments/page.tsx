@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Payment {
@@ -33,12 +33,22 @@ export default function AdminPaymentsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateRange, setDateRange] = useState('30');
   const [searchTerm, setSearchTerm] = useState('');
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Function to fetch payments
   const fetchPayments = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
       
       const token = await getAccessToken();
       if (!token) {
@@ -77,12 +87,18 @@ export default function AdminPaymentsPage() {
         metadata: txn.metadata || {},
         subscriptionId: txn.plan
       }));
-      setPayments(mappedPayments);
+      if (isMountedRef.current) {
+        setPayments(mappedPayments);
+      }
     } catch (err) {
       console.error('Failed to fetch payments:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load payments');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load payments');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

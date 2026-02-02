@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 
 export default function SupabaseAdminSetup() {
@@ -10,10 +10,19 @@ export default function SupabaseAdminSetup() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [step, setStep] = useState<'register' | 'setup'>('register');
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Step 1: Register/Sign in user with Supabase Auth
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isMountedRef.current) return;
     setStatus('loading');
     setMessage('');
 
@@ -32,32 +41,45 @@ export default function SupabaseAdminSetup() {
         });
 
         if (signInError) {
-          setStatus('error');
-          setMessage('Sign in failed: ' + signInError.message);
+          if (isMountedRef.current) {
+            setStatus('error');
+            setMessage('Sign in failed: ' + signInError.message);
+          }
           return;
         }
 
-        setMessage('Signed in successfully! Now enter the setup secret.');
-        setStep('setup');
+        if (isMountedRef.current) {
+          setMessage('Signed in successfully! Now enter the setup secret.');
+          setStep('setup');
+        }
       } else if (signUpError) {
-        setStatus('error');
-        setMessage('Registration failed: ' + signUpError.message);
+        if (isMountedRef.current) {
+          setStatus('error');
+          setMessage('Registration failed: ' + signUpError.message);
+        }
         return;
       } else {
-        setMessage('Account created! Now enter the setup secret.');
-        setStep('setup');
+        if (isMountedRef.current) {
+          setMessage('Account created! Now enter the setup secret.');
+          setStep('setup');
+        }
       }
 
-      setStatus('idle');
+      if (isMountedRef.current) {
+        setStatus('idle');
+      }
     } catch (error: any) {
-      setStatus('error');
-      setMessage('Error: ' + error.message);
+      if (isMountedRef.current) {
+        setStatus('error');
+        setMessage('Error: ' + error.message);
+      }
     }
   };
 
   // Step 2: Set up admin with secret key
   const handleAdminSetup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isMountedRef.current) return;
     setStatus('loading');
     setMessage('');
 
@@ -66,8 +88,10 @@ export default function SupabaseAdminSetup() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setStatus('error');
-        setMessage('You must be signed in to set up admin.');
+        if (isMountedRef.current) {
+          setStatus('error');
+          setMessage('You must be signed in to set up admin.');
+        }
         return;
       }
 
@@ -87,16 +111,22 @@ export default function SupabaseAdminSetup() {
       const data = await response.json();
 
       if (!response.ok) {
-        setStatus('error');
-        setMessage(data.error || 'Failed to set up admin');
+        if (isMountedRef.current) {
+          setStatus('error');
+          setMessage(data.error || 'Failed to set up admin');
+        }
         return;
       }
 
-      setStatus('success');
-      setMessage('🎉 Admin user created successfully! You can now access the admin panel.');
+      if (isMountedRef.current) {
+        setStatus('success');
+        setMessage('🎉 Admin user created successfully! You can now access the admin panel.');
+      }
     } catch (error: any) {
-      setStatus('error');
-      setMessage('Error: ' + error.message);
+      if (isMountedRef.current) {
+        setStatus('error');
+        setMessage('Error: ' + error.message);
+      }
     }
   };
 

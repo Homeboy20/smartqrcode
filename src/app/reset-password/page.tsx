@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
@@ -16,6 +16,14 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Check if this is a valid password reset link
   useEffect(() => {
@@ -37,6 +45,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isMountedRef.current) return;
     setError(null);
 
     if (password.length < 6) {
@@ -65,16 +74,24 @@ export default function ResetPasswordPage() {
         throw error;
       }
 
-      setSuccess(true);
+      if (isMountedRef.current) {
+        setSuccess(true);
+      }
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
-        router.push('/login?message=Password updated successfully');
+        if (isMountedRef.current) {
+          router.push('/login?message=Password updated successfully');
+        }
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      if (isMountedRef.current) {
+        setError(err.message || 'Failed to reset password');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 

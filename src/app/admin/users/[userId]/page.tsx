@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
@@ -34,6 +34,7 @@ export default function UserDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
+  const isMountedRef = useRef(true);
   
   // Form state
   const [formData, setFormData] = useState<Partial<UserData>>({});
@@ -41,12 +42,20 @@ export default function UserDetailPage() {
   const refreshUserData = useCallback(() => {
     setDataVersion(prev => prev + 1);
   }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
   
   useEffect(() => {
     const fetchUser = async () => {
       if (!userId) return;
       
       try {
+        if (!isMountedRef.current) return;
         setLoading(true);
         setError(null);
 
@@ -55,7 +64,10 @@ export default function UserDetailPage() {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
         if (!accessToken) {
-          throw new Error('Not authenticated. Please log in again.');
+          if (isMountedRef.current) {
+            setLoading(false);
+          }
+          return;
         }
 
         const response = await fetch(`/api/admin/users/${userId}?v=${Date.now()}`, {
@@ -98,6 +110,7 @@ export default function UserDetailPage() {
           },
         };
 
+        if (!isMountedRef.current) return;
         setUser(normalizedUser);
 
         // For users that exist in Auth but not Firestore, we'll still show their basic info
@@ -108,9 +121,13 @@ export default function UserDetailPage() {
         });
       } catch (err) {
         console.error('Failed to fetch user:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load user data');
+        if (isMountedRef.current) {
+          setError(err instanceof Error ? err.message : 'Failed to load user data');
+        }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
@@ -134,6 +151,7 @@ export default function UserDetailPage() {
     }
     
     try {
+      if (!isMountedRef.current) return;
       setSaving(true);
       setError(null);
       setSuccess(null);
@@ -141,7 +159,10 @@ export default function UserDetailPage() {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) {
-        throw new Error('Not authenticated. Please log in again.');
+        if (isMountedRef.current) {
+          setSaving(false);
+        }
+        return;
       }
       
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -158,18 +179,26 @@ export default function UserDetailPage() {
         throw new Error(`Error ${response.status}: ${await response.text()}`);
       }
       
-      setSuccess('User updated successfully');
+      if (isMountedRef.current) {
+        setSuccess('User updated successfully');
+      }
       
       // Update local user state with the changes
-      setUser(prev => prev ? { ...prev, ...formData } : null);
+      if (isMountedRef.current) {
+        setUser(prev => prev ? { ...prev, ...formData } : null);
+      }
       
       // Refresh data from server to ensure we have the latest
       refreshUserData();
     } catch (err) {
       console.error('Failed to update user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to update user');
+      }
     } finally {
-      setSaving(false);
+      if (isMountedRef.current) {
+        setSaving(false);
+      }
     }
   };
 
@@ -184,13 +213,17 @@ export default function UserDetailPage() {
     }
     
     try {
+      if (!isMountedRef.current) return;
       setSaving(true);
       setError(null);
 
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
       if (!accessToken) {
-        throw new Error('Not authenticated. Please log in again.');
+        if (isMountedRef.current) {
+          setSaving(false);
+        }
+        return;
       }
       
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -208,8 +241,10 @@ export default function UserDetailPage() {
       router.push('/admin/users');
     } catch (err) {
       console.error('Failed to delete user:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
-      setSaving(false);
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to delete user');
+        setSaving(false);
+      }
     }
   };
 

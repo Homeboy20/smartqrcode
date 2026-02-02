@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
 
 interface Subscription {
@@ -28,12 +28,22 @@ export default function AdminSubscriptionsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPlan, setFilterPlan] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Function to fetch subscriptions
   const fetchSubscriptions = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      if (isMountedRef.current) {
+        setLoading(true);
+        setError(null);
+      }
       
       const token = await getAccessToken();
       if (!token) {
@@ -54,12 +64,18 @@ export default function AdminSubscriptionsPage() {
       }
       
       const data = await response.json();
-      setSubscriptions(data.subscriptions || []);
+      if (isMountedRef.current) {
+        setSubscriptions(data.subscriptions || []);
+      }
     } catch (err) {
       console.error('Failed to fetch subscriptions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load subscriptions');
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load subscriptions');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -69,10 +85,12 @@ export default function AdminSubscriptionsPage() {
 
   // Filter subscriptions based on search term and filters
   const filteredSubscriptions = subscriptions.filter(subscription => {
+    const emailValue = (subscription.userEmail || '').toLowerCase();
+    const planValue = (subscription.plan || '').toLowerCase();
     const matchesSearch = 
       searchTerm === '' || 
-      subscription.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      subscription.plan.toLowerCase().includes(searchTerm.toLowerCase());
+      emailValue.includes(searchTerm.toLowerCase()) ||
+      planValue.includes(searchTerm.toLowerCase());
     
     const matchesStatus = filterStatus === 'all' || subscription.status === filterStatus;
     const matchesPlan = filterPlan === 'all' || subscription.plan === filterPlan;
