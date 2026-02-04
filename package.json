@@ -30,11 +30,11 @@
     "date-fns": "^4.1.0",
     "file-saver": "^2.0.5",
     "firebase": "^11.6.0",
-    "firebase-admin": "^13.2.0",
+    "firebase-admin": "^13.6.0",
     "html2canvas": "^1.4.1",
     "jose": "^5.10.0",
     "jsbarcode": "^3.11.6",
-    "jspdf": "^3.0.1",
+    "jspdf": "^4.1.0",
     "jszip": "^3.10.1",
     "libphonenumber-js": "^1.12.33",
     "lucide-react": "^0.487.0",
@@ -69,5 +69,9 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "fast-xml-parser": "^5.3.4",
+    "glob": "^13.0.1"
   }
 }

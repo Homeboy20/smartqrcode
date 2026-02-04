@@ -141,11 +141,15 @@ const featureLimitMap: Record<FeatureType, any> = {
   barcodesGenerated: 'barcodeGenerationLimit',
   bulkGenerations: 'bulkGenerationLimit',
   aiCustomizations: 'aiCustomizationLimit',
+
+  // access-based features (no numeric limits)
   noWatermark: 'noWatermark',
   svgDownload: 'svgDownload',
   pdfDownload: 'pdfDownload',
   qrCodeTracking: 'qrCodeTracking',
   enhancedBarcodes: 'enhancedBarcodes',
   fileUploads: 'fileUploads',
-  analytics: 'analytics'
+  analytics: 'analytics',
+  restaurant: 'restaurant',
+  restaurantTeam: 'restaurantTeam',
 }; 

@@ -4,11 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabaseAuth } from '@/context/SupabaseAuthContext';
+import { supabase } from '@/lib/supabase/client';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, supabase } = useSupabaseAuth();
+  const { user } = useSupabaseAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

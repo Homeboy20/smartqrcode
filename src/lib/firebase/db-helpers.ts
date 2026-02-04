@@ -1,7 +1,7 @@
 // Legacy Firebase Firestore helpers.
 // This file is intentionally disabled during the Supabase migration.
 
-type QueryDocumentSnapshot = unknown;
+type QueryDocumentSnapshot<T = any> = unknown;
 type Timestamp = unknown;
 
 // Generic type for Firestore document data
