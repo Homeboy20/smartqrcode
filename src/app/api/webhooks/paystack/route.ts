@@ -78,7 +78,17 @@ export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request.headers);
 
   try {
-    // Rate limiting
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return createErrorResponse('VALIDATION_ERROR', 'Invalid content type', 415);
+    }
+
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (Number.isFinite(contentLength) && contentLength > 1_000_000) {
+      return createErrorResponse('VALIDATION_ERROR', 'Payload too large', 413);
+    }
+
+    // Rate limiting (best-effort)
     const rateLimit = checkRateLimit(clientIP, RATE_LIMITS.WEBHOOK);
     if (!rateLimit.allowed) {
       return createErrorResponse('RATE_LIMIT_EXCEEDED', undefined, 429);
@@ -112,12 +122,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the event
-    const event = JSON.parse(body);
-    
-    console.log('Received Paystack webhook event:', event.event);
+    let event: any;
+    try {
+      event = body ? JSON.parse(body) : null;
+    } catch {
+      return createErrorResponse('VALIDATION_ERROR', 'Invalid JSON', 400);
+    }
+
+    const eventType = String(event?.event || '');
+    console.log('Received Paystack webhook event:', eventType);
 
     // Handle the event based on type
-    switch (event.event) {
+    switch (eventType) {
       case 'charge.success': {
         const data = event.data;
         

@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
     await verifyAdminAccess(request);
 
     const settings = await getAllPaymentSettingsForAdmin();
-    return NextResponse.json(settings);
+    return NextResponse.json(settings, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (error) {
     console.error('Error in GET payment settings:', error);
     if (error instanceof Error) {
@@ -59,7 +63,14 @@ export async function POST(request: NextRequest) {
       credentials: (credentials ?? null) as Record<string, unknown> | null,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true },
+      {
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      }
+    );
   } catch (error) {
     console.error('Error in POST payment settings:', error);
     return NextResponse.json(

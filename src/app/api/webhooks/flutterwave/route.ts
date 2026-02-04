@@ -76,6 +76,16 @@ export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request.headers);
 
   try {
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return createErrorResponse('VALIDATION_ERROR', 'Invalid content type', 415);
+    }
+
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (Number.isFinite(contentLength) && contentLength > 1_000_000) {
+      return createErrorResponse('VALIDATION_ERROR', 'Payload too large', 413);
+    }
+
     const rateLimit = checkRateLimit(clientIP, RATE_LIMITS.WEBHOOK);
     if (!rateLimit.allowed) {
       return createErrorResponse('RATE_LIMIT_EXCEEDED', undefined, 429);

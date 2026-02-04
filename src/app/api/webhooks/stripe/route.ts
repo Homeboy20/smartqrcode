@@ -19,7 +19,18 @@ export async function POST(request: NextRequest) {
   const clientIP = getClientIP(request.headers);
 
   try {
-    // Rate limiting
+    // Basic request hygiene
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return createErrorResponse('VALIDATION_ERROR', 'Invalid content type', 415);
+    }
+
+    const contentLength = Number(request.headers.get('content-length') || 0);
+    if (Number.isFinite(contentLength) && contentLength > 1_000_000) {
+      return createErrorResponse('VALIDATION_ERROR', 'Payload too large', 413);
+    }
+
+    // Rate limiting (best-effort). Webhook IPs vary, but this still blocks obvious abuse.
     const rateLimit = checkRateLimit(clientIP, RATE_LIMITS.WEBHOOK);
     if (!rateLimit.allowed) {
       return createErrorResponse('RATE_LIMIT_EXCEEDED', undefined, 429);
@@ -27,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Get the webhook signature from headers
     const signature = request.headers.get('stripe-signature');
-    
+
     if (!signature) {
       logError('stripe-webhook', new Error('Missing stripe-signature header'), { clientIP });
       return createErrorResponse('VALIDATION_ERROR', 'Missing signature', 400);
@@ -35,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Get webhook secret from credentials
     const webhookSecret = await getCredential('STRIPE_WEBHOOK_SECRET');
-    
+
     if (!webhookSecret) {
       logError('stripe-webhook', new Error('Missing STRIPE_WEBHOOK_SECRET'), { clientIP });
       return createErrorResponse('INTERNAL_ERROR', 'Webhook secret not configured', 500);
@@ -46,19 +57,30 @@ export async function POST(request: NextRequest) {
 
     // Verify webhook signature
     const isValid = verifyStripeSignature(signature, body, webhookSecret);
-    
+
     if (!isValid) {
       logError('stripe-webhook', new Error('Invalid webhook signature'), { clientIP });
       return createErrorResponse('AUTHORIZATION_ERROR', 'Invalid signature', 400);
     }
 
     // Parse the event
-    const event = JSON.parse(body);
-    
-    console.log('Received Stripe webhook event:', event.type);
+    let event: any;
+    try {
+      event = body ? JSON.parse(body) : null;
+    } catch {
+      return createErrorResponse('VALIDATION_ERROR', 'Invalid JSON', 400);
+    }
+
+    const eventType = String(event?.type || '');
+    if (!eventType) {
+      return createErrorResponse('VALIDATION_ERROR', 'Missing event type', 400);
+    }
+
+    // Avoid logging full payloads (can contain PII/metadata)
+    console.log('Received Stripe webhook event:', eventType);
 
     // Handle the event based on type
-    switch (event.type) {
+    switch (eventType) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         
@@ -123,10 +145,21 @@ export async function POST(request: NextRequest) {
           })
           .eq('id', userId);
 
-        // Create transaction record
-        await supabaseAdmin
+        // Create transaction record (idempotent best-effort)
+        const paymentIntentId = String(session.payment_intent || '').trim();
+        if (!paymentIntentId) {
+          logError('stripe-webhook', new Error('Missing payment_intent'), { sessionId: session.id });
+          return createErrorResponse('VALIDATION_ERROR', 'Missing payment_intent', 400);
+        }
+
+        const { data: existingTxn } = await supabaseAdmin
           .from('transactions')
-          .insert({
+          .select('id,status')
+          .eq('transaction_id', paymentIntentId)
+          .maybeSingle();
+
+        if (!existingTxn) {
+          await supabaseAdmin.from('transactions').insert({
             user_id: userId,
             user_email: session.customer_email || null,
             amount: session.amount_total ? session.amount_total / 100 : 0,
@@ -135,8 +168,9 @@ export async function POST(request: NextRequest) {
             payment_gateway: 'stripe',
             payment_method: 'card',
             plan: planId,
-            transaction_id: session.payment_intent as string,
+            transaction_id: paymentIntentId,
             metadata: {
+              eventId: event?.id || null,
               sessionId: session.id,
               customerId: session.customer,
               subscriptionId: session.subscription,
@@ -144,6 +178,7 @@ export async function POST(request: NextRequest) {
             paid_at: now,
             created_at: now,
           });
+        }
 
         break;
       }
