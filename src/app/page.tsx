@@ -265,7 +265,7 @@ export default function Home() {
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                 </svg>
-                Create an account to generate & manage codes
+                Try without account — sign up for downloads & analytics
               </div>
             )}
             
@@ -299,6 +299,12 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
+              <Link
+                href="/generator"
+                className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-indigo-600/70 backdrop-blur rounded-xl hover:bg-indigo-600 transition-all border border-white/10"
+              >
+                Try without account
+              </Link>
               <Link 
                 href="/pricing/" 
                 className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-white/10 backdrop-blur rounded-xl hover:bg-white/20 transition-all border border-white/20"
@@ -317,6 +323,12 @@ export default function Home() {
                   {t}
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-3 text-xs text-indigo-100">
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Mobile money ready</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Local pricing in TZS</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">No auto-renew trial</span>
             </div>
 
             </div>
@@ -426,6 +438,90 @@ export default function Home() {
               <div>
                 <p className="font-semibold text-gray-900">Manage & track</p>
                 <p className="text-sm text-gray-600">Edit destinations + analytics (Pro+)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Free → Trial → Paid funnel */}
+      <section className="py-14 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase">Step 1</p>
+              <h3 className="mt-2 text-xl font-bold text-gray-900">Try free mode</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Generate a QR or barcode instantly. Advanced exports, analytics, and dynamic edits require an account.
+              </p>
+              <Link
+                href="/generator"
+                className="mt-4 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                Try without account
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-6">
+              <p className="text-xs font-semibold text-indigo-600 uppercase">Step 2</p>
+              <h3 className="mt-2 text-xl font-bold text-gray-900">Start a paid trial</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Small one-time payment. No auto-renew. Unlock downloads and pro tools.
+              </p>
+              <Link
+                href="/checkout?plan=pro&billingInterval=trial"
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                Start trial
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6">
+              <p className="text-xs font-semibold text-emerald-700 uppercase">Step 3</p>
+              <h3 className="mt-2 text-xl font-bold text-gray-900">Upgrade when ready</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Go monthly or yearly for full access, team features, and higher limits.
+              </p>
+              <Link
+                href="/pricing/"
+                className="mt-4 inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+              >
+                Compare plans
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product Preview */}
+      <section className="py-16 sm:py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <span className="text-indigo-600 font-semibold text-sm uppercase tracking-wider">Product proof</span>
+            <h2 className="mt-3 text-3xl sm:text-4xl font-bold text-gray-900">See ScanMagic in action</h2>
+            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+              Real screens from the dashboard, analytics, and restaurant order management.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <img src="/screenshots/dashboard.svg" alt="Dashboard overview" className="w-full h-auto" loading="lazy" />
+              <div className="p-5">
+                <h3 className="text-lg font-semibold text-gray-900">Dashboard overview</h3>
+                <p className="mt-2 text-sm text-gray-600">Track scans, active codes, and performance at a glance.</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <img src="/screenshots/analytics.svg" alt="Analytics snapshot" className="w-full h-auto" loading="lazy" />
+              <div className="p-5">
+                <h3 className="text-lg font-semibold text-gray-900">Analytics snapshot</h3>
+                <p className="mt-2 text-sm text-gray-600">Understand where scans happen and what converts.</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+              <img src="/screenshots/orders.svg" alt="Restaurant orders" className="w-full h-auto" loading="lazy" />
+              <div className="p-5">
+                <h3 className="text-lg font-semibold text-gray-900">Restaurant orders</h3>
+                <p className="mt-2 text-sm text-gray-600">Manage QR menu orders and WhatsApp handoff fast.</p>
               </div>
             </div>
           </div>

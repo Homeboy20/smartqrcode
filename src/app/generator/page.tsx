@@ -13,24 +13,41 @@ export default function GeneratorPage() {
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-        <h1 className="text-2xl font-bold mb-4">Open the Generator</h1>
-        <p className="text-gray-600 mb-6 text-center max-w-md">
-          Create QR codes, barcodes, sequences, and bulk batches from one place.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/login"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-md"
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/register"
-            className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-900 font-semibold py-2 px-6 rounded-md"
-          >
-            Create an Account
-          </Link>
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <div className="border-b border-gray-200 bg-gray-50">
+            <div className="px-6 py-5">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Try the Generator</h1>
+                  <p className="text-gray-600 text-sm">
+                    Create a QR code or barcode without signing up. Advanced exports, analytics, and dynamic edits require an account.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link
+                    href="/login"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-md"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-900 font-semibold py-2 px-6 rounded-md"
+                  >
+                    Create an Account
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-6">
+            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Free preview: generate one-off codes. Advanced exports, bulk ZIP, analytics, and dynamic edits require an account.
+            </div>
+            <UnifiedGenerator />
+          </div>
         </div>
       </div>
     );

@@ -365,7 +365,7 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
     const eligibility = currencyInfo?.providerEligibility || {};
     const base: UniversalPaymentProvider[] = ['flutterwave', 'paystack'];
     const uniq = Array.from(new Set([...base, ...availableProviders]));
-    return uniq.map((p) => {
+    const cards = uniq.map((p) => {
       const info = eligibility[p];
       const baseAllowed = info ? Boolean(info.allowed) : availableProviders.includes(p);
 
@@ -381,6 +381,7 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
       const reason = info?.reason;
       return { provider: p, allowed, reason };
     });
+    return cards.filter((card) => card.allowed);
   }, [currencyInfo?.providerEligibility, availableProviders, billingInterval]);
 
   useEffect(() => {
@@ -448,6 +449,12 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
 
   const planName = selectedPlan === 'pro' ? 'Pro' : 'Business';
   const paidTrialDays = currencyInfo?.paidTrial?.days ?? 7;
+  const summaryPeriodLabel =
+    billingInterval === 'trial'
+      ? `for ${paidTrialDays} days`
+      : billingInterval === 'yearly'
+        ? 'per year'
+        : 'per month';
   const planFeatures = subscriptionFeatures[selectedPlan];
 
   const commonBillingCountries = useMemo(
@@ -728,6 +735,9 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
           </button>
           <div className="text-sm text-gray-500">Secure checkout</div>
         </div>
+        <div className="mt-2 text-xs text-gray-500">
+          Free preview → paid trial (no auto-renew) → monthly/yearly for full access
+        </div>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left: form */}
@@ -888,54 +898,60 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                     )}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {providerCards.map(({ provider: p, allowed, reason }) => {
-                      const isSelected = provider === p;
-                      const isRecommended = currencyInfo?.recommendedProvider === p;
-                      const disabled = !allowed;
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => {
-                            if (disabled) {
-                              showProviderNotice(reason || 'This provider is not available for your billing country/currency.');
-                              return;
-                            }
-                            setProviderNotice(null);
-                            setProvider(p);
-                          }}
-                          disabled={disabled}
-                          className={`text-left border-2 rounded-xl p-4 transition-all ${
-                            disabled
-                              ? 'border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed'
-                              : isSelected
-                                ? 'border-indigo-600 bg-indigo-50 shadow-md'
-                                : 'border-gray-200 hover:border-indigo-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="font-semibold text-gray-900">{providerLabel(p)}</div>
-                            {isRecommended && (
-                              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">
-                                Recommended
-                              </span>
+                  {providerCards.length === 0 ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      No payment providers are available for this billing country/currency.
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {providerCards.map(({ provider: p, allowed, reason }) => {
+                        const isSelected = provider === p;
+                        const isRecommended = currencyInfo?.recommendedProvider === p;
+                        const disabled = !allowed;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              if (disabled) {
+                                showProviderNotice(reason || 'This provider is not available for your billing country/currency.');
+                                return;
+                              }
+                              setProviderNotice(null);
+                              setProvider(p);
+                            }}
+                            disabled={disabled}
+                            className={`text-left border-2 rounded-xl p-4 transition-all ${
+                              disabled
+                                ? 'border-gray-200 bg-gray-50 opacity-70 cursor-not-allowed'
+                                : isSelected
+                                  ? 'border-indigo-600 bg-indigo-50 shadow-md'
+                                  : 'border-gray-200 hover:border-indigo-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-semibold text-gray-900">{providerLabel(p)}</div>
+                              {isRecommended && (
+                                <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                  Recommended
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2 text-xs text-gray-500">
+                              {p === 'flutterwave'
+                                ? 'Best for international cards & local methods'
+                                : p === 'paystack'
+                                  ? 'Best for NGN and cards'
+                                  : 'Secure checkout'}
+                            </div>
+                            {disabled && reason && (
+                              <div className="mt-2 text-xs text-amber-700">{reason}</div>
                             )}
-                          </div>
-                          <div className="mt-2 text-xs text-gray-500">
-                            {p === 'flutterwave'
-                              ? 'Best for international cards & local methods'
-                              : p === 'paystack'
-                                ? 'Best for NGN and cards'
-                                : 'Secure checkout'}
-                          </div>
-                          {disabled && reason && (
-                            <div className="mt-2 text-xs text-amber-700">{reason}</div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {providerNotice && (
                     <p className="mt-2 text-xs text-amber-700">
@@ -974,6 +990,11 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                       {methodAvailabilityNote}
                     </p>
                   )}
+                  {paymentMethod === 'mobile_money' && effectiveCountryCode === 'TZ' && provider === 'flutterwave' && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Common options in Tanzania: M-Pesa, TigoPesa, Airtel Money (availability depends on provider setup).
+                    </p>
+                  )}
                 </div>
 
                 {error && (
@@ -998,6 +1019,10 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                       ? 'Redirecting to secure payment…'
                       : 'Continue to secure payment'}
                 </button>
+
+                <div className="mt-3 text-xs text-gray-500 text-center">
+                  Pay securely → account created → access dashboard immediately
+                </div>
 
                 <div className="flex items-center justify-center gap-6 text-xs text-gray-500">
                   <div className="flex items-center">
@@ -1031,7 +1056,7 @@ export default function CheckoutClient(props: { initialCurrencyInfo?: CurrencyIn
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-bold text-gray-900">{planPrice}</div>
-                    <div className="text-xs text-gray-500">/month</div>
+                    <div className="text-xs text-gray-500">{summaryPeriodLabel}</div>
                   </div>
                 </div>
 
