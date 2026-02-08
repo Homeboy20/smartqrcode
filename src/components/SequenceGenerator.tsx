@@ -50,6 +50,10 @@ export default function SequenceGenerator() {
   const [count, setCount] = useState<number>(1);
   const [format, setFormat] = useState<"qrcode" | "barcode">("barcode");
   const [barcodeType, setBarcodeType] = useState<string>("CODE128");
+  const [qrSize, setQrSize] = useState<number>(180);
+  const [qrLevel, setQrLevel] = useState<'L' | 'M' | 'Q' | 'H'>('M');
+  const [qrForeground, setQrForeground] = useState<string>('#000000');
+  const [qrBackground, setQrBackground] = useState<string>('#FFFFFF');
   const [previewCode, setPreviewCode] = useState<string>("");
   const [generatedCodes, setGeneratedCodes] = useState<string[]>([]);
   const [imageFormat, setImageFormat] = useState<ImageFormat>('png');
@@ -76,6 +80,13 @@ export default function SequenceGenerator() {
     { value: "pharmacode", label: "Pharmacode" },
   ];
 
+  const qrErrorLevels = [
+    { value: 'L', label: 'Low (L) - ~7% recovery' },
+    { value: 'M', label: 'Medium (M) - ~15% recovery' },
+    { value: 'Q', label: 'Quartile (Q) - ~25% recovery' },
+    { value: 'H', label: 'High (H) - ~30% recovery' },
+  ];
+
   const isValidHttpUrl = (value: string) => {
     try {
       const url = new URL(value);
@@ -84,6 +95,12 @@ export default function SequenceGenerator() {
       return false;
     }
   };
+
+  useEffect(() => {
+    if (!useDynamicLink) {
+      setEncryptDestination(false);
+    }
+  }, [useDynamicLink]);
 
   // Generate preview whenever input values change (only when not browsing a generated sequence)
   useEffect(() => {
@@ -257,13 +274,29 @@ export default function SequenceGenerator() {
           const qrElement = document.createElement('div');
           qrElement.style.display = 'inline-block';
           document.body.appendChild(qrElement);
-          const qrComponent = <QRCode value={codeValue} size={256} level="M" />;
+          const qrComponent = (
+            <QRCode
+              value={codeValue}
+              size={qrSize}
+              level={qrLevel}
+              bgColor={qrBackground}
+              fgColor={qrForeground}
+            />
+          );
           createRoot(qrElement).render(qrComponent);
           const renderedSvg = qrElement.querySelector('svg');
           svgString = renderedSvg ? renderedSvg.outerHTML : '';
           document.body.removeChild(qrElement);
         } else {
-          await qrcode.toCanvas(canvas, codeValue, { width: 256, margin: 1 });
+          await qrcode.toCanvas(canvas, codeValue, {
+            width: qrSize,
+            margin: 1,
+            errorCorrectionLevel: qrLevel,
+            color: {
+              dark: qrForeground,
+              light: qrBackground,
+            },
+          });
           imageDataUrl = canvas.toDataURL('image/png'); // Use PNG as base for PDF
         }
       } else {
@@ -495,7 +528,9 @@ export default function SequenceGenerator() {
       {/* Left column - Controls */}
       <div className="flex-1">
         <div className="bg-white p-6 rounded-lg shadow-sm">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Generate Barcode Sequence</h2>
+          <h2 className="text-xl font-bold text-gray-800 mb-6">
+            Generate {format === 'qrcode' ? 'QR Code' : 'Barcode'} Sequence
+          </h2>
           
           {/* Form Container */}
           <div className="space-y-6">
@@ -546,6 +581,70 @@ export default function SequenceGenerator() {
                     </option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {format === "qrcode" && (
+              <div className="mb-4 space-y-4">
+                <div>
+                  <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="qr-size">
+                    QR Size (px)
+                  </label>
+                  <input
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    id="qr-size"
+                    type="number"
+                    min={120}
+                    max={512}
+                    value={qrSize}
+                    onChange={(e) => setQrSize(Math.min(512, Math.max(120, Number(e.target.value) || 180)))}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="qr-level">
+                    Error Correction
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    id="qr-level"
+                    value={qrLevel}
+                    onChange={(e) => setQrLevel(e.target.value as 'L' | 'M' | 'Q' | 'H')}
+                  >
+                    {qrErrorLevels.map((level) => (
+                      <option key={level.value} value={level.value}>
+                        {level.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="qr-foreground">
+                      Foreground Color
+                    </label>
+                    <input
+                      id="qr-foreground"
+                      type="color"
+                      value={qrForeground}
+                      onChange={(e) => setQrForeground(e.target.value)}
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white p-1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="qr-background">
+                      Background Color
+                    </label>
+                    <input
+                      id="qr-background"
+                      type="color"
+                      value={qrBackground}
+                      onChange={(e) => setQrBackground(e.target.value)}
+                      className="h-10 w-full rounded-md border border-gray-300 bg-white p-1"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -611,7 +710,7 @@ export default function SequenceGenerator() {
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Dynamic link</div>
                   <div className="text-xs text-gray-600">
-                    Creates a short link you can edit later and track.
+                    Available for URL {format === 'qrcode' ? 'QR codes' : 'barcodes'}. Each code must be a valid http(s) URL.
                   </div>
                 </div>
                 <label className="inline-flex items-center">
@@ -643,7 +742,6 @@ export default function SequenceGenerator() {
                       }
 
                       setUseDynamicLink(next);
-                      if (!next) setEncryptDestination(false);
                     }}
                     className="h-4 w-4"
                   />
@@ -899,8 +997,10 @@ export default function SequenceGenerator() {
                   <div className="p-4 bg-white rounded-md shadow-sm" ref={qrCodeRef}>
                     <QRCode
                       value={previewCode}
-                      size={180}
-                      level="M"
+                      size={qrSize}
+                      level={qrLevel}
+                      bgColor={qrBackground}
+                      fgColor={qrForeground}
                     />
                     <div className="mt-2 text-center font-medium">{previewCode}</div>
                   </div>

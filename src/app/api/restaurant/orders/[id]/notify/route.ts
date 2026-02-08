@@ -15,7 +15,10 @@ function canNotify(role: string | null, isOwner: boolean): boolean {
   return role === 'manager' || role === 'kitchen';
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const access = await getRestaurantAccess(request);
     if (!canNotify(access.staffRole, access.isOwner)) {
@@ -33,7 +36,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
     );
     if (!gate.ok) return json(gate.status, { error: gate.error });
 
-    const orderId = String(params?.id || '').trim();
+    const { id } = await params;
+    const orderId = String(id || '').trim();
     if (!orderId) return json(400, { error: 'Order id is required' });
 
     const { data: order, error: orderErr } = await admin

@@ -199,6 +199,8 @@ export default function DashboardOrdersPage() {
   const [assignable, setAssignable] = useState<AssignableStaff[]>([]);
   const [selectedAssigneeByOrder, setSelectedAssigneeByOrder] = useState<Record<string, string>>({});
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [search, setSearch] = useState('');
 
   const audioUnlockedRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -264,6 +266,37 @@ export default function DashboardOrdersPage() {
 
     return [{ href: '/dashboard/orders', label: 'Orders' }];
   }, [access]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<OrderStatus, number> = {
+      placed: 0,
+      accepted: 0,
+      preparing: 0,
+      ready: 0,
+      served: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    for (const o of orders) {
+      counts[o.status] += 1;
+    }
+    return counts;
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+
+      if (!query) return true;
+      const idMatch = o.id.toLowerCase().includes(query);
+      const nameMatch = (o.customer_name || '').toLowerCase().includes(query);
+      const phoneMatch = (o.customer_phone || '').toLowerCase().includes(query);
+      const tableMatch = o.table_number ? String(o.table_number).includes(query) : false;
+      return idMatch || nameMatch || phoneMatch || tableMatch;
+    });
+  }, [orders, statusFilter, search]);
 
   async function fetchOrders(currentAccess: RestaurantAccess) {
     // Prefer cookie auth; fall back to bearer.
@@ -591,20 +624,77 @@ export default function DashboardOrdersPage() {
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.message}</div>
       ) : null}
 
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by order ID, customer, phone, or table"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
+          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="all">All statuses</option>
+          <option value="placed">Placed</option>
+          <option value="accepted">Accepted</option>
+          <option value="preparing">Preparing</option>
+          <option value="ready">Ready</option>
+          <option value="served">Served</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2 text-xs">
+        {([
+          ['placed', statusCounts.placed],
+          ['accepted', statusCounts.accepted],
+          ['preparing', statusCounts.preparing],
+          ['ready', statusCounts.ready],
+          ['served', statusCounts.served],
+          ['completed', statusCounts.completed],
+          ['cancelled', statusCounts.cancelled],
+        ] as Array<[OrderStatus, number]>).map(([statusKey, count]) => (
+          <button
+            key={statusKey}
+            type="button"
+            onClick={() => setStatusFilter(statusKey)}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold ${
+              statusFilter === statusKey
+                ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {statusLabel(statusKey)}
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700">
+              {count}
+            </span>
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="space-y-3">
           <div className="h-10 bg-gray-100 animate-pulse rounded" />
           <div className="h-10 bg-gray-100 animate-pulse rounded" />
           <div className="h-10 bg-gray-100 animate-pulse rounded" />
         </div>
-      ) : orders.length === 0 ? (
+      ) : filteredOrders.length === 0 ? (
         <div className="rounded-md border border-gray-200 bg-gray-50 p-6 text-center">
-          <div className="text-sm font-semibold text-gray-900">No orders yet</div>
-          <p className="mt-1 text-sm text-gray-600">Orders will appear here once customers place them.</p>
+          <div className="text-sm font-semibold text-gray-900">
+            {orders.length === 0 ? 'No orders yet' : 'No orders match your filters'}
+          </div>
+          <p className="mt-1 text-sm text-gray-600">
+            {orders.length === 0
+              ? 'Orders will appear here once customers place them.'
+              : 'Try clearing the filters or adjusting your search.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {orders.map((o) => (
+          {filteredOrders.map((o) => (
             <div key={o.id} className="rounded-lg border border-gray-200 bg-white p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>

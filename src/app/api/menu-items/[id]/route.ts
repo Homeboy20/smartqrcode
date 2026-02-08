@@ -35,10 +35,11 @@ async function getRestaurantIdForUser(userId: string) {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await verifyUserAccess(request);
+    const { id } = await params;
 
     const body = await request.json().catch(() => null);
 
@@ -78,7 +79,7 @@ export async function PATCH(
     const { data: updated, error: updateError } = await supabase
       .from('menu_items')
       .update(patch)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('restaurant_id', restaurantId)
       .select('id,restaurant_id,category,name,description,image_url,price,available,created_at,updated_at')
       .maybeSingle();
@@ -97,10 +98,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await verifyUserAccess(request);
+    const { id } = await params;
 
     const { supabase, restaurantId, error } = await getRestaurantIdForUser(userId);
     if (error) return NextResponse.json({ error }, { status: 500 });
@@ -109,7 +111,7 @@ export async function DELETE(
     const { data: deleted, error: deleteError } = await supabase
       .from('menu_items')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('restaurant_id', restaurantId)
       .select('id')
       .maybeSingle();

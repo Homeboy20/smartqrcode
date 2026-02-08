@@ -52,7 +52,10 @@ function normalizeUuid(value: any): string | null {
   return v;
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const access = await getRestaurantAccess(request);
     const admin = createServerClient();
@@ -66,7 +69,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
     if (!gate.ok) return json(gate.status, { error: gate.error });
 
-    const id = String(params?.id || '').trim();
+    const { id: rawId } = await params;
+    const id = String(rawId || '').trim();
     if (!id) return json(400, { error: 'Order id is required' });
 
     const { data: existingOrder, error: existingErr } = await admin

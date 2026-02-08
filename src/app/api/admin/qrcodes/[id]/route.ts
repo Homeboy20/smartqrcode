@@ -6,10 +6,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyAdminAccess(request);
+
+    const { id } = await params;
 
     const supabase = createServerClient();
     if (!supabase) {
@@ -19,7 +21,7 @@ export async function GET(
     const { data: qrCode, error } = await supabase
       .from('qrcodes')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single();
 
     if (error || !qrCode) {
@@ -38,10 +40,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyAdminAccess(request);
+
+    const { id } = await params;
 
     const body = await request.json();
     const { name, content, type, format, customizations } = body;
@@ -64,7 +68,7 @@ export async function PUT(
     const { error } = await supabase
       .from('qrcodes')
       .update(updateData)
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
       throw new Error(error.message);
@@ -85,10 +89,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyAdminAccess(request);
+
+    const { id } = await params;
 
     const supabase = createServerClient();
     if (!supabase) {
@@ -98,7 +104,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('qrcodes')
       .delete()
-      .eq('id', params.id);
+      .eq('id', id);
 
     if (error) {
       throw new Error(error.message);

@@ -6,8 +6,8 @@ import CheckoutClient from './CheckoutClient';
 
 export const runtime = 'nodejs';
 
-function getBaseUrl() {
-  const h = headers();
+async function getBaseUrl() {
+  const h = await headers();
   const proto = h.get('x-forwarded-proto') || 'http';
   const host = h.get('x-forwarded-host') || h.get('host');
   if (!host) return null;
@@ -15,12 +15,12 @@ function getBaseUrl() {
 }
 
 export default async function CheckoutPage() {
-  const h = headers();
+  const h = await headers();
   const country = detectCountryFromHeaders(h);
 
   let initialCurrencyInfo: any = null;
   try {
-    const baseUrl = getBaseUrl();
+    const baseUrl = await getBaseUrl();
     if (baseUrl) {
       const url = `${baseUrl}/api/pricing?country=${encodeURIComponent(country)}`;
       const res = await fetch(url, {

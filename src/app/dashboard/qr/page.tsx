@@ -125,6 +125,12 @@ export default function DashboardQrPage() {
     return rows;
   }, [restaurant?.slug, tableStart, tableEnd]);
 
+  const tableCsv = useMemo(() => {
+    if (!tableUrls.length) return '';
+    const rows = ['table,url', ...tableUrls.map((t) => `${t.table},${t.url}`)];
+    return rows.join('\n');
+  }, [tableUrls]);
+
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(menuUrl);
@@ -133,6 +139,31 @@ export default function DashboardQrPage() {
     } catch {
       setStatus({ kind: 'error', message: 'Copy failed. Please copy manually.' });
     }
+  }
+
+  async function copyTableLinks() {
+    if (!tableUrls.length) return;
+    try {
+      const text = tableUrls.map((t) => `Table ${t.table}: ${t.url}`).join('\n');
+      await navigator.clipboard.writeText(text);
+      setStatus({ kind: 'success', message: 'Copied table links' });
+      setTimeout(() => setStatus({ kind: 'idle' }), 1500);
+    } catch {
+      setStatus({ kind: 'error', message: 'Copy failed. Please try again.' });
+    }
+  }
+
+  function downloadTableCsv() {
+    if (!tableCsv) return;
+    const blob = new Blob([tableCsv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `table-qr-links-${restaurant?.slug || 'menu'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -295,6 +326,25 @@ export default function DashboardQrPage() {
                 <label className="block text-xs font-semibold text-gray-700">Tip</label>
                 <div className="mt-2 text-xs text-gray-600">Print and place on each table.</div>
               </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={copyTableLinks}
+                disabled={!tableUrls.length}
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Copy all links
+              </button>
+              <button
+                type="button"
+                onClick={downloadTableCsv}
+                disabled={!tableUrls.length}
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Download CSV
+              </button>
             </div>
 
             {tableUrls.length ? (

@@ -18,7 +18,6 @@ const supabaseHost = hostnameFromUrl(process.env.NEXT_PUBLIC_SUPABASE_URL);
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
 
   // Enable standalone output for Docker deployment (Coolify)
   output: 'standalone',
@@ -75,12 +74,6 @@ const nextConfig = {
 
   assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
 
-  experimental: {
-    appDocumentPreloading: false,
-    // Allow useSearchParams without Suspense boundary (client-side only pages)
-    missingSuspenseWithCSRBailout: false,
-  },
-
   distDir: '.next',
   excludeDefaultMomentLocales: true,
 
@@ -99,12 +92,6 @@ const nextConfig = {
       process.env.VERCEL_GIT_COMMIT_SHA ||
       process.env.GITHUB_SHA ||
       'dev',
-  },
-
-  eslint: {
-    // SECURITY: don’t silently ship with lint errors.
-    // You can temporarily override by setting NEXT_IGNORE_ESLINT=true.
-    ignoreDuringBuilds: process.env.NEXT_IGNORE_ESLINT === 'true',
   },
 
   typescript: {

@@ -9,12 +9,13 @@ import { verifyAdminAccess } from '@/lib/supabase/auth';
 // GET - Get single customer
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyAdminAccess(request);
 
-    const customer = await getFlutterwaveCustomer(params.id);
+    const { id } = await params;
+    const customer = await getFlutterwaveCustomer(id);
     
     return NextResponse.json({ customer });
   } catch (error) {
@@ -27,10 +28,12 @@ export async function GET(
 // PUT - Update customer
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await verifyAdminAccess(request);
+
+    const { id } = await params;
 
     const body = await request.json();
     const updates: Partial<FlutterwaveCustomer> = {};
@@ -41,7 +44,7 @@ export async function PUT(
     if (body.address) updates.address = body.address;
     if (body.meta) updates.meta = body.meta;
 
-    const customer = await updateFlutterwaveCustomer(params.id, updates);
+    const customer = await updateFlutterwaveCustomer(id, updates);
     
     return NextResponse.json({ customer });
   } catch (error) {

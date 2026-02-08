@@ -88,6 +88,39 @@ export default function DashboardShell({
             <NavLink key={item.href} href={item.href} label={item.label} />
           ))}
         </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/generator#qrcode"
+            className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+          >
+            New QR
+          </Link>
+          <Link
+            href="/generator#barcode"
+            className="inline-flex items-center rounded-md bg-gray-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black"
+          >
+            New Barcode
+          </Link>
+          <Link
+            href="/sequence"
+            className="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            Sequence
+          </Link>
+          <Link
+            href="/dashboard/qr"
+            className="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            Menu QR
+          </Link>
+          <Link
+            href="/dashboard/orders"
+            className="inline-flex items-center rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+          >
+            Orders
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-5">{children}</div>

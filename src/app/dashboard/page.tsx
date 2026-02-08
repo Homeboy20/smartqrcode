@@ -24,6 +24,11 @@ function formatShortDate(value?: string) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
+function usagePercent(used: number, limit?: number | null) {
+  if (!limit || limit <= 0) return 0;
+  return Math.min(100, Math.round((used / limit) * 100));
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, getAccessToken } = useSupabaseAuth();
@@ -170,6 +175,13 @@ export default function DashboardPage() {
     );
   }
 
+  const qrLimit = limits?.qrGenerationLimit?.daily ?? 0;
+  const barcodeLimit = limits?.barcodeGenerationLimit?.daily ?? 0;
+  const bulkLimit = limits?.bulkGenerationLimit?.daily ?? 0;
+  const qrUsage = usagePercent(featuresUsage.qrCodesGenerated, qrLimit);
+  const barcodeUsage = usagePercent(featuresUsage.barcodesGenerated, barcodeLimit);
+  const bulkUsage = usagePercent(featuresUsage.bulkGenerations, bulkLimit);
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
@@ -206,16 +218,34 @@ export default function DashboardPage() {
           <div className="text-sm text-gray-500">QR codes generated</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.qrCodesGenerated}</div>
           <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.qrGenerationLimit.daily}</div>
+          <div className="mt-3 h-2 rounded-full bg-gray-100">
+            <div
+              className="h-2 rounded-full bg-indigo-600"
+              style={{ width: `${qrUsage}%` }}
+            />
+          </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">Barcodes generated</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.barcodesGenerated}</div>
           <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.barcodeGenerationLimit.daily}</div>
+          <div className="mt-3 h-2 rounded-full bg-gray-100">
+            <div
+              className="h-2 rounded-full bg-gray-900"
+              style={{ width: `${barcodeUsage}%` }}
+            />
+          </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm text-gray-500">Bulk generations</div>
           <div className="mt-1 text-2xl font-bold text-gray-900">{featuresUsage.bulkGenerations}</div>
           <div className="mt-2 text-xs text-gray-500">Daily limit: {limits.bulkGenerationLimit.daily}</div>
+          <div className="mt-3 h-2 rounded-full bg-gray-100">
+            <div
+              className="h-2 rounded-full bg-emerald-600"
+              style={{ width: `${bulkUsage}%` }}
+            />
+          </div>
         </div>
       </div>
 

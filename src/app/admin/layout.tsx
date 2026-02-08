@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Metadata } from 'next';
 
@@ -19,7 +19,9 @@ export default function AdminPageLayout({
   return (
     // The actual admin UI will be rendered through AdminLayout
     <div className="w-full min-h-screen max-w-none p-0 m-0">
-      <AdminLayout>{children}</AdminLayout>
+      <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+        <AdminLayout>{children}</AdminLayout>
+      </Suspense>
     </div>
   );
 } 

@@ -183,7 +183,7 @@ export default function QRCodeGenerator({ onDownload, initialUrl }: QRCodeGenera
     { value: "pdf", label: "PDF", premium: true },
   ];
 
-  const dynamicSupported = qrType === 'url' || qrType === 'menu';
+  const dynamicSupported = true;
 
   useEffect(() => {
     if (!dynamicSupported) {
@@ -381,8 +381,8 @@ export default function QRCodeGenerator({ onDownload, initialUrl }: QRCodeGenera
           return;
         }
 
-        if (!isValidHttpUrl(qrValue)) {
-          alert('Dynamic QR Codes only support http(s) URLs.');
+        if ((qrType === 'url' || qrType === 'menu') && !isValidHttpUrl(qrValue)) {
+          alert('Dynamic QR Codes for URL-based types require a valid http(s) URL.');
           return;
         }
 
@@ -646,7 +646,7 @@ export default function QRCodeGenerator({ onDownload, initialUrl }: QRCodeGenera
                 <div>
                   <div className="text-sm font-semibold text-gray-900">Dynamic link</div>
                   <div className="text-xs text-gray-600">
-                    Creates a short ScanMagic link that can track scans.
+                    Creates a short ScanMagic link that can track scans. URL-based types require http(s) URLs.
                   </div>
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">

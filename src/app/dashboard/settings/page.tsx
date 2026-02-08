@@ -132,6 +132,18 @@ export default function DashboardSettingsPage() {
     return `${window.location.origin}/menu/${slug}`;
   }, [slug]);
 
+  const setupChecklist = useMemo(() => {
+    const items = [
+      { label: 'Restaurant name', done: Boolean(name.trim()) },
+      { label: 'WhatsApp number', done: Boolean(whatsappNumber.trim()) },
+      { label: 'Accepted payments', done: parsePayments(acceptedPaymentsText).length > 0 },
+      { label: 'Menu link ready', done: Boolean(slug) },
+      { label: 'Brand color', done: Boolean(brandPrimaryColor) },
+    ];
+    const completed = items.filter((i) => i.done).length;
+    return { items, completed, total: items.length };
+  }, [name, whatsappNumber, acceptedPaymentsText, slug, brandPrimaryColor]);
+
   async function uploadLogo() {
     if (!logoFile) {
       setStatus({ kind: 'error', message: 'Choose a logo image first' });
@@ -170,6 +182,17 @@ export default function DashboardSettingsPage() {
       setStatus({ kind: 'error', message: e?.message || 'Upload failed' });
     } finally {
       setUploadingLogo(false);
+    }
+  }
+
+  async function copyMenuLink() {
+    if (!menuUrl) return;
+    try {
+      await navigator.clipboard.writeText(menuUrl);
+      setStatus({ kind: 'success', message: 'Menu link copied' });
+      setTimeout(() => setStatus({ kind: 'idle' }), 1500);
+    } catch {
+      setStatus({ kind: 'error', message: 'Copy failed. Please copy manually.' });
     }
   }
 
@@ -271,6 +294,63 @@ export default function DashboardSettingsPage() {
           {status.message}
         </div>
       ) : null}
+
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="rounded-md border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Setup checklist</div>
+              <div className="mt-1 text-xs text-gray-600">
+                {setupChecklist.completed} of {setupChecklist.total} complete
+              </div>
+            </div>
+            <div className="text-xs font-semibold text-indigo-600">
+              {Math.round((setupChecklist.completed / setupChecklist.total) * 100)}%
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {setupChecklist.items.map((item) => (
+              <div key={item.label} className="flex items-center justify-between text-sm">
+                <span className="text-gray-700">{item.label}</span>
+                <span className={item.done ? 'text-emerald-600' : 'text-gray-400'}>
+                  {item.done ? 'Done' : 'Pending'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-gray-200 bg-white p-4">
+          <div className="text-sm font-semibold text-gray-900">Quick actions</div>
+          <div className="mt-2 text-xs text-gray-600">Menu link</div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              value={menuUrl}
+              readOnly
+              className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700"
+              placeholder="Menu link will appear after setup"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={copyMenuLink}
+              disabled={!menuUrl}
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Copy link
+            </button>
+            <a
+              href={menuUrl || '#'}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-2 text-xs font-semibold ${menuUrl ? 'text-gray-800 hover:bg-gray-50' : 'text-gray-400 pointer-events-none'}`}
+            >
+              Open menu
+            </a>
+          </div>
+        </div>
+      </div>
 
       {loading ? (
         <div className="space-y-3">

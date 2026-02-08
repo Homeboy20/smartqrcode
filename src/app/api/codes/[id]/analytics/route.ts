@@ -13,10 +13,11 @@ function toIsoDay(value: string): string {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await verifyUserAccess(request);
+    const { id } = await params;
 
     const supabase = createServerClient();
     if (!supabase) {
@@ -26,7 +27,7 @@ export async function GET(
     const { data: codeRow, error: codeErr } = await supabase
       .from('qrcodes')
       .select('id, user_id, name, type, scans, created_at, last_scan')
-      .eq('id', params.id)
+      .eq('id', id)
       .maybeSingle();
 
     if (codeErr || !codeRow) {
@@ -40,12 +41,12 @@ export async function GET(
     const { count: totalEvents } = await supabase
       .from('qrcode_scan_events')
       .select('*', { count: 'exact', head: true })
-      .eq('code_id', params.id);
+      .eq('code_id', id);
 
     const { data: events } = await supabase
       .from('qrcode_scan_events')
       .select('scanned_at, country, referer, user_agent')
-      .eq('code_id', params.id)
+      .eq('code_id', id)
       .order('scanned_at', { ascending: false })
       .limit(200);
 

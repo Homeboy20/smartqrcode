@@ -80,6 +80,9 @@ export default function DashboardMenuPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(true);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [availabilityFilter, setAvailabilityFilter] = useState<'all' | 'available' | 'unavailable'>('all');
 
   async function loadAll() {
     setLoading(true);
@@ -117,14 +120,38 @@ export default function DashboardMenuPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscriptionLoading, hasRestaurantAccess]);
 
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of items) {
+      set.add(item.category || 'Other');
+    }
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return items.filter((item) => {
+      if (availabilityFilter === 'available' && !item.available) return false;
+      if (availabilityFilter === 'unavailable' && item.available) return false;
+
+      const categoryName = item.category || 'Other';
+      if (categoryFilter !== 'all' && categoryName !== categoryFilter) return false;
+
+      if (!query) return true;
+      const nameMatch = item.name.toLowerCase().includes(query);
+      const descMatch = (item.description || '').toLowerCase().includes(query);
+      return nameMatch || descMatch || categoryName.toLowerCase().includes(query);
+    });
+  }, [items, search, categoryFilter, availabilityFilter]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, MenuItem[]>();
-    for (const item of items) {
+    for (const item of filteredItems) {
       const key = item.category || 'Other';
       map.set(key, [...(map.get(key) || []), item]);
     }
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [items]);
+  }, [filteredItems]);
 
   function resetForm() {
     setEditId(null);
@@ -463,7 +490,55 @@ export default function DashboardMenuPage() {
       ) : null}
 
       {restaurant ? (
-        loading ? (
+        <>
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Total items</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{items.length}</div>
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Available</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">
+                {items.filter((i) => i.available).length}
+              </div>
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Categories</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{categories.length}</div>
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search items by name, category, or description"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="all">All categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <select
+              value={availabilityFilter}
+              onChange={(e) => setAvailabilityFilter(e.target.value as 'all' | 'available' | 'unavailable')}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="all">All availability</option>
+              <option value="available">Available only</option>
+              <option value="unavailable">Unavailable only</option>
+            </select>
+          </div>
+
+          {loading ? (
           <div className="space-y-3">
             <div className="h-10 bg-gray-100 animate-pulse rounded" />
             <div className="h-10 bg-gray-100 animate-pulse rounded" />
@@ -473,6 +548,11 @@ export default function DashboardMenuPage() {
           <div className="rounded-md border border-gray-200 p-6 text-center">
             <div className="text-sm font-semibold text-gray-900">No menu items yet</div>
             <p className="mt-1 text-sm text-gray-600">Add your first item above.</p>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="rounded-md border border-gray-200 p-6 text-center">
+            <div className="text-sm font-semibold text-gray-900">No results match your filters</div>
+            <p className="mt-1 text-sm text-gray-600">Try clearing filters or adjusting your search.</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -533,7 +613,8 @@ export default function DashboardMenuPage() {
               </div>
             ))}
           </div>
-        )
+        )}
+        </>
       ) : null}
         </>
       )}

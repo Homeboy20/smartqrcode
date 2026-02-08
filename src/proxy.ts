@@ -3,10 +3,10 @@ import type { NextRequest } from 'next/server';
 import { createSupabaseMiddlewareClient } from '@/lib/supabase/ssr';
 
 /**
- * Supabase SSR middleware.
+ * Supabase SSR proxy.
  * Refreshes auth cookies so route handlers and server components can trust cookie auth.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { supabase, response } = createSupabaseMiddlewareClient(request);
 
   // If env vars are missing, just continue.

@@ -45,6 +45,8 @@ export default function DashboardStaffPage() {
   const [role, setRole] = useState<StaffRole>('waiter');
   const [usePassword, setUsePassword] = useState(true);
   const [password, setPassword] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | StaffRole>('all');
 
   const roleOptions = useMemo(() => {
     const base: Array<{ value: StaffRole; label: string }> = [
@@ -59,6 +61,30 @@ export default function DashboardStaffPage() {
 
     return base;
   }, [isOwner]);
+
+  const roleCounts = useMemo(() => {
+    const counts: Record<StaffRole, number> = {
+      manager: 0,
+      kitchen: 0,
+      waiter: 0,
+      delivery: 0,
+    };
+    for (const s of staff) {
+      counts[s.role] += 1;
+    }
+    return counts;
+  }, [staff]);
+
+  const filteredStaff = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return staff.filter((s) => {
+      if (roleFilter !== 'all' && s.role !== roleFilter) return false;
+      if (!query) return true;
+      const nameMatch = (s.displayName || '').toLowerCase().includes(query);
+      const emailMatch = (s.email || '').toLowerCase().includes(query);
+      return nameMatch || emailMatch;
+    });
+  }, [staff, search, roleFilter]);
 
   const baseTier = baseSubscriptionTier || subscriptionTier;
   const hasTeamAccess = canUseFeature('restaurantTeam');
@@ -225,11 +251,50 @@ export default function DashboardStaffPage() {
             </div>
           </div>
 
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Total</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{staff.length}</div>
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Managers</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{roleCounts.manager}</div>
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Kitchen</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{roleCounts.kitchen}</div>
+            </div>
+            <div className="rounded-md border border-gray-200 bg-white p-3">
+              <div className="text-xs text-gray-500">Waiters + Delivery</div>
+              <div className="mt-1 text-lg font-semibold text-gray-900">{roleCounts.waiter + roleCounts.delivery}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[1fr_200px]">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search staff by name or email"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as 'all' | StaffRole)}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="all">All roles</option>
+              <option value="manager">Manager</option>
+              <option value="kitchen">Kitchen</option>
+              <option value="waiter">Waiter</option>
+              <option value="delivery">Delivery</option>
+            </select>
+          </div>
+
           {loading ? (
             <div className="mt-4 text-sm text-gray-600">Loading…</div>
-          ) : staff.length === 0 ? (
+          ) : filteredStaff.length === 0 ? (
             <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-              No staff members yet.
+              {staff.length === 0 ? 'No staff members yet.' : 'No staff match your filters.'}
             </div>
           ) : (
             <div className="mt-4 overflow-hidden rounded-md border border-gray-200">
@@ -243,7 +308,7 @@ export default function DashboardStaffPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {staff.map((s) => (
+                  {filteredStaff.map((s) => (
                     <tr key={s.id}>
                       <td className="px-4 py-2 text-sm text-gray-900">
                         {s.displayName || '—'}
