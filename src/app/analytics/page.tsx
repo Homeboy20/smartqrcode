@@ -2,10 +2,15 @@
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Bar } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+"use client";
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { Bar } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from "chart.js";
+
 import { useSupabaseAuth } from "@/context/SupabaseAuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
-import Link from "next/link";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -25,6 +30,25 @@ type AnalyticsSummary = {
   topCodes: Array<{ id: string; name: string | null; type: string | null; scans: number }>;
 };
 
+function StatCard({ label, value, helper }: { label: string; value: string | number; helper?: string }) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="mt-2 text-3xl font-bold text-gray-900">{value}</div>
+      {helper ? <div className="mt-2 text-xs text-gray-500">{helper}</div> : null}
+    </div>
+  );
+}
+
+function EmptyPanel({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+      <div className="text-sm font-semibold text-gray-900">{title}</div>
+      <p className="mt-1 text-sm text-gray-600">{body}</p>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { user, loading: authLoading, getAccessToken } = useSupabaseAuth();
   const { canUseFeature, loading: subscriptionLoading } = useSubscription();
@@ -33,7 +57,7 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<Record<string, ChartData>>({});
 
-  const analyticsEnabled = !!user && canUseFeature('analytics');
+  const analyticsEnabled = !!user && canUseFeature("analytics");
   const getAccessTokenRef = useRef(getAccessToken);
 
   useEffect(() => {
@@ -46,12 +70,12 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/analytics/summary', { cache: 'no-store' });
+      const res = await fetch("/api/analytics/summary", { cache: "no-store" });
 
       if (res.status === 401) {
         const token = await getAccessTokenRef.current();
-        const retry = await fetch('/api/analytics/summary', {
-          cache: 'no-store',
+        const retry = await fetch("/api/analytics/summary", {
+          cache: "no-store",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const body = await retry.json().catch(() => ({} as any));
@@ -65,8 +89,8 @@ export default function AnalyticsPage() {
 
       setSummary(body as AnalyticsSummary);
     } catch (err) {
-      console.error('Error fetching analytics summary:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load analytics.');
+      console.error("Error fetching analytics summary:", err);
+      setError(err instanceof Error ? err.message : "Failed to load analytics.");
       setSummary(null);
     } finally {
       setLoading(false);
@@ -76,15 +100,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (authLoading || subscriptionLoading) return;
 
-    // If we can't/shouldn't load analytics, stop showing the initial loader.
-    if (!user) {
-      setLoading(false);
-      setSummary(null);
-      setError(null);
-      return;
-    }
-
-    if (!analyticsEnabled) {
+    if (!user || !analyticsEnabled) {
       setLoading(false);
       setSummary(null);
       setError(null);
@@ -104,9 +120,9 @@ export default function AnalyticsPage() {
       labels,
       datasets: [
         {
-          label: 'Total scans by code type',
+          label: "Total scans by code type",
           data,
-          backgroundColor: 'rgba(99, 102, 241, 0.6)',
+          backgroundColor: "rgba(79, 70, 229, 0.7)",
         },
       ],
     };
@@ -121,22 +137,54 @@ export default function AnalyticsPage() {
   }, [typeChart]);
 
   if (authLoading || subscriptionLoading || loading) {
-    return <div className="text-center py-10">Loading analytics...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto w-full max-w-6xl px-4 py-10">
+          <div className="h-36 rounded-2xl bg-white/70 shadow-sm border border-gray-200 animate-pulse" />
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-28 rounded-2xl bg-white/70 border border-gray-200 animate-pulse" />
+            ))}
+          </div>
+          <div className="mt-6 h-64 rounded-2xl bg-white/70 border border-gray-200 animate-pulse" />
+        </div>
+      </div>
+    );
   }
-  
+
   if (error) {
-    return <div className="text-center py-10 text-red-600">Error: {error}</div>;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto w-full max-w-3xl px-4 py-12">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
+            <div className="text-sm font-semibold">Analytics failed to load</div>
+            <div className="mt-1 text-sm">{error}</div>
+            <button
+              onClick={fetchSummary}
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <div className="text-center py-10">
-        <h2 className="text-2xl font-semibold mb-4">Sign in required</h2>
-        <p className="text-gray-600">Please sign in to view analytics.</p>
-        <div className="mt-6">
-          <Link href="/login?redirect=/analytics" className="px-4 py-2 bg-indigo-600 text-white rounded">
-            Sign in
-          </Link>
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto w-full max-w-xl px-4 py-12">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+            <div className="text-sm font-semibold text-gray-900">Sign in required</div>
+            <p className="mt-1 text-sm text-gray-600">Please sign in to view analytics.</p>
+            <Link
+              href="/login?redirect=/analytics"
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -144,224 +192,175 @@ export default function AnalyticsPage() {
 
   if (!analyticsEnabled) {
     return (
-      <div className="text-center py-10">
-        <h2 className="text-2xl font-semibold mb-4">Analytics Unavailable</h2>
-        <p className="text-gray-600">Upgrade to Pro or Business to access analytics.</p>
-        <div className="mt-6">
-          <Link href="/pricing" className="px-4 py-2 bg-indigo-600 text-white rounded">
-            View pricing
-          </Link>
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto w-full max-w-xl px-4 py-12">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+            <div className="text-sm font-semibold text-gray-900">Analytics unavailable</div>
+            <p className="mt-1 text-sm text-gray-600">Upgrade to Pro or Business to access analytics.</p>
+            <Link
+              href="/pricing"
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              View pricing
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   if (!summary) {
-    return <div className="text-center py-10">No analytics available yet.</div>;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="mx-auto w-full max-w-3xl px-4 py-12">
+          <EmptyPanel title="No analytics yet" body="Generate and share a code to start tracking scans." />
+        </div>
+      </div>
+    );
   }
 
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Chart Title',
-      },
+      legend: { position: "top" as const },
+      title: { display: false, text: "" },
+    },
+    scales: {
+      x: { grid: { display: false } },
+      y: { grid: { color: "#eef2f7" } },
     },
   };
 
+  const topCode = summary.topCodes?.[0];
+  const avgScansPerCode = summary.totalCodes ? Math.round(summary.totalScans / summary.totalCodes) : 0;
+  const topType = Object.entries(summary.codesByType || {})
+    .sort(([, a], [, b]) => (b.scans || 0) - (a.scans || 0))
+    .map(([k]) => k)[0];
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Analytics Dashboard</h1>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <SummaryCard title="Total Codes" value={summary.totalCodes} />
-        <SummaryCard title="Total Scans" value={summary.totalScans} />
-        <SummaryCard title="Top Code Scans" value={summary.topCodes?.[0]?.scans || 0} />
-        <SummaryCard title="Top Code Type" value={(summary.topCodes?.[0]?.type || 'N/A') as any} />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Scans by Type Chart */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Scans by Type</h2>
-            <button
-              onClick={fetchSummary}
-              className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              Refresh
-            </button>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8">
+        <div className="rounded-3xl border border-gray-200 bg-gradient-to-br from-white via-white to-indigo-50 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">ScanMagic Analytics</div>
+              <h1 className="mt-2 text-2xl font-bold text-gray-900">Overview</h1>
+              <p className="mt-1 text-sm text-gray-600">Monitor scan performance and the codes driving the most engagement.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={fetchSummary}
+                className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              >
+                Refresh
+              </button>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                Back to dashboard
+              </Link>
+            </div>
           </div>
-          <div className="mt-4">
-            {chartData.scansByType?.labels?.length > 0 ? (
-              <Bar
-                options={{
-                  ...chartOptions,
-                  plugins: { ...chartOptions.plugins, title: { display: true, text: 'Total scans by type' } },
-                }}
-                data={chartData.scansByType}
-              />
+
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Total codes" value={summary.totalCodes} helper="Across QR + barcodes" />
+            <StatCard label="Total scans" value={summary.totalScans} helper="All-time tracked" />
+            <StatCard label="Average scans/code" value={avgScansPerCode} helper="Benchmark performance" />
+            <StatCard label="Top code type" value={topType || "—"} helper="Highest total scans" />
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Scans by type</h2>
+              <span className="text-xs text-gray-500">Last 30 days</span>
+            </div>
+            <div className="mt-4">
+              {chartData.scansByType?.labels?.length ? (
+                <Bar options={chartOptions} data={chartData.scansByType} />
+              ) : (
+                <EmptyPanel title="No scan data" body="Share a code to start tracking scans." />
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Top code</h2>
+            {topCode ? (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <div className="text-sm font-semibold text-gray-900 truncate">{topCode.name || topCode.id}</div>
+                  <div className="text-xs text-gray-500">{topCode.type || "unknown"}</div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-xs text-gray-500">Total scans</div>
+                  <div className="mt-1 text-xl font-bold text-gray-900">{topCode.scans}</div>
+                </div>
+                <Link
+                  href={`/dashboard/codes/${topCode.id}/analytics`}
+                  className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  View detailed analytics
+                </Link>
+              </div>
             ) : (
-              <p className="text-gray-600">No scan data yet.</p>
+              <EmptyPanel title="No top code yet" body="Generate and share a code to start tracking." />
             )}
           </div>
         </div>
 
-        {/* Top Codes */}
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-xl font-semibold mb-4">Top Codes</h2>
-          {summary.topCodes?.length ? (
-            <ul className="space-y-2">
-              {summary.topCodes.map((code) => (
-                <li key={code.id} className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="font-medium text-gray-900 truncate">{code.name || code.id}</div>
-                    <div className="text-xs text-gray-500">{code.type || 'unknown'}</div>
-                  </div>
-                  <div className="text-sm font-semibold text-gray-900">{code.scans} scans</div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-gray-600">No scanned codes yet.</p>
-          )}
-
-          <div className="mt-6">
-            <Link href="/dashboard" className="text-indigo-600 hover:text-indigo-700 font-medium">
+        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Top codes</h2>
+            <Link href="/dashboard" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
               View recent codes →
             </Link>
           </div>
+          {summary.topCodes?.length ? (
+            <div className="mt-4 divide-y divide-gray-100">
+              {summary.topCodes.map((code) => (
+                <div key={code.id} className="flex flex-wrap items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 truncate">{code.name || code.id}</div>
+                    <div className="text-xs text-gray-500">{code.type || "unknown"}</div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm font-semibold text-gray-900">{code.scans} scans</div>
+                    <Link
+                      href={`/dashboard/codes/${code.id}/analytics`}
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Details
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel title="No scans yet" body="Start sharing your codes to see performance." />
+          )}
         </div>
       </div>
-
-      {/* Hero Section */}
-      <div className="hero bg-cover bg-center py-20" style={{ backgroundImage: 'url(/path/to/your/image.jpg)' }}>
-        <div className="container mx-auto text-center">
-          <h1 className="text-5xl font-bold text-white mb-4">Welcome to Our Service</h1>
-          <p className="text-xl text-white mb-8">Discover the best features and benefits we offer.</p>
-          <button className="px-6 py-3 bg-blue-500 text-white rounded">Get Started</button>
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <div className="features py-20">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-10">Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="feature text-center">
-              <img src="/path/to/icon1.png" alt="Feature 1" className="mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Feature 1</h3>
-              <p>Short description of feature 1.</p>
-            </div>
-            <div className="feature text-center">
-              <img src="/path/to/icon2.png" alt="Feature 2" className="mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Feature 2</h3>
-              <p>Short description of feature 2.</p>
-            </div>
-            <div className="feature text-center">
-              <img src="/path/to/icon3.png" alt="Feature 3" className="mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Feature 3</h3>
-              <p>Short description of feature 3.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Testimonials Section */}
-      <div className="testimonials bg-gray-100 py-20">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-10">Testimonials</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="testimonial p-6 bg-white rounded shadow">
-              <p className="mb-4">"This service is amazing! It has changed the way I work."</p>
-              <p className="font-semibold">- Customer Name</p>
-            </div>
-            <div className="testimonial p-6 bg-white rounded shadow">
-              <p className="mb-4">"Highly recommend to everyone looking for great features."</p>
-              <p className="font-semibold">- Another Customer</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* About Us Section */}
-      <div className="about-us py-20">
-        <div className="container mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">About Us</h2>
-          <p className="mb-4">We are a company dedicated to providing the best service to our customers.</p>
-          <p>Our mission is to deliver high-quality products that meet the needs of our clients.</p>
-        </div>
-      </div>
-
-      {/* Pricing Section */}
-      <div className="pricing bg-gray-100 py-20">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-10">Pricing</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="pricing-plan p-6 bg-white rounded shadow text-center">
-              <h3 className="text-xl font-semibold mb-4">Basic Plan</h3>
-              <p className="text-2xl font-bold mb-4">$9.99/month</p>
-              <button className="px-4 py-2 bg-blue-500 text-white rounded">Choose Plan</button>
-            </div>
-            <div className="pricing-plan p-6 bg-white rounded shadow text-center">
-              <h3 className="text-xl font-semibold mb-4">Pro Plan</h3>
-              <p className="text-2xl font-bold mb-4">$19.99/month</p>
-              <button className="px-4 py-2 bg-blue-500 text-white rounded">Choose Plan</button>
-            </div>
-            <div className="pricing-plan p-6 bg-white rounded shadow text-center">
-              <h3 className="text-xl font-semibold mb-4">Enterprise Plan</h3>
-              <p className="text-2xl font-bold mb-4">Contact Us</p>
-              <button className="px-4 py-2 bg-blue-500 text-white rounded">Contact Sales</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Contact Section */}
-      <div className="contact py-20">
-        <div className="container mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">Contact Us</h2>
-          <p className="mb-4">Have questions? We'd love to hear from you.</p>
-          <form className="max-w-md mx-auto">
-            <input type="text" placeholder="Your Name" className="w-full p-2 mb-4 border rounded" />
-            <input type="email" placeholder="Your Email" className="w-full p-2 mb-4 border rounded" />
-            <textarea placeholder="Your Message" className="w-full p-2 mb-4 border rounded"></textarea>
-            <button type="submit" className="px-6 py-3 bg-blue-500 text-white rounded">Send Message</button>
-          </form>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="footer bg-gray-800 text-white py-6">
-        <div className="container mx-auto text-center">
-          <p>&copy; 2023 Your Company. All rights reserved.</p>
-          <div className="social-icons mt-4">
-            <a href="#" className="mx-2">Facebook</a>
-            <a href="#" className="mx-2">Twitter</a>
-            <a href="#" className="mx-2">LinkedIn</a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
-
-interface SummaryCardProps {
-  title: string;
-  value: string | number;
-}
-
-function SummaryCard({ title, value }: SummaryCardProps) {
-  return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-sm font-medium text-gray-500 mb-1">{title}</h3>
-      <p className="text-2xl font-semibold text-gray-900">{value || 'N/A'}</p>
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Details
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-md border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600">
+              No scanned codes yet.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
-} 
+}
