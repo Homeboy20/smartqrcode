@@ -346,21 +346,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-                      className="inline-flex items-center justify-center rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                    >
-                      Details
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-md border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600">
-              No scanned codes yet.
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
