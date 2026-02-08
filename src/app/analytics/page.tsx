@@ -1,9 +1,5 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Bar } from "react-chartjs-2";
-"use client";
-
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Bar } from "react-chartjs-2";
