@@ -325,6 +325,22 @@ export default function Home() {
               ))}
             </div>
 
+            {/* Social Proof Stats */}
+            <div className="mt-8 flex flex-wrap justify-center lg:justify-start gap-8">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">50,000+</p>
+                <p className="text-indigo-200 text-sm">QR Codes Created</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">2,500+</p>
+                <p className="text-indigo-200 text-sm">Happy Users</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white">4.8★</p>
+                <p className="text-indigo-200 text-sm">Average Rating</p>
+              </div>
+            </div>
+
             <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-3 text-xs text-indigo-100">
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Mobile money ready</span>
               <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">Local pricing in TZS</span>
